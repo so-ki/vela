@@ -284,3 +284,9 @@ vela-platform/
 ## 许可证
 
 本项目为演示 / 比赛用途。法条原文版权归相应官方机构所有；平台输出不构成正式法律意见。
+
+---
+
+## 上传 GitHub / 邀请测试者
+
+见 **[GITHUB_SETUP.md](./GITHUB_SETUP.md)** 与 **[TESTING.md](./TESTING.md)**。
