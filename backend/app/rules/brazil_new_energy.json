@@ -1,0 +1,214 @@
+{
+  "jurisdiction": {
+    "id": "brazil",
+    "name": "巴西",
+    "name_pt": "Brasil",
+    "default_state": "sao_paulo"
+  },
+  "industries": {
+    "new_energy": {
+      "id": "new_energy",
+      "name": "新能源",
+      "keywords": ["新能源", "电动", "电池", "光伏", "储能", "客车", "大巴", "铁锂", "零排放", "renewable", "battery", "ev", "bus"],
+      "sub_sectors": ["electric_bus", "battery_pack", "solar", "energy_storage", "rd_center"]
+    }
+  },
+  "action_types": {
+    "greenfield_plant": {
+      "id": "greenfield_plant",
+      "name": "境外设厂",
+      "keywords": ["设厂", "工厂", "制造", "组装", "投产", "建设", "厂房", "研发中心", "factory", "manufacturing", "plant"],
+      "includes_rd": {
+        "keywords": ["研发", "research", "development", "R&D", "研发中心"],
+        "extra_dimensions": []
+      }
+    }
+  },
+  "dimensions": {
+    "labor": {
+      "id": "labor",
+      "name": "劳工用工",
+      "name_pt": "Trabalho (CLT/FGTS)",
+      "order": 1,
+      "description": "巴西统一劳动法 CLT、FGTS、工会及本地雇佣合规"
+    },
+    "foreign_investment": {
+      "id": "foreign_investment",
+      "name": "外资准入",
+      "name_pt": "Investimento Estrangeiro",
+      "order": 2,
+      "description": "100% 外资子公司设立、行业外资限制及注册备案"
+    },
+    "tax": {
+      "id": "tax",
+      "name": "联邦/州/市税制",
+      "name_pt": "Tributação",
+      "order": 3,
+      "description": "联邦、州（圣保罗）、市级税种及投资激励"
+    },
+    "industry_access": {
+      "id": "industry_access",
+      "name": "行业准入与安全生产",
+      "name_pt": "Licenciamento e Segurança",
+      "order": 4,
+      "description": "工业许可、制造业登记、产品认证及安全生产要求"
+    }
+  },
+  "checklist_items": [
+    {
+      "id": "LAB-001",
+      "dimension": "labor",
+      "title": "核查本地雇佣规模与 CLT 适用",
+      "description": "确认约 450 名本地雇员计划是否全部适用 CLT 劳动合同制度，岗位分类（生产/研发/管理）及雇佣合同模板。",
+      "priority": "high",
+      "always_include": true,
+      "triggers": ["雇员", "就业", "岗位", "450", "工人", "员工", "hiring", "jobs"]
+    },
+    {
+      "id": "LAB-002",
+      "dimension": "labor",
+      "title": "FGTS 及法定福利缴付安排",
+      "description": "核实 FGTS（工龄保障基金）8% 缴付、13薪、年假及法定福利预算与外包/派遣边界。",
+      "priority": "high",
+      "always_include": true,
+      "triggers": ["FGTS", "福利", "薪酬", "派遣"]
+    },
+    {
+      "id": "LAB-003",
+      "dimension": "labor",
+      "title": "工会与集体谈判风险",
+      "description": "评估坎皮纳斯制造业工会覆盖情况、集体谈判（CCT/ACT）义务及停工风险预案。",
+      "priority": "medium",
+      "always_include": true,
+      "triggers": ["工会", "坎皮纳斯", "制造"]
+    },
+    {
+      "id": "LAB-004",
+      "dimension": "labor",
+      "title": "外籍派驻人员工作许可",
+      "description": "如存在中方技术或管理人员派驻，核查工作签证、社保双重覆盖及派遣合规。",
+      "priority": "medium",
+      "always_include": false,
+      "triggers": ["外派", "派驻", "中方", "签证", "expatriate"]
+    },
+    {
+      "id": "FOR-001",
+      "dimension": "foreign_investment",
+      "title": "100% 外资子公司设立路径",
+      "description": "确认通过巴西全资子公司投资的设立流程（CNPJ 注册、公司章程、外资申报）。",
+      "priority": "high",
+      "always_include": true,
+      "triggers": ["外资", "子公司", "100%", "全资", "比亚迪"]
+    },
+    {
+      "id": "FOR-002",
+      "dimension": "foreign_investment",
+      "title": "行业外资准入限制筛查",
+      "description": "核查电动客车、动力电池、光伏及储能领域是否存在外资股比、本地成分或特许要求。",
+      "priority": "high",
+      "always_include": true,
+      "triggers": ["电池", "客车", "光伏", "储能", "制造"]
+    },
+    {
+      "id": "FOR-003",
+      "dimension": "foreign_investment",
+      "title": "RDE/外汇及利润汇回",
+      "description": "评估巴西中央银行等外资登记、资本汇入、利润汇出及合规报告义务。",
+      "priority": "medium",
+      "always_include": true,
+      "triggers": ["投资", "汇回", "外汇"]
+    },
+    {
+      "id": "TAX-001",
+      "dimension": "tax",
+      "title": "联邦层企业所得税（IRPJ/CSLL）",
+      "description": "确认制造+研发混合业务的联邦所得税、社会贡献税适用及预估税负模型。",
+      "priority": "high",
+      "always_include": true,
+      "triggers": ["制造", "研发", "所得税"]
+    },
+    {
+      "id": "TAX-002",
+      "dimension": "tax",
+      "title": "圣保罗州 ICMS 及州激励",
+      "description": "核查州级 ICMS、坎皮纳斯/圣保罗州投资激励（如 PADIS、PRODEIC 等）适用资格。",
+      "priority": "high",
+      "always_include": true,
+      "triggers": ["圣保罗", "坎皮纳斯", "州"]
+    },
+    {
+      "id": "TAX-003",
+      "dimension": "tax",
+      "title": "市级 ISS/IPTU 及地方税",
+      "description": "确认坎皮纳斯市服务税 ISS（研发/服务环节）、物业税 IPTU 及市政收费。",
+      "priority": "medium",
+      "always_include": true,
+      "triggers": ["坎皮纳斯", "市", "研发"]
+    },
+    {
+      "id": "TAX-004",
+      "dimension": "tax",
+      "title": "进口设备与零部件关税规划",
+      "description": "评估生产线设备、电池材料进口关税、Ex Tarifário 及本地化采购对税负影响。",
+      "priority": "medium",
+      "always_include": false,
+      "triggers": ["进口", "零部件", "设备", "电池", "组装"]
+    },
+    {
+      "id": "IND-001",
+      "dimension": "industry_access",
+      "title": "工业用地与建设许可（Alvará）",
+      "description": "核查 32,000m² + 20,000m² 厂房用地性质、建筑许可、消防及 ocupação 合规。",
+      "priority": "high",
+      "always_include": true,
+      "triggers": ["厂房", "平方米", "m²", "建设", "开工", "32,000", "20,000"]
+    },
+    {
+      "id": "IND-002",
+      "dimension": "industry_access",
+      "title": "制造业登记与运营许可",
+      "description": "确认客车组装、电池包生产所需工业登记、ANATEL/INMETRO 等产品合规路径。",
+      "priority": "high",
+      "always_include": true,
+      "triggers": ["制造", "组装", "电池", "客车", "生产"]
+    },
+    {
+      "id": "IND-003",
+      "dimension": "industry_access",
+      "title": "电池生产安全与危废管理",
+      "description": "磷酸铁锂电池产线涉及化学品存储、危废处置、NR-12/NR-10 等安全生产规范。",
+      "priority": "high",
+      "always_include": false,
+      "triggers": ["电池", "磷酸铁锂", "防火", "安全", "回收"]
+    },
+    {
+      "id": "IND-004",
+      "dimension": "industry_access",
+      "title": "研发中心设立与业务许可",
+      "description": "光伏、智能电网、LED 研发中心的设立登记、知识产权归属及与制造业务的分拆合规。",
+      "priority": "medium",
+      "always_include": false,
+      "triggers": ["研发", "光伏", "智能电网", "LED", "研发中心"]
+    },
+    {
+      "id": "IND-005",
+      "dimension": "industry_access",
+      "title": "产能扩张与分期投产合规",
+      "description": "首年 1000 台客车及电池产能分期投产时，各阶段许可范围与扩产备案要求。",
+      "priority": "medium",
+      "always_include": false,
+      "triggers": ["产能", "1000", "投产", "首年"]
+    }
+  ],
+  "state_overlays": {
+    "sao_paulo": {
+      "name": "圣保罗州",
+      "cities": {
+        "campinas": {
+          "name": "坎皮纳斯",
+          "extra_items": ["TAX-002", "IND-001"]
+        }
+      }
+    }
+  }
+}

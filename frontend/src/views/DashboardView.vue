@@ -1,0 +1,178 @@
+<script setup lang="ts">
+import { ref, onMounted } from 'vue'
+import { RouterLink, useRouter } from 'vue-router'
+import { createFullSample, fetchLegalStatus, fetchScenarios, fetchSystemStatus } from '@/api/client'
+import { useAuthStore } from '@/stores/auth'
+import type { ScenarioSummary } from '@/types/scenario'
+import type { SystemStatus } from '@/types'
+
+const auth = useAuthStore()
+const router = useRouter()
+const status = ref<SystemStatus | null>(null)
+const legalStatus = ref<{ document_count?: number; mode?: string } | null>(null)
+const scenarios = ref<ScenarioSummary[]>([])
+const loading = ref(true)
+const creatingSample = ref(false)
+const sampleError = ref<string | null>(null)
+
+onMounted(async () => {
+  try {
+    const [sys, list, legal] = await Promise.all([
+      fetchSystemStatus(),
+      fetchScenarios(),
+      fetchLegalStatus().catch(() => null),
+    ])
+    status.value = sys
+    scenarios.value = list
+    legalStatus.value = legal
+  } finally {
+    loading.value = false
+  }
+})
+
+async function runCreateSample() {
+  creatingSample.value = true
+  sampleError.value = null
+  try {
+    const scenario = await createFullSample()
+    await router.push({ name: 'review', params: { id: scenario.id } })
+  } catch {
+    sampleError.value = '生成样本失败，请确认后端已启动'
+  } finally {
+    creatingSample.value = false
+  }
+}
+
+function scenarioLinks(s: ScenarioSummary) {
+  return {
+    checklist: `/scenarios/${s.id}/checklist`,
+    brief: `/scenarios/${s.id}/brief`,
+    review: `/scenarios/${s.id}/review`,
+  }
+}
+
+const roadmap = [
+  { step: 1, title: '项目骨架', done: true, desc: '认证、免责、基础架构' },
+  { step: 2, title: '规则库', done: true, desc: '场景 → 法律审查维度映射' },
+  { step: 3, title: '法源 RAG', done: true, desc: 'LexML / STF / STJ 检索索引' },
+  { step: 4, title: '清单生成', done: true, desc: '中文意图解析 → 核查清单' },
+  { step: 5, title: '双语简报', done: true, desc: '匹配度门控 + 中葡风险简报' },
+  { step: 6, title: '法务复核', done: true, desc: '确认 / 驳回 / 批注工作台' },
+  { step: 7, title: '导出底稿', done: true, desc: 'Word 协查底稿导出' },
+  { step: 8, title: 'LLM 润色', done: true, desc: 'DeepSeek / Qwen 双语简报润色' },
+]
+</script>
+
+<template>
+  <div class="dashboard">
+    <section class="hero-card">
+      <div>
+        <p class="eyebrow">工作台 · 完整样本流程已就绪</p>
+        <h1>欢迎，{{ auth.user?.full_name }}</h1>
+        <p class="lead">
+          一键生成 <strong>BYD 坎皮纳斯</strong> 完整协查样本：清单 → 法源 → 双语简报 → 法务复核 → Word 底稿。
+        </p>
+      </div>
+      <div class="hero-stats">
+        <div class="stat">
+          <span class="stat-label">法域</span>
+          <span class="stat-value">巴西</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">行业包</span>
+          <span class="stat-value">新能源</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="grid-2">
+      <section class="panel sample-panel">
+        <h2>生成完整样本</h2>
+        <p class="muted">自动完成 BYD 演示场景、法条绑定、双语简报，并进入法务复核工作台。</p>
+        <p class="error" v-if="sampleError">{{ sampleError }}</p>
+        <button type="button" class="btn-primary" :disabled="creatingSample" @click="runCreateSample">
+          {{ creatingSample ? '生成中…' : '一键生成完整样本' }}
+        </button>
+      </section>
+
+      <section class="panel">
+        <h2>分步操作</h2>
+        <p class="muted">也可手动逐步提交场景、查看清单与简报。</p>
+        <div class="action-row">
+          <RouterLink to="/scenarios/new" class="btn-secondary link-btn">提交协查场景</RouterLink>
+          <RouterLink to="/scenarios/new" class="btn-secondary link-btn">使用演示模板</RouterLink>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>系统状态</h2>
+        <div v-if="loading" class="muted">检测中…</div>
+        <ul v-else-if="status" class="status-list">
+          <li>
+            <span>数据库</span>
+            <span :class="status.database === 'ok' ? 'badge ok' : 'badge err'">{{ status.database }}</span>
+          </li>
+          <li>
+            <span>规则库</span>
+            <span class="badge ok">新能源 · 4 维度</span>
+          </li>
+          <li>
+            <span>法源索引</span>
+            <span class="badge ok">
+              {{ legalStatus?.document_count ?? '—' }} 条 · {{ legalStatus?.mode ?? 'keyword' }}
+            </span>
+          </li>
+        </ul>
+      </section>
+    </div>
+
+    <section class="panel" v-if="scenarios.length">
+      <h2>最近协查场景</h2>
+      <ul class="scenario-list">
+        <li v-for="s in scenarios" :key="s.id">
+          <div>
+            <strong>{{ s.project_name }}</strong>
+            <span class="muted">{{ s.total_items }} 条清单 · {{ new Date(s.created_at).toLocaleDateString('zh-CN') }}</span>
+          </div>
+          <div class="scenario-actions">
+            <RouterLink :to="scenarioLinks(s).checklist" class="btn-secondary link-btn sm">清单</RouterLink>
+            <RouterLink
+              v-if="s.status.startsWith('brief_') || s.status.startsWith('review_')"
+              :to="scenarioLinks(s).brief"
+              class="btn-secondary link-btn sm"
+            >
+              简报
+            </RouterLink>
+            <RouterLink
+              v-if="s.status.startsWith('review_')"
+              :to="scenarioLinks(s).review"
+              class="btn-secondary link-btn sm"
+            >
+              复核
+            </RouterLink>
+          </div>
+        </li>
+      </ul>
+    </section>
+
+    <section class="panel">
+      <h2>实施路线图</h2>
+      <div class="roadmap">
+        <div
+          v-for="item in roadmap"
+          :key="item.step"
+          class="roadmap-item"
+          :class="{ done: item.done, current: item.step === 8 }"
+        >
+          <div class="step-num">{{ item.step }}</div>
+          <div>
+            <strong>{{ item.title }}</strong>
+            <p>{{ item.desc }}</p>
+          </div>
+          <span class="roadmap-badge" v-if="item.done">已完成</span>
+          <span class="roadmap-badge next" v-else-if="item.step === 8">可选</span>
+        </div>
+      </div>
+    </section>
+  </div>
+</template>

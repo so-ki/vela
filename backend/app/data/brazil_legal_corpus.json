@@ -1,0 +1,498 @@
+{
+  "version": "1.0",
+  "jurisdiction": "brazil",
+  "sources": [
+    {
+      "id": "lexml-clt-art-7",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:decreto.lei:1943-05-01;5452",
+      "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:decreto.lei:1943-05-01;5452",
+      "title_pt": "Decreto-Lei nº 5.452/1943 - CLT Art. 7º",
+      "title_zh": "劳动法 CLT 第7条（劳动者权利）",
+      "dimension": "labor",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "1943-05-01",
+      "tags": [
+        "CLT",
+        "trabalho",
+        "emprego",
+        "contrato",
+        "劳工",
+        "雇佣"
+      ],
+      "checklist_codes": [
+        "LAB-001",
+        "LAB-002"
+      ],
+      "text_pt": "Art. 7º São direitos dos trabalhadores urbanos e rurais, além de outros que visem à melhoria de sua condição social: (...) XXIX - ação, quanto a créditos resultantes das relações de trabalho, com prazo prescricional de cinco anos para os trabalhadores urbanos e rurais, até o limite de dois anos após a extinção do contrato de trabalho.",
+      "text_zh": "第7条规定城市与农村劳动者的权利，包括劳动合同产生的债权诉讼时效等。"
+    },
+    {
+      "id": "lexml-clt-art-443",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:decreto.lei:1943-05-01;5452",
+      "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:decreto.lei:1943-05-01;5452",
+      "title_pt": "CLT Art. 443 - Contrato de Trabalho",
+      "title_zh": "CLT 第443条 - 劳动合同",
+      "dimension": "labor",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "1943-05-01",
+      "tags": [
+        "CLT",
+        "contrato",
+        "prazo",
+        "劳动合同"
+      ],
+      "checklist_codes": [
+        "LAB-001"
+      ],
+      "text_pt": "Art. 443 - Contrato individual de trabalho é o acordo tácito ou expresso, correspondente à relação de emprego. Parágrafo único - Todas as modalidades de contrato de trabalho são admitidas, respeitadas as normas de proteção ao trabalho e as limitações impostas por lei.",
+      "text_zh": "个人劳动合同为对应雇佣关系的默示或明示协议；须遵守劳动保护规范。"
+    },
+    {
+      "id": "lexml-lei-8036-fgts",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:lei:1990-05-11;8036",
+      "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:lei:1990-05-11;8036",
+      "title_pt": "Lei nº 8.036/1990 - FGTS",
+      "title_zh": "第8036/1990号法 - FGTS 工龄保障基金",
+      "dimension": "labor",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "1990-05-11",
+      "tags": [
+        "FGTS",
+        "fundo",
+        "trabalhador",
+        "8%",
+        "福利"
+      ],
+      "checklist_codes": [
+        "LAB-002"
+      ],
+      "text_pt": "Art. 2º O FGTS é um fundo formado por depósitos realizados pelo empregador, destinado a proteger o trabalhador dispensado sem justa causa. Art. 15. Para os fins previstos nesta lei, todos os empregadores ficam obrigados a depositar, até o dia 7 (sete) de cada mês, em conta bancária vinculada, a importância correspondente a 8 (oito) por cento da remuneração paga ou devida ao trabalhador.",
+      "text_zh": "FGTS 由雇主按月缴存，用于保护无正当理由被解雇的工人；雇主须每月7日前缴存相当于报酬8%的金额。"
+    },
+    {
+      "id": "lexml-clt-art-611",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:decreto.lei:1943-05-01;5452",
+      "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:decreto.lei:1943-05-01;5452",
+      "title_pt": "CLT Art. 611 - Convenção e Acordo Coletivo",
+      "title_zh": "CLT 第611条 - 集体谈判",
+      "dimension": "labor",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "1943-05-01",
+      "tags": [
+        "sindicato",
+        "CCT",
+        "ACT",
+        "工会",
+        "集体谈判",
+        "campinas"
+      ],
+      "checklist_codes": [
+        "LAB-003"
+      ],
+      "text_pt": "Art. 611. Convenção Coletiva de Trabalho é o acordo de caráter normativo, pelo qual dois ou mais Sindicatos representativos de categorias econômicas e profissionais estipulam condições de trabalho aplicáveis, no âmbito das respectivas representações, às relações individuais de trabalho.",
+      "text_zh": "集体劳动协议是工会组织之间规范劳动条件的协议，适用于各自代表范围内的个别劳动关系。"
+    },
+    {
+      "id": "lexml-lei-13429-trab-estrangeiro",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:lei:2017-03-13;13429",
+      "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:lei:2017-03-13;13429",
+      "title_pt": "Lei nº 13.429/2017 - Trabalho Estrangeiro",
+      "title_zh": "第13429/2017号法 - 外籍工作",
+      "dimension": "labor",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "2017-03-13",
+      "tags": [
+        "estrangeiro",
+        "visto",
+        "外派",
+        "expatriate",
+        "签证"
+      ],
+      "checklist_codes": [
+        "LAB-004"
+      ],
+      "text_pt": "Dispõe sobre o trabalho temporário e o trabalho de estrangeiros no Brasil, altera a Consolidação das Leis do Trabalho (CLT) e a Lei nº 6.019, de 3 de janeiro de 1974. Regulamenta condições para contratação de trabalhadores estrangeiros e exige autorização do Ministério do Trabalho conforme normas migratórias vigentes.",
+      "text_zh": "规范巴西境内临时用工及外籍劳动者，外籍雇员须符合移民及劳动主管部门要求。"
+    },
+    {
+      "id": "lexml-lei-4131-capital-estrangeiro",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:lei:1962-09-03;4131",
+      "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:lei:1962-09-03;4131",
+      "title_pt": "Lei nº 4.131/1962 - Investimento Estrangeiro",
+      "title_zh": "第4131/1962号法 - 外国投资",
+      "dimension": "foreign_investment",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "1962-09-03",
+      "tags": [
+        "investimento",
+        "estrangeiro",
+        "capital",
+        "外资",
+        "100%"
+      ],
+      "checklist_codes": [
+        "FOR-001",
+        "FOR-002"
+      ],
+      "text_pt": "Art. 1º É permitido o investimento de capital estrangeiro em atividades econômicas de interesse do desenvolvimento nacional, ressalvadas as limitações legais. Art. 2º O capital estrangeiro será admitido sob as formas de participação em empresas já existentes ou em empresas a serem instaladas no País.",
+      "text_zh": "允许外国资本投资于符合国家经济发展利益的经济活动，法律限制除外；可以参与现有或新设企业。"
+    },
+    {
+      "id": "lexml-lei-6404-sociedades",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:lei:1976-12-15;6404",
+      "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:lei:1976-12-15;6404",
+      "title_pt": "Lei nº 6.404/1976 - Sociedades por Ações",
+      "title_zh": "第6404/1976号法 - 公司法",
+      "dimension": "foreign_investment",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "1976-12-15",
+      "tags": [
+        "CNPJ",
+        "subsidiária",
+        "sociedade",
+        "子公司",
+        "设立"
+      ],
+      "checklist_codes": [
+        "FOR-001"
+      ],
+      "text_pt": "Dispõe sobre as Sociedades por Ações. Estabelece requisitos para constituição, registro e funcionamento de sociedades anônimas e limitadas no Brasil, inclusive filiais de sociedades estrangeiras, perante a Junta Comercial e Receita Federal para obtenção de CNPJ.",
+      "text_zh": "规定股份有限公司设立与登记要求，外国公司巴西子公司须在商业登记机关及联邦税务局注册并取得 CNPJ。"
+    },
+    {
+      "id": "lexml-decreto-6854-rde",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:decreto:2008-06-02;6854",
+      "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:decreto:2008-06-02;6854",
+      "title_pt": "Decreto nº 6.854/2008 - Registro Declaratório Eletrônico (RDE)",
+      "title_zh": "第6854/2008号法令 - 电子声明登记 RDE",
+      "dimension": "foreign_investment",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "2008-06-02",
+      "tags": [
+        "RDE",
+        "cambio",
+        "BACEN",
+        "外汇",
+        "汇回",
+        "利润"
+      ],
+      "checklist_codes": [
+        "FOR-003"
+      ],
+      "text_pt": "Regulamenta o Registro Declaratório Eletrônico (RDE) no âmbito do Banco Central do Brasil para registro de investimento estrangeiro direto, reinvestimentos, empréstimos intercompanhias e remessa de lucros e dividendos ao exterior, conforme normas cambiais vigentes.",
+      "text_zh": "规范巴西央行框架内外国直接投资、再投资、公司间贷款及利润汇出的电子声明登记（RDE）。"
+    },
+    {
+      "id": "lexml-lei-12550-automoveis",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:lei:2011-12-30;12550",
+      "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:lei:2011-12-30;12550",
+      "title_pt": "Lei nº 12.550/2011 - Incentivo Automotivo",
+      "title_zh": "第12550/2011号法 - 汽车工业激励",
+      "dimension": "foreign_investment",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "2011-12-30",
+      "tags": [
+        "automóvel",
+        "ônibus",
+        "indústria",
+        "客车",
+        "制造",
+        "电池"
+      ],
+      "checklist_codes": [
+        "FOR-002",
+        "IND-002"
+      ],
+      "text_pt": "Institui regime especial de tributação para o setor automotivo e estabelece requisitos de investimento em pesquisa e desenvolvimento e de conteúdo local para montadoras de veículos, ônibus e autopeças no território nacional.",
+      "text_zh": "设立汽车行业特殊税制，对车辆、客车及零部件制造商会要求研发投资及本地化含量。"
+    },
+    {
+      "id": "lexml-ctn-irpj",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:decreto.lei:1966-12-25;5984",
+      "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:decreto.lei:1966-12-25;5984",
+      "title_pt": "Decreto-Lei nº 5.984/1966 - CTN (Imposto de Renda)",
+      "title_zh": "税法典 CTN - 所得税框架",
+      "dimension": "tax",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "1966-12-25",
+      "tags": [
+        "IRPJ",
+        "CSLL",
+        "imposto",
+        "所得税",
+        "联邦"
+      ],
+      "checklist_codes": [
+        "TAX-001"
+      ],
+      "text_pt": "Institui o Código Tributário Nacional. Define impostos federais incidentes sobre a renda e proventos de qualquer natureza, competência da União para instituição de impostos e princípios gerais de tributação aplicáveis às pessoas jurídicas, inclusive industriais.",
+      "text_zh": "设立国家税法典，规定联邦层面对收入征收的税种及法人普遍适用的征税原则。"
+    },
+    {
+      "id": "lexml-lc-87-icms",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:lei.complementar:1996-09-13;87",
+      "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:lei.complementar:1996-09-13;87",
+      "title_pt": "LC nº 87/1996 - ICMS (Lei Kandir)",
+      "title_zh": "第87/1996号补充法 - ICMS（州级流转税）",
+      "dimension": "tax",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "1996-09-13",
+      "tags": [
+        "ICMS",
+        "São Paulo",
+        "estadual",
+        "州税",
+        "圣保罗"
+      ],
+      "checklist_codes": [
+        "TAX-002"
+      ],
+      "text_pt": "Dispõe sobre o Imposto sobre Operações Relativas à Circulação de Mercadorias e sobre Prestações de Serviços de Transporte Interestadual e Intermunicipal e de Comunicação (ICMS). Cada Estado, inclusive São Paulo, legisla sobre alíquotas, benefícios fiscais e obrigações acessórias para operações industriais e comerciais.",
+      "text_zh": "规定 ICMS 州级货物流转税；各州（含圣保罗）对工业及商业运营制定税率、优惠及附随义务。"
+    },
+    {
+      "id": "lexml-lei-10833-iss",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:lei:2003-12-29;10833",
+      "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:lei:2003-12-29;10833",
+      "title_pt": "Lei nº 10.833/2003 - ISS e PIS/COFINS",
+      "title_zh": "第10833/2003号法 - ISS 等",
+      "dimension": "tax",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "2003-12-29",
+      "tags": [
+        "ISS",
+        "municipal",
+        "Campinas",
+        "市级",
+        "研发",
+        "服务"
+      ],
+      "checklist_codes": [
+        "TAX-003"
+      ],
+      "text_pt": "Altera legislação tributária federal e estabelece regras sobre contribuições sociais. O Imposto Sobre Serviços (ISS) é de competência municipal — incluindo Campinas — incidente sobre prestação de serviços como pesquisa, desenvolvimento e engenharia.",
+      "text_zh": "ISS 为市级服务税，坎皮纳斯等市对研发、工程等服务业征收。"
+    },
+    {
+      "id": "lexml-decreto-7488-ex-tarifario",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:decreto:2011-06-08;7488",
+      "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:decreto:2011-06-08;7488",
+      "title_pt": "Decreto nº 7.488/2011 - Ex Tarifário",
+      "title_zh": "第7488/2011号法令 - 临时降税（Ex Tarifário）",
+      "dimension": "tax",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "2011-06-08",
+      "tags": [
+        "importação",
+        "tarifa",
+        "equipamento",
+        "进口",
+        "设备",
+        "关税"
+      ],
+      "checklist_codes": [
+        "TAX-004"
+      ],
+      "text_pt": "Regulamenta o regime de Ex Tarifário para bens de capital (BK) e bens de informática e automação (BIT), permitindo redução temporária de alíquotas de Imposto de Importação para máquinas e equipamentos sem produção equivalente nacional, relevante para linhas de montagem industrial.",
+      "text_zh": "规范资本货物及自动化设备的临时进口关税减免制度，适用于无国产替代的工业生产线设备。"
+    },
+    {
+      "id": "lexml-lei-14097-licenciamento",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:lei:2005-01-31;14097",
+      "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:lei:2005-01-31;14097",
+      "title_pt": "Lei nº 14.097/2005 - Licenciamento Urbanístico",
+      "title_zh": "第14097/2005号法 - 城市建设许可",
+      "dimension": "industry_access",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "2005-01-31",
+      "tags": [
+        "alvará",
+        "construção",
+        "obra",
+        "建设",
+        "厂房",
+        "许可"
+      ],
+      "checklist_codes": [
+        "IND-001"
+      ],
+      "text_pt": "Estabelece normas gerais para licenciamento urbanístico e obras de construção civil. Exige alvará de construção e habite-se emitidos pelo município, cumprimento do Código de Obras local e normas do Corpo de Bombeiros para edificações industriais.",
+      "text_zh": "规定城市建设许可一般规则；工业建筑须取得市政建设许可、消防合规及占用证。"
+    },
+    {
+      "id": "lexml-inmetro-dec-5440",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:decreto:2005-04-25;5440",
+      "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:decreto:2005-04-25;5440",
+      "title_pt": "Decreto nº 5.440/2005 - Regulamento INMETRO",
+      "title_zh": "第5440/2005号法令 - INMETRO 产品合规",
+      "dimension": "industry_access",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "2005-04-25",
+      "tags": [
+        "INMETRO",
+        "certificação",
+        "produto",
+        "客车",
+        "认证"
+      ],
+      "checklist_codes": [
+        "IND-002"
+      ],
+      "text_pt": "Aprova o Regulamento da Avaliação da Conformidade, da Regulamentação, do Controle do Mercado, do Sistema Nacional de Metrologia e da Acreditação. Produtos industrializados, inclusive veículos e componentes elétricos, podem exigir certificação compulsória perante o INMETRO.",
+      "text_zh": "批准合格评定与市场准入规章；车辆及电气组件等产品可能须 INMETRO 强制认证。"
+    },
+    {
+      "id": "lexml-nr-10-seguranca",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:portaria:2004-12-07;886",
+      "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:portaria:2004-12-07;886",
+      "title_pt": "NR-10 - Segurança em Instalações Elétricas",
+      "title_zh": "NR-10 电气安装安全",
+      "dimension": "industry_access",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "2004-12-07",
+      "tags": [
+        "NR-10",
+        "NR-12",
+        "bateria",
+        "segurança",
+        "电池",
+        "安全"
+      ],
+      "checklist_codes": [
+        "IND-003"
+      ],
+      "text_pt": "Norma Regulamentadora NR-10 estabelece requisitos mínimos e diretrizes para implementação de medidas de controle e sistemas preventivos de segurança em instalações elétricas e serviços com eletricidade, aplicável a fábricas de montagem de baterias e veículos elétricos.",
+      "text_zh": "NR-10 规定电气安装及涉电作业的最低安全要求，适用于电池与电动车组装工厂。"
+    },
+    {
+      "id": "lexml-lei-9609-pi",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:lei:1998-02-19;9609",
+      "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:lei:1998-02-19;9609",
+      "title_pt": "Lei nº 9.609/1998 - Software e P&D",
+      "title_zh": "第9609/1998号法 - 软件与知识产权",
+      "dimension": "industry_access",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "1998-02-19",
+      "tags": [
+        "P&D",
+        "centro",
+        "pesquisa",
+        "研发",
+        "光伏",
+        "LED"
+      ],
+      "checklist_codes": [
+        "IND-004"
+      ],
+      "text_pt": "Dispõe sobre a proteção de programas de computador e dá outras providências. Centros de pesquisa e desenvolvimento em tecnologia, smart grid e iluminação devem observar registro de propriedade intelectual e contratos de transferência de tecnologia.",
+      "text_zh": "规定计算机程序保护；光伏、智能电网、LED 等研发中心须注意知识产权归属及技术转让合同。"
+    },
+    {
+      "id": "lexml-lei-6404-capacidade",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:lei:1976-12-15;6404",
+      "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:lei:1976-12-15;6404",
+      "title_pt": "Alteração Contratual - Expansão de Capacidade",
+      "title_zh": "公司章程变更 - 产能扩张",
+      "dimension": "industry_access",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "1976-12-15",
+      "tags": [
+        "capacidade",
+        "expansão",
+        "1000",
+        "产能",
+        "投产"
+      ],
+      "checklist_codes": [
+        "IND-005"
+      ],
+      "text_pt": "A ampliação de capacidade produtiva de estabelecimento industrial pode exigir alteração do contrato social, novo licenciamento ambiental e municipal quando ultrapassar limites aprovados, comunicação à Junta Comercial e atualização de registros na Receita Federal.",
+      "text_zh": "工业产能扩张若超出已批准范围，可能需修改公司章程、更新环境及市政许可并在商业登记机关备案。"
+    },
+    {
+      "id": "stf-tema-investimento",
+      "source": "stf",
+      "urn": "stf:jurisprudencia:investimento-estrangeiro",
+      "url": "https://portal.stf.jus.br/jurisprudencia/",
+      "title_pt": "STF - Jurisprudência sobre Investimento Estrangeiro",
+      "title_zh": "STF 判例 - 外国投资",
+      "dimension": "foreign_investment",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "2010-01-01",
+      "tags": [
+        "STF",
+        "investimento",
+        "estrangeiro",
+        "判例"
+      ],
+      "checklist_codes": [
+        "FOR-002",
+        "FOR-003"
+      ],
+      "text_pt": "O Supremo Tribunal Federal consolidou entendimento de que normas restrictivas ao investimento estrangeiro devem ser interpretadas conforme a Constituição Federal e tratados internacionais, garantindo tratamento não discriminatório salvo exceções legais expressas em setores estratégicos.",
+      "text_zh": "联邦最高法院判例认为，限制外资的规范须合宪解释，除战略行业法定例外外保障非歧视待遇。"
+    },
+    {
+      "id": "stj-tema-trabalhista",
+      "source": "stj",
+      "urn": "stj:jurisprudencia:relacao-trabalho",
+      "url": "https://scon.stj.jus.br/SCON/",
+      "title_pt": "STJ - Relação de Emprego e Terceirização",
+      "title_zh": "STJ 判例 - 劳动关系与外包",
+      "dimension": "labor",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "2018-01-01",
+      "tags": [
+        "STJ",
+        "terceirização",
+        "emprego",
+        "外包",
+        "派遣"
+      ],
+      "checklist_codes": [
+        "LAB-001",
+        "LAB-004"
+      ],
+      "text_pt": "O Superior Tribunal de Justiça fixou entendimento sobre distinção entre relação de emprego, trabalho autônomo e terceirização lícita, relevante para plantas industriais que contratam mão de obra direta e indireta em larga escala.",
+      "text_zh": "高级法院判例区分雇佣关系、自营劳动与合法外包，对大规模直接/间接用工的工厂具有参考价值。"
+    }
+  ]
+}
