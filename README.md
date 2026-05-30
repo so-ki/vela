@@ -309,4 +309,4 @@ vela-platform/
 
 ## 上传 GitHub / 邀请测试者
 
-见 **[GITHUB_SETUP.md](./GITHUB_SETUP.md)**、**[TESTING.md](./TESTING.md)** 与 **[API.md](./API.md)**（REST 集成说明）。
+见 **[客户操作手册.md](./客户操作手册.md)** / **[客户操作手册.docx](./客户操作手册.docx)**（面向法务/业务用户）、**[操作手册.md](./操作手册.md)** / **[操作手册.docx](./操作手册.docx)**（含部署与演示脚本）、**[GITHUB_SETUP.md](./GITHUB_SETUP.md)**、**[TESTING.md](./TESTING.md)** 与 **[API.md](./API.md)**（REST 集成说明）。
