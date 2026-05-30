@@ -10,6 +10,7 @@ SOURCE_LABELS = {
     "lexml": "LexML Brasil",
     "stf": "STF 判例",
     "stj": "STJ 判例",
+    "jusbrasil": "Jusbrasil 案例",
 }
 
 
@@ -32,7 +33,7 @@ def _score_doc(
         score += 45.0
     tags = set(t.lower() for t in doc.get("tags", []))
     title_tokens = _tokenize(doc.get("title_pt", "") + " " + doc.get("title_zh", ""))
-    text_tokens = _tokenize(doc.get("text_pt", ""))
+    text_tokens = _tokenize(doc.get("text_pt", "") + " " + doc.get("text_zh", ""))
     overlap = len(query_tokens & (tags | title_tokens | text_tokens))
     score += overlap * 8.0
     return score

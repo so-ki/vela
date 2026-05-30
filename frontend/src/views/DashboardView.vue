@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
-import { createFullSample, fetchLegalStatus, fetchScenarios, fetchSystemStatus } from '@/api/client'
+import { createFullSample, fetchLegalMonitor, fetchLegalStatus, fetchScenarios, fetchSystemStatus, scanLegalMonitor } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import type { ScenarioSummary } from '@/types/scenario'
 import type { SystemStatus } from '@/types'
@@ -9,7 +9,9 @@ import type { SystemStatus } from '@/types'
 const auth = useAuthStore()
 const router = useRouter()
 const status = ref<SystemStatus | null>(null)
-const legalStatus = ref<{ document_count?: number; mode?: string } | null>(null)
+const legalStatus = ref<{ document_count?: number; mode?: string; sources_breakdown?: Record<string, number> } | null>(null)
+const legalMonitor = ref<{ alerts?: Array<{ title: string; message: string; level: string }>; last_scan_at?: string | null } | null>(null)
+const scanningLegal = ref(false)
 const scenarios = ref<ScenarioSummary[]>([])
 const loading = ref(true)
 const creatingSample = ref(false)
@@ -17,14 +19,16 @@ const sampleError = ref<string | null>(null)
 
 onMounted(async () => {
   try {
-    const [sys, list, legal] = await Promise.all([
+    const [sys, list, legal, monitor] = await Promise.all([
       fetchSystemStatus(),
       fetchScenarios(),
       fetchLegalStatus().catch(() => null),
+      fetchLegalMonitor().catch(() => null),
     ])
     status.value = sys
     scenarios.value = list
     legalStatus.value = legal
+    legalMonitor.value = monitor
   } finally {
     loading.value = false
   }
@@ -43,6 +47,16 @@ async function runCreateSample() {
   }
 }
 
+async function runLegalScan() {
+  scanningLegal.value = true
+  try {
+    legalMonitor.value = await scanLegalMonitor(false)
+    legalStatus.value = await fetchLegalStatus()
+  } finally {
+    scanningLegal.value = false
+  }
+}
+
 function scenarioLinks(s: ScenarioSummary) {
   return {
     checklist: `/scenarios/${s.id}/checklist`,
@@ -58,8 +72,8 @@ const roadmap = [
   { step: 4, title: '清单生成', done: true, desc: '中文意图解析 → 核查清单' },
   { step: 5, title: '双语简报', done: true, desc: '匹配度门控 + 中葡风险简报' },
   { step: 6, title: '法务复核', done: true, desc: '确认 / 驳回 / 批注工作台' },
-  { step: 7, title: '导出底稿', done: true, desc: 'Word 协查底稿导出' },
-  { step: 8, title: 'LLM 润色', done: true, desc: 'DeepSeek / Qwen 双语简报润色' },
+  { step: 7, title: '导出底稿', done: true, desc: 'Word + PDF 协查底稿' },
+  { step: 8, title: 'LLM 增强', done: true, desc: '意图解析 + 简报润色' },
 ]
 </script>
 
@@ -105,6 +119,25 @@ const roadmap = [
       </section>
 
       <section class="panel">
+        <h2>法规动态监测（辅线）</h2>
+        <p class="muted">MVP：本地语料变更检测 + 手动扫描；生产可对接 LexML 更新源。</p>
+        <ul v-if="legalMonitor?.alerts?.length" class="status-list monitor-list">
+          <li v-for="alert in legalMonitor.alerts.slice(0, 3)" :key="alert.title">
+            <span>{{ alert.title }}</span>
+            <span class="badge pri-medium">{{ alert.level }}</span>
+          </li>
+        </ul>
+        <p class="muted" v-else>暂无监测提醒，点击下方扫描。</p>
+        <div class="action-row">
+          <button type="button" class="btn-secondary" :disabled="scanningLegal" @click="runLegalScan">
+            {{ scanningLegal ? '扫描中…' : '手动扫描法规更新' }}
+          </button>
+          <a class="btn-secondary link-btn" href="http://127.0.0.1:8000/docs" target="_blank" rel="noopener">API 文档 /docs</a>
+          <a class="btn-secondary link-btn" href="https://github.com/so-ki/vela" target="_blank" rel="noopener">GitHub 仓库</a>
+        </div>
+      </section>
+
+      <section class="panel">
         <h2>系统状态</h2>
         <div v-if="loading" class="muted">检测中…</div>
         <ul v-else-if="status" class="status-list">
@@ -120,6 +153,9 @@ const roadmap = [
             <span>法源索引</span>
             <span class="badge ok">
               {{ legalStatus?.document_count ?? '—' }} 条 · {{ legalStatus?.mode ?? 'keyword' }}
+              <template v-if="legalStatus?.sources_breakdown">
+                · LexML {{ legalStatus.sources_breakdown.lexml ?? 0 }}
+              </template>
             </span>
           </li>
         </ul>

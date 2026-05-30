@@ -146,6 +146,24 @@ def generate_checklist(scenario: ScenarioInput) -> dict[str, Any]:
     selected = set(scenario.compliance_dimensions)
     valid_dimensions = set(rules["dimensions"].keys())
     selected = selected & valid_dimensions
+
+    intent_meta: dict[str, Any] = {"mode": "rules"}
+    try:
+        from app.services.intent_parser import parse_scenario_intent
+
+        intent, err = parse_scenario_intent(
+            description=scenario.description,
+            project_name=scenario.project_name,
+            investment_structure=scenario.investment_structure,
+        )
+        if intent and intent.get("dimensions"):
+            selected = selected | (set(intent["dimensions"]) & valid_dimensions)
+            intent_meta = intent
+        elif err:
+            intent_meta = {"mode": "rules", "llm_skipped": err}
+    except Exception as exc:
+        intent_meta = {"mode": "rules", "llm_skipped": str(exc)[:120]}
+
     if not selected:
         selected = valid_dimensions
 
@@ -219,6 +237,7 @@ def generate_checklist(scenario: ScenarioInput) -> dict[str, Any]:
         "detected_action_type": detected_action,
         "detected_action_type_name": rules["action_types"].get(detected_action, {}).get("name", detected_action),
         "selected_dimensions": list(selected),
+        "intent_parsing": intent_meta,
         "total_items": sum(len(s["items"]) for s in sections),
         "sections": sections,
         "disclaimer": (
@@ -255,4 +274,26 @@ def get_demo_scenario_template() -> dict[str, Any]:
         "start_date": "2015-06-01",
         "production_date": "2020-10-01",
         "remarks": "同时规划光伏、储能产线及研发中心",
+    }
+
+
+def get_mining_demo_scenario_template() -> dict[str, Any]:
+    """矿产投资场景模板（行业定制 MVP）。"""
+    return {
+        "project_name": "巴西铁矿绿地投资（演示模板）",
+        "country": "brazil",
+        "state": "minas_gerais",
+        "city": "belo_horizonte",
+        "industry": "new_energy",
+        "action_type": "greenfield_plant",
+        "investment_structure": "合资 SPV，外资占比 70%",
+        "description": (
+            "中资矿业企业在米纳斯吉拉斯州考察铁矿选矿与物流枢纽项目，"
+            "涉及环境许可、原住民土地咨询、外资登记及州级税制优惠申请。"
+        ),
+        "employee_count": 120,
+        "capacity_notes": "年处理矿石 200 万吨",
+        "facility_notes": "选矿厂 + 铁路装车设施",
+        "compliance_dimensions": ["foreign_investment", "tax", "industry_access", "labor"],
+        "remarks": "行业模板演示：规则库仍以新能源条目为主，展示多场景输入能力",
     }

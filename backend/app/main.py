@@ -7,6 +7,7 @@ from app.api import auth, legal, scenarios, system
 from app.core.config import get_settings
 from app.core.database import init_db
 from app.services.legal_ingest import ingest_corpus
+from app.services.legal_monitor import scan_regulatory_updates
 
 
 @asynccontextmanager
@@ -14,6 +15,7 @@ async def lifespan(_: FastAPI):
     init_db()
     try:
         ingest_corpus(force=False)
+        scan_regulatory_updates(force_reindex=False)
     except Exception:
         pass  # Chroma 未安装时跳过，/legal/index 可手动触发
     yield
@@ -23,8 +25,12 @@ def create_app() -> FastAPI:
     settings = get_settings()
     app = FastAPI(
         title=settings.app_name,
-        description="拉美涉外投资合规协查与法律风险简报助手",
-        version="0.1.0",
+        description=(
+            "拉美涉外投资合规协查与法律风险简报助手。"
+            "OpenAPI 文档：/docs · ReDoc：/redoc · "
+            "集成说明见仓库 API.md"
+        ),
+        version="0.2.0-mvp",
         lifespan=lifespan,
     )
 

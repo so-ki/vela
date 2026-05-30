@@ -66,10 +66,42 @@ class LegalStatusResponse(BaseModel):
     chroma_installed: bool
     document_count: int
     collection: str
+    mode: str = "pending"
+    corpus_version: str = "1.0"
+    sources_breakdown: dict[str, int] = Field(default_factory=dict)
     sources: dict[str, str] = Field(
         default_factory=lambda: {
             "lexml": "https://www.lexml.gov.br/",
             "stf": "https://portal.stf.jus.br/jurisprudencia/",
             "stj": "https://scon.stj.jus.br/SCON/",
+            "jusbrasil": "https://www.jusbrasil.com.br/",
         }
     )
+
+
+class LegalMonitorAlert(BaseModel):
+    id: str
+    level: str
+    title: str
+    message: str
+    detected_at: str
+
+
+class LegalMonitorResponse(BaseModel):
+    enabled: bool
+    corpus_version: str
+    document_count: int
+    sources_breakdown: dict[str, int]
+    index_mode: str
+    last_scan_at: Optional[str] = None
+    corpus_fingerprint: Optional[str] = None
+    alerts: List[LegalMonitorAlert] = Field(default_factory=list)
+    subscription_note: str = ""
+
+
+class LegalMonitorScanResponse(BaseModel):
+    scanned_at: str
+    corpus_fingerprint: str
+    new_alerts: List[LegalMonitorAlert]
+    alerts: List[LegalMonitorAlert]
+    index: LegalIndexResponse

@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "jurisdiction": "brazil",
   "sources": [
     {
@@ -493,6 +493,82 @@
       ],
       "text_pt": "O Superior Tribunal de Justiça fixou entendimento sobre distinção entre relação de emprego, trabalho autônomo e terceirização lícita, relevante para plantas industriais que contratam mão de obra direta e indireta em larga escala.",
       "text_zh": "高级法院判例区分雇佣关系、自营劳动与合法外包，对大规模直接/间接用工的工厂具有参考价值。"
+    },
+    {
+      "id": "jusbrasil-sp-ambiental",
+      "source": "jusbrasil",
+      "urn": "jusbrasil:sp:licenciamento-ambiental",
+      "url": "https://www.jusbrasil.com.br/",
+      "title_pt": "Jusbrasil - Licenciamento Ambiental em São Paulo",
+      "title_zh": "Jusbrasil — 圣保罗州环境许可实践",
+      "dimension": "industry_access",
+      "level": "state",
+      "validity": "vigente",
+      "published_at": "2022-06-01",
+      "tags": [
+        "Jusbrasil",
+        "São Paulo",
+        "licenciamento",
+        "ambiental",
+        "IBAMA",
+        "环境许可"
+      ],
+      "checklist_codes": [
+        "IND-002",
+        "IND-003"
+      ],
+      "text_pt": "A jurisprudência e prática administrativa paulista reforçam a necessidade de licenciamento ambiental prévio para instalações industriais de grande porte, incluindo montagem de baterias e linhas de veículos elétricos, com exigência de estudos de impacto e condicionantes operacionais.",
+      "text_zh": "圣保罗州司法与行政实践强调大型工业设施（含电池与电动车产线）须事先取得环境许可，并提交环境影响研究及运营附加条件。"
+    },
+    {
+      "id": "jusbrasil-campinas-municipal",
+      "source": "jusbrasil",
+      "urn": "jusbrasil:sp:campinas:urbanismo",
+      "url": "https://www.jusbrasil.com.br/",
+      "title_pt": "Jusbrasil - Campinas: Alvará e Zoneamento Industrial",
+      "title_zh": "Jusbrasil — 坎皮纳斯市工业 zoning 与施工许可",
+      "dimension": "industry_access",
+      "level": "municipal",
+      "validity": "vigente",
+      "published_at": "2021-03-15",
+      "tags": [
+        "Jusbrasil",
+        "Campinas",
+        "alvará",
+        "zoneamento",
+        "设厂许可"
+      ],
+      "checklist_codes": [
+        "IND-001",
+        "IND-004"
+      ],
+      "text_pt": "Decisões municipais em Campinas tratam de alvará de construção, conformidade de zoneamento industrial e exigências de segurança para plantas automotivas e de energia.",
+      "text_zh": "坎皮纳斯市裁决涉及施工许可、工业用地分区合规及汽车/能源工厂安全要求。"
+    },
+    {
+      "id": "lexml-ibama-licenciamento",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:lei:1998-07-20;9965",
+      "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:lei:1998-07-20;9965",
+      "title_pt": "Lei nº 9.965/1998 - Política Nacional de Meio Ambiente (Licenciamento)",
+      "title_zh": "第9965/1998号法 — 国家环境政策（许可框架）",
+      "dimension": "industry_access",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "1998-07-20",
+      "tags": [
+        "IBAMA",
+        "licenciamento",
+        "meio ambiente",
+        "环境",
+        "许可"
+      ],
+      "checklist_codes": [
+        "IND-002",
+        "IND-003"
+      ],
+      "text_pt": "Estabelece o Sistema Nacional de Meio Ambiente (SISNAMA) e o licenciamento ambiental como instrumento de controle de atividades efetiva ou potencialmente poluidoras, aplicável a empreendimentos industriais de médio e grande porte.",
+      "text_zh": "建立国家环境系统（SISNAMA），对实际或潜在污染活动实施环境许可，适用于中大型工业项目。"
     }
   ]
 }

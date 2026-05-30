@@ -138,6 +138,30 @@ export async function downloadDocxExport(scenarioId: number) {
   return data as Blob
 }
 
+export async function downloadPdfExport(scenarioId: number) {
+  const { data } = await api.get(`/scenarios/${scenarioId}/export/pdf`, {
+    responseType: 'blob',
+  })
+  return data as Blob
+}
+
+export async function fetchLegalMonitor() {
+  const { data } = await api.get('/legal/monitor')
+  return data
+}
+
+export async function scanLegalMonitor(forceReindex = false) {
+  const { data } = await api.post('/legal/monitor/scan', null, {
+    params: { force_reindex: forceReindex },
+  })
+  return data
+}
+
+export async function fetchMiningDemoTemplate() {
+  const { data } = await api.get('/rules/demo-template/mining')
+  return data
+}
+
 export async function fetchLegalStatus() {
   const { data } = await api.get('/legal/status')
   return data

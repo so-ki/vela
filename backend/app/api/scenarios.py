@@ -22,7 +22,7 @@ from app.schemas.legal import LegalRetrievalResponse
 from app.schemas.review import ReviewItemUpdateRequest, ReviewResponse
 from app.services.audit import write_audit_log
 from app.services.brief_generator import generate_brief
-from app.services.export_service import build_sample_docx
+from app.services.export_service import build_sample_docx, build_sample_pdf
 from app.services.legal_ingest import get_index_status, ingest_corpus
 from app.services.legal_rag import retrieve_for_checklist
 from app.services.review_service import (
@@ -32,7 +32,7 @@ from app.services.review_service import (
     review_to_response,
     update_review_item,
 )
-from app.services.rule_engine import get_demo_scenario_template, get_rules_catalog
+from app.services.rule_engine import get_demo_scenario_template, get_mining_demo_scenario_template, get_rules_catalog
 from app.services.scenario_service import create_scenario_with_checklist, get_demo_request, scenario_to_response
 
 router = APIRouter(tags=["协查场景"])
@@ -52,6 +52,11 @@ def rules_catalog(_: User = Depends(get_current_user)):
 @router.get("/rules/demo-template")
 def demo_template(_: User = Depends(get_current_user)):
     return get_demo_scenario_template()
+
+
+@router.get("/rules/demo-template/mining")
+def mining_demo_template(_: User = Depends(get_current_user)):
+    return get_mining_demo_scenario_template()
 
 
 @router.post("/scenarios", response_model=ScenarioResponse, status_code=201)
@@ -456,6 +461,43 @@ def export_docx(
     return Response(
         content=content,
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{encoded_name}'
+            )
+        },
+    )
+
+
+@router.get("/scenarios/{scenario_id}/export/pdf")
+def export_pdf(
+    scenario_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    scenario = _load_owned_scenario(db, scenario_id, current_user.id)
+    review = scenario.checklist.payload.get("review")
+    if not review or not review_to_response(scenario_id, review).get("can_export"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="请先完成法务复核定稿后再导出",
+        )
+
+    content, filename = build_sample_pdf(scenario)
+    write_audit_log(
+        db,
+        user=current_user,
+        action="export.pdf",
+        resource_type="scenario",
+        resource_id=str(scenario.id),
+        detail=f"导出 PDF 协查底稿 {filename}",
+    )
+
+    ascii_name = "vela_compliance_brief.pdf"
+    encoded_name = quote(filename)
+    return Response(
+        content=content,
+        media_type="application/pdf",
         headers={
             "Content-Disposition": (
                 f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{encoded_name}'

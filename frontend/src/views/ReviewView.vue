@@ -4,6 +4,7 @@ import { useRoute, useRouter, RouterLink } from 'vue-router'
 import {
   approveAllReview,
   downloadDocxExport,
+  downloadPdfExport,
   fetchReview,
   fetchScenario,
   finalizeReview,
@@ -19,7 +20,7 @@ const review = ref<ReviewState | null>(null)
 const loading = ref(true)
 const saving = ref<string | null>(null)
 const finalizing = ref(false)
-const exporting = ref(false)
+const exportingPdf = ref(false)
 const error = ref<string | null>(null)
 const comments = ref<Record<string, string>>({})
 
@@ -111,6 +112,25 @@ async function runFinalize() {
   }
 }
 
+async function runExportPdf() {
+  if (!scenario.value || !review.value?.can_export) return
+  exportingPdf.value = true
+  error.value = null
+  try {
+    const blob = await downloadPdfExport(scenario.value.id)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${scenario.value.project_name}_协查底稿.pdf`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e: unknown) {
+    error.value = extractError(e)
+  } finally {
+    exportingPdf.value = false
+  }
+}
+
 async function runExport() {
   if (!scenario.value || !review.value?.can_export) return
   exporting.value = true
@@ -189,7 +209,15 @@ function goBrief() {
             :disabled="!review.can_export || exporting"
             @click="runExport"
           >
-            {{ exporting ? '导出中…' : '导出 Word 底稿' }}
+            {{ exporting ? '导出中…' : '导出 Word' }}
+          </button>
+          <button
+            type="button"
+            class="btn-secondary"
+            :disabled="!review.can_export || exportingPdf"
+            @click="runExportPdf"
+          >
+            {{ exportingPdf ? '导出中…' : '导出 PDF' }}
           </button>
         </div>
       </header>

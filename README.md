@@ -147,15 +147,18 @@ vela-platform/
 - [x] BYD 坎皮纳斯演示场景模板
 - [x] 提交场景 + 自动生成《专项核查清单》（15 条）
 
-### Step 3 — 法源 RAG
+### Step 3 — 法源 RAG（增强）
 
-- [x] 精选法源库 20 条（LexML / STF / STJ）
+- [x] 精选法源库 **23 条**（LexML / STF / STJ / **Jusbrasil**）
 - [x] 清单条目自动检索 Top-3 法条片段 + LexML 溯源链接
 - [x] 匹配度评分，低于 70 分标记「需法务复核」
+- [x] 中英葡关键词联合打分（跨语种检索增强）
+- [x] 法规动态监测 MVP（手动扫描 + 提醒列表）
 
-### Step 4 — 清单生成（规则引擎）
+### Step 4 — 清单生成（规则 + LLM 意图）
 
-- [x] 中文场景字段 + 关键词映射生成清单（非 LLM 依赖，可离线演示）
+- [x] 中文场景字段 + 关键词映射生成清单
+- [x] 可选 LLM 意图解析（通义千问 / DeepSeek，补充审查维度与关键词）
 
 ### Step 5 — 双语法律风险简报
 
@@ -169,14 +172,15 @@ vela-platform/
 - [x] 全部确认、提交复核定稿
 - [x] 状态流转与审计日志
 
-### Step 7 — Word 导出
+### Step 7 — Word / PDF 导出
 
-- [x] 导出协查底稿（场景 + 清单 + 法条 + 简报 + 复核记录 + 免责声明）
+- [x] 导出协查底稿 Word（.docx）
+- [x] 导出协查底稿 PDF（.pdf）
 
-### Step 8 — LLM 润色
+### Step 8 — LLM 增强
 
-- [x] 通义千问 / DeepSeek 双语简报润色（不改变法律结论与法条依据）
-- [x] 未配置 Key 或调用失败时自动回退模板模式
+- [x] 通义千问 / DeepSeek 双语简报润色
+- [x] LLM 中文场景意图解析（清单维度补充）
 
 ---
 
@@ -237,6 +241,21 @@ vela-platform/
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/v1/scenarios/{id}/export/docx` | 导出 Word 协查底稿（需复核定稿） |
+| GET | `/api/v1/scenarios/{id}/export/pdf` | 导出 PDF 协查底稿（需复核定稿） |
+
+### 法源监测
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/legal/monitor` | 法规动态监测状态与提醒 |
+| POST | `/api/v1/legal/monitor/scan` | 手动扫描/刷新监测（可选 force_reindex） |
+
+### 演示模板
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/api/v1/rules/demo-template` | BYD 新能源设厂 |
+| GET | `/api/v1/rules/demo-template/mining` | 矿产投资场景模板 |
 
 ---
 
@@ -273,10 +292,11 @@ vela-platform/
 | 项 | 现状 | 规划 |
 |----|------|------|
 | 法域 | 巴西单国 | 拉美多法域扩展 |
-| 法源库 | 精选 20 条 + 关键词检索 | LexML 增量同步、语料扩容 |
-| 意图解析 | 规则引擎 | 可选 LLM 增强 |
-| 法规监测 | 索引状态展示 | 辅线：新法抓取与差异对比 |
-| 导出 | Word (.docx) | PDF、律所模板 |
+| 法源库 | 精选 23 条 + Jusbrasil + 关键词/Chroma | LexML 增量同步、语料扩容 |
+| 意图解析 | 规则引擎 + 可选 LLM | 全 LLM 解析模式 |
+| 法规监测 | 手动扫描 + 提醒列表 | 自动爬虫 + 订阅推送 |
+| 导出 | Word + PDF | 律所定制模板 |
+| 行业模板 | BYD + 矿产演示模板 | 跨境电商等更多模板 |
 | 角色 | 单一 demo 账号 | 业务提交 / 法务复核分权 |
 
 ---
@@ -289,4 +309,4 @@ vela-platform/
 
 ## 上传 GitHub / 邀请测试者
 
-见 **[GITHUB_SETUP.md](./GITHUB_SETUP.md)** 与 **[TESTING.md](./TESTING.md)**。
+见 **[GITHUB_SETUP.md](./GITHUB_SETUP.md)**、**[TESTING.md](./TESTING.md)** 与 **[API.md](./API.md)**（REST 集成说明）。
