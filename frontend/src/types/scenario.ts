@@ -135,6 +135,8 @@ export interface ScenarioSummary {
   status: string
   total_items: number | null
   created_at: string
+  submitter_name?: string | null
+  submitter_organization?: string | null
 }
 
 export interface BriefCitation {

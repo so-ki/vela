@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.security import create_access_token, get_password_hash, verify_password
+from app.core.roles import ROLE_BUSINESS
 from app.models.user import User
 from app.schemas.auth import UserRegister
 from app.services.audit import write_audit_log
@@ -26,7 +27,7 @@ def register_user(db: Session, payload: UserRegister) -> User:
         full_name=payload.full_name,
         organization=payload.organization,
         hashed_password=get_password_hash(payload.password),
-        role="legal",
+        role=ROLE_BUSINESS,
         disclaimer_accepted=True,
         disclaimer_accepted_at=now,
     )

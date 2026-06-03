@@ -109,5 +109,7 @@ class ScenarioSummary(BaseModel):
     status: str
     total_items: Optional[int] = None
     created_at: datetime
+    submitter_name: Optional[str] = None
+    submitter_organization: Optional[str] = None
 
     model_config = {"from_attributes": True}

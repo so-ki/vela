@@ -20,11 +20,21 @@ Authorization: Bearer <JWT>
 | 1 | POST | `/scenarios` | 提交场景并生成核查清单（含 LLM 意图解析，可选） |
 | 2 | POST | `/scenarios/{id}/retrieve` | 法源 RAG 绑定 |
 | 3 | POST | `/scenarios/{id}/brief?polish=true` | 生成双语简报 |
-| 4 | POST | `/scenarios/{id}/review/init` | 初始化复核 |
+| 3b | POST | `/scenarios/{id}/submit` | **业务角色**：提交法务复核 |
+| 4 | POST | `/scenarios/{id}/review/init` | **法务角色**：初始化复核 |
 | 5 | PATCH | `/scenarios/{id}/review/items/{code}` | 更新复核项 |
-| 6 | POST | `/scenarios/{id}/review/finalize` | 定稿 |
-| 7 | GET | `/scenarios/{id}/export/docx` | 导出 Word |
-| 7b | GET | `/scenarios/{id}/export/pdf` | 导出 PDF |
+| 6 | POST | `/scenarios/{id}/review/finalize` | **法务角色**：定稿 |
+| 7 | GET | `/scenarios/{id}/export/docx` | **法务角色**：导出 Word |
+| 7b | GET | `/scenarios/{id}/export/pdf` | **法务角色**：导出 PDF |
+
+## 角色
+
+| role | 说明 |
+|------|------|
+| `business` | 提交场景、生成清单/简报、提交法务复核 |
+| `legal` | 查看全部场景、复核、定稿、导出；可一键样本 |
+
+演示账号：`biz@demo.vela` / `legal@demo.vela`，密码 `Demo1234!`
 
 ## 一键样本
 

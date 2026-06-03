@@ -46,7 +46,7 @@ npm run dev -- --host 127.0.0.1 --port 5173
 
 - 前端：http://127.0.0.1:5173
 - 后端 API：http://127.0.0.1:8000
-- 演示账户：`legal@demo.vela` / `Demo1234!`
+- 演示账户：`legal@demo.vela` / `biz@demo.vela`（密码均为 `Demo1234!`）
 
 ### LLM 润色（可选）
 
@@ -230,6 +230,7 @@ vela-platform/
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
+| POST | `/api/v1/scenarios/{id}/submit` | 业务提交人：提交法务复核 |
 | GET | `/api/v1/scenarios/{id}/review` | 获取复核状态 |
 | POST | `/api/v1/scenarios/{id}/review/init` | 初始化复核 |
 | PATCH | `/api/v1/scenarios/{id}/review/items/{code}` | 更新单条复核 |
@@ -297,7 +298,7 @@ vela-platform/
 | 法规监测 | 手动扫描 + 提醒列表 | 自动爬虫 + 订阅推送 |
 | 导出 | Word + PDF | 律所定制模板 |
 | 行业模板 | BYD + 矿产演示模板 | 跨境电商等更多模板 |
-| 角色 | 单一 demo 账号 | 业务提交 / 法务复核分权 |
+| 角色 | 业务提交 / 法务复核分权 | ✅ 已实现（`business` / `legal` 双演示账号） |
 
 ---
 

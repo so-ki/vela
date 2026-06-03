@@ -55,7 +55,11 @@ async function handleSubmit() {
         <RouterLink to="/register">注册企业法务账户</RouterLink>
       </p>
 
-      <p class="demo-hint">演示账户：legal@demo.vela / Demo1234!</p>
+      <p class="demo-hint">
+        演示账户：<br />
+        法务 legal@demo.vela / Demo1234!<br />
+        业务 biz@demo.vela / Demo1234!
+      </p>
     </div>
   </div>
 </template>

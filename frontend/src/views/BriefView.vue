@@ -1,16 +1,20 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
-import { fetchBrief, fetchLlmStatus, fetchScenario, generateBrief } from '@/api/client'
+import { fetchBrief, fetchLlmStatus, fetchScenario, generateBrief, submitScenarioForReview } from '@/api/client'
+import { useAuthStore } from '@/stores/auth'
 import type { RiskBrief, Scenario } from '@/types/scenario'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const scenario = ref<Scenario | null>(null)
 const brief = ref<RiskBrief | null>(null)
 const llmStatus = ref<{ available: boolean; message: string; provider?: string | null } | null>(null)
 const loading = ref(true)
 const generating = ref(false)
+const submitting = ref(false)
+const submitted = ref(false)
 const error = ref<string | null>(null)
 
 const statusLabel: Record<string, string> = {
@@ -36,6 +40,9 @@ onMounted(async () => {
   try {
     llmStatus.value = await fetchLlmStatus().catch(() => null)
     scenario.value = await fetchScenario(id)
+    if (scenario.value.status === 'pending_legal_review') {
+      submitted.value = true
+    }
     try {
       brief.value = await fetchBrief(id)
     } catch {
@@ -70,6 +77,20 @@ function extractError(e: unknown): string {
     if (typeof resp?.data?.detail === 'string') return resp.data.detail
   }
   return '生成简报失败，请确认已完成法源检索'
+}
+
+async function runSubmit() {
+  if (!scenario.value) return
+  submitting.value = true
+  error.value = null
+  try {
+    scenario.value = await submitScenarioForReview(scenario.value.id)
+    submitted.value = true
+  } catch (e: unknown) {
+    error.value = extractError(e)
+  } finally {
+    submitting.value = false
+  }
 }
 
 const passedItems = computed(() =>
@@ -217,10 +238,24 @@ const passedItems = computed(() =>
 
       <div class="next-step panel">
         <h2>下一步（Step 6）</h2>
-        <p class="muted">对每条核查项进行确认 / 驳回 / 批注，定稿后可导出 Word 协查底稿。</p>
-        <button type="button" class="btn-primary" @click="router.push({ name: 'review', params: { id: scenario.id } })">
-          进入法务复核
-        </button>
+        <template v-if="auth.isBusiness">
+          <p class="muted" v-if="scenario?.status === 'pending_legal_review' || submitted">
+            已提交法务复核，请等待法务同事处理。您可在工作台查看进度。
+          </p>
+          <template v-else>
+            <p class="muted">确认简报内容后，提交法务同事进行逐条复核与定稿。</p>
+            <button type="button" class="btn-primary" :disabled="submitting || !brief" @click="runSubmit">
+              {{ submitting ? '提交中…' : '提交法务复核' }}
+            </button>
+          </template>
+          <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
+        </template>
+        <template v-else>
+          <p class="muted">对每条核查项进行确认 / 驳回 / 批注，定稿后可导出 Word / PDF 协查底稿。</p>
+          <button type="button" class="btn-primary" @click="router.push({ name: 'review', params: { id: scenario.id } })">
+            进入法务复核
+          </button>
+        </template>
       </div>
     </template>
   </div>

@@ -8,7 +8,8 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.orm.attributes import flag_modified
 
 from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_legal_user, get_current_user
+from app.core.roles import ROLE_BUSINESS, ROLE_LEGAL, ROLE_ADMIN, is_legal_role, require_role
 from app.models.scenario import InvestigationScenario
 from app.models.user import User
 from app.schemas.scenario import (
@@ -74,13 +75,15 @@ def list_scenarios(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    rows = (
-        db.query(InvestigationScenario)
+    query = (
+        db.query(InvestigationScenario, User)
+        .join(User, InvestigationScenario.user_id == User.id)
         .options(joinedload(InvestigationScenario.checklist))
-        .filter(InvestigationScenario.user_id == current_user.id)
-        .order_by(InvestigationScenario.created_at.desc())
-        .all()
     )
+    if not is_legal_role(current_user):
+        query = query.filter(InvestigationScenario.user_id == current_user.id)
+
+    rows = query.order_by(InvestigationScenario.created_at.desc()).all()
     return [
         ScenarioSummary(
             id=s.id,
@@ -90,8 +93,10 @@ def list_scenarios(
             status=s.status,
             total_items=s.checklist.total_items if s.checklist else None,
             created_at=s.created_at,
+            submitter_name=owner.full_name if is_legal_role(current_user) else None,
+            submitter_organization=owner.organization if is_legal_role(current_user) else None,
         )
-        for s in rows
+        for s, owner in rows
     ]
 
 
@@ -101,17 +106,7 @@ def get_scenario(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    scenario = (
-        db.query(InvestigationScenario)
-        .options(joinedload(InvestigationScenario.checklist))
-        .filter(
-            InvestigationScenario.id == scenario_id,
-            InvestigationScenario.user_id == current_user.id,
-        )
-        .first()
-    )
-    if scenario is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="场景不存在")
+    scenario = _load_accessible_scenario(db, scenario_id, current_user)
     return scenario_to_response(scenario)
 
 
@@ -131,17 +126,9 @@ def retrieve_legal_sources(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    scenario = (
-        db.query(InvestigationScenario)
-        .options(joinedload(InvestigationScenario.checklist))
-        .filter(
-            InvestigationScenario.id == scenario_id,
-            InvestigationScenario.user_id == current_user.id,
-        )
-        .first()
-    )
-    if scenario is None or scenario.checklist is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="场景或清单不存在")
+    scenario = _load_accessible_scenario(db, scenario_id, current_user)
+    if not is_legal_role(current_user):
+        _assert_owner(scenario, current_user)
 
     ingest_corpus(force=False)
     payload = scenario.checklist.payload
@@ -165,6 +152,41 @@ def retrieve_legal_sources(
     )
 
 
+def _load_scenario_row(
+    db: Session,
+    scenario_id: int,
+    *,
+    require_checklist: bool = True,
+) -> InvestigationScenario:
+    scenario = (
+        db.query(InvestigationScenario)
+        .options(joinedload(InvestigationScenario.checklist))
+        .filter(InvestigationScenario.id == scenario_id)
+        .first()
+    )
+    if scenario is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="场景不存在")
+    if require_checklist and scenario.checklist is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="场景或清单不存在")
+    return scenario
+
+
+def _assert_can_access(scenario: InvestigationScenario, user: User) -> None:
+    if scenario.user_id != user.id and not is_legal_role(user):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权访问该协查场景")
+
+
+def _assert_owner(scenario: InvestigationScenario, user: User) -> None:
+    if scenario.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅场景提交人可执行此操作")
+
+
+def _load_accessible_scenario(db: Session, scenario_id: int, user: User) -> InvestigationScenario:
+    scenario = _load_scenario_row(db, scenario_id)
+    _assert_can_access(scenario, user)
+    return scenario
+
+
 def _load_owned_scenario(db: Session, scenario_id: int, user_id: int) -> InvestigationScenario:
     scenario = (
         db.query(InvestigationScenario)
@@ -186,7 +208,7 @@ def get_brief(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    scenario = _load_owned_scenario(db, scenario_id, current_user.id)
+    scenario = _load_accessible_scenario(db, scenario_id, current_user)
     brief = scenario.checklist.payload.get("brief")
     if not brief:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="尚未生成双语简报，请先调用生成接口")
@@ -200,7 +222,9 @@ def create_brief(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    scenario = _load_owned_scenario(db, scenario_id, current_user.id)
+    scenario = _load_accessible_scenario(db, scenario_id, current_user)
+    if not is_legal_role(current_user):
+        _assert_owner(scenario, current_user)
     payload = scenario.checklist.payload
 
     if not payload.get("legal_retrieved"):
@@ -240,6 +264,42 @@ def create_brief(
     return BriefGenerateResponse(**brief)
 
 
+@router.post("/scenarios/{scenario_id}/submit", response_model=ScenarioResponse)
+def submit_for_legal_review(
+    scenario_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """业务提交人：将已生成简报的场景提交法务复核。"""
+    require_role(current_user, (ROLE_BUSINESS,))
+    scenario = _load_owned_scenario(db, scenario_id, current_user.id)
+    payload = scenario.checklist.payload
+
+    if not payload.get("brief"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="请先生成双语简报后再提交法务复核")
+
+    if scenario.status == "pending_legal_review":
+        return scenario_to_response(scenario)
+
+    if scenario.status.startswith("review_"):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="该场景已进入或完成法务复核")
+
+    scenario.status = "pending_legal_review"
+    db.commit()
+    db.refresh(scenario)
+
+    write_audit_log(
+        db,
+        user=current_user,
+        action="scenario.submit",
+        resource_type="scenario",
+        resource_id=str(scenario.id),
+        detail=f"提交法务复核：{scenario.project_name}",
+    )
+
+    return scenario_to_response(scenario)
+
+
 def _ensure_brief(scenario: InvestigationScenario, payload: dict) -> dict:
     if payload.get("brief"):
         return payload
@@ -267,7 +327,7 @@ def _ensure_brief(scenario: InvestigationScenario, payload: dict) -> dict:
 @router.post("/scenarios/demo/sample", response_model=ScenarioResponse, status_code=201)
 def create_full_sample(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_legal_user),
 ):
     """一键生成完整样本：演示场景 → 法源绑定 → 双语简报 → 初始化复核。"""
     scenario = create_scenario_with_checklist(db, current_user, get_demo_request())
@@ -312,7 +372,9 @@ def get_review(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    scenario = _load_owned_scenario(db, scenario_id, current_user.id)
+    scenario = _load_accessible_scenario(db, scenario_id, current_user)
+    if not is_legal_role(current_user):
+        require_role(current_user, (ROLE_BUSINESS,))
     review = scenario.checklist.payload.get("review")
     if not review:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="尚未初始化复核，请从简报页进入")
@@ -323,9 +385,9 @@ def get_review(
 def start_review(
     scenario_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_legal_user),
 ):
-    scenario = _load_owned_scenario(db, scenario_id, current_user.id)
+    scenario = _load_accessible_scenario(db, scenario_id, current_user)
     payload = scenario.checklist.payload
     payload = _ensure_brief(scenario, payload)
 
@@ -353,9 +415,9 @@ def patch_review_item(
     item_code: str,
     body: ReviewItemUpdateRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_legal_user),
 ):
-    scenario = _load_owned_scenario(db, scenario_id, current_user.id)
+    scenario = _load_accessible_scenario(db, scenario_id, current_user)
     review = scenario.checklist.payload.get("review")
     if not review:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="复核尚未初始化")
@@ -381,9 +443,9 @@ def patch_review_item(
 def approve_all_review_items(
     scenario_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_legal_user),
 ):
-    scenario = _load_owned_scenario(db, scenario_id, current_user.id)
+    scenario = _load_accessible_scenario(db, scenario_id, current_user)
     review = scenario.checklist.payload.get("review")
     if not review:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="复核尚未初始化")
@@ -403,9 +465,9 @@ def approve_all_review_items(
 def finalize_scenario_review(
     scenario_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_legal_user),
 ):
-    scenario = _load_owned_scenario(db, scenario_id, current_user.id)
+    scenario = _load_accessible_scenario(db, scenario_id, current_user)
     review = scenario.checklist.payload.get("review")
     if not review:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="复核尚未初始化")
@@ -436,9 +498,9 @@ def finalize_scenario_review(
 def export_docx(
     scenario_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_legal_user),
 ):
-    scenario = _load_owned_scenario(db, scenario_id, current_user.id)
+    scenario = _load_accessible_scenario(db, scenario_id, current_user)
     review = scenario.checklist.payload.get("review")
     if not review or not review_to_response(scenario_id, review).get("can_export"):
         raise HTTPException(
@@ -473,9 +535,9 @@ def export_docx(
 def export_pdf(
     scenario_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_legal_user),
 ):
-    scenario = _load_owned_scenario(db, scenario_id, current_user.id)
+    scenario = _load_accessible_scenario(db, scenario_id, current_user)
     review = scenario.checklist.payload.get("review")
     if not review or not review_to_response(scenario_id, review).get("can_export"):
         raise HTTPException(

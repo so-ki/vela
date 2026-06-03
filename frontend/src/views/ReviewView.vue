@@ -11,15 +11,18 @@ import {
   initReview,
   updateReviewItem,
 } from '@/api/client'
+import { useAuthStore } from '@/stores/auth'
 import type { ReviewState, Scenario } from '@/types/scenario'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const scenario = ref<Scenario | null>(null)
 const review = ref<ReviewState | null>(null)
 const loading = ref(true)
 const saving = ref<string | null>(null)
 const finalizing = ref(false)
+const exporting = ref(false)
 const exportingPdf = ref(false)
 const error = ref<string | null>(null)
 const comments = ref<Record<string, string>>({})
@@ -32,7 +35,7 @@ const statusLabel: Record<string, string> = {
 }
 
 const isLocked = computed(() =>
-  review.value ? !['in_progress'].includes(review.value.status) : false,
+  review.value ? !['in_progress'].includes(review.value.status) || !auth.isLegal : true,
 )
 
 onMounted(async () => {
@@ -42,7 +45,11 @@ onMounted(async () => {
     try {
       review.value = await fetchReview(id)
     } catch {
-      review.value = await initReview(id)
+      if (auth.isLegal) {
+        review.value = await initReview(id)
+      } else {
+        error.value = '法务尚未开始复核，请在工作台等待处理结果'
+      }
     }
     for (const item of review.value?.items || []) {
       if (item.comment) comments.value[item.code] = item.comment
@@ -184,7 +191,7 @@ function goBrief() {
             </span>
           </p>
         </div>
-        <div class="header-actions">
+        <div class="header-actions" v-if="auth.isLegal">
           <button type="button" class="btn-secondary" @click="goBrief">查看简报</button>
           <button
             v-if="!isLocked"
@@ -223,7 +230,12 @@ function goBrief() {
       </header>
 
       <div class="disclaimer-banner">
-        请对每条核查项作出确认或驳回，并可在批注栏补充意见。全部处理完成后方可定稿并导出协查底稿。
+        <template v-if="auth.isLegal">
+          请对每条核查项作出确认或驳回，并可在批注栏补充意见。全部处理完成后方可定稿并导出协查底稿。
+        </template>
+        <template v-else>
+          本页仅供查看复核进度。确认、定稿与导出须由法务角色操作。
+        </template>
       </div>
 
       <p class="error banner-error" v-if="error">{{ error }}</p>

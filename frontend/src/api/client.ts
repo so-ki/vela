@@ -131,6 +131,11 @@ export async function createFullSample() {
   return data
 }
 
+export async function submitScenarioForReview(scenarioId: number) {
+  const { data } = await api.post(`/scenarios/${scenarioId}/submit`)
+  return data
+}
+
 export async function downloadDocxExport(scenarioId: number) {
   const { data } = await api.get(`/scenarios/${scenarioId}/export/docx`, {
     responseType: 'blob',

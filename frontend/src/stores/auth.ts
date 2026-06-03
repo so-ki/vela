@@ -11,6 +11,16 @@ export const useAuthStore = defineStore('auth', () => {
 
   const isAuthenticated = computed(() => !!token.value)
   const needsDisclaimer = computed(() => isAuthenticated.value && user.value && !user.value.disclaimer_accepted)
+  const isLegal = computed(() => user.value?.role === 'legal' || user.value?.role === 'admin')
+  const isBusiness = computed(() => user.value?.role === 'business')
+  const roleLabel = computed(() => {
+    const labels: Record<string, string> = {
+      business: '业务协同',
+      legal: '法务复核',
+      admin: '系统管理员',
+    }
+    return user.value ? labels[user.value.role] || user.value.role : ''
+  })
 
   function setSession(accessToken: string, userData: User) {
     token.value = accessToken
@@ -71,6 +81,9 @@ export const useAuthStore = defineStore('auth', () => {
     error,
     isAuthenticated,
     needsDisclaimer,
+    isLegal,
+    isBusiness,
+    roleLabel,
     login,
     loadUser,
     confirmDisclaimer,

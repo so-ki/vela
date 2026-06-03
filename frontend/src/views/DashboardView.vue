@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import { createFullSample, fetchLegalMonitor, fetchLegalStatus, fetchScenarios, fetchSystemStatus, scanLegalMonitor } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
@@ -65,6 +65,21 @@ function scenarioLinks(s: ScenarioSummary) {
   }
 }
 
+const pendingForLegal = computed(() =>
+  scenarios.value.filter((s) => s.status === 'pending_legal_review'),
+)
+
+const statusLabel: Record<string, string> = {
+  checklist_generated: '清单已生成',
+  brief_generated: '简报已生成',
+  brief_blocked: '简报需关注',
+  pending_legal_review: '待法务复核',
+  review_in_progress: '复核中',
+  review_approved: '已定稿',
+  review_partial: '部分确认',
+  review_rejected: '已驳回',
+}
+
 const roadmap = [
   { step: 1, title: '项目骨架', done: true, desc: '认证、免责、基础架构' },
   { step: 2, title: '规则库', done: true, desc: '场景 → 法律审查维度映射' },
@@ -83,8 +98,11 @@ const roadmap = [
       <div>
         <p class="eyebrow">工作台 · 完整样本流程已就绪</p>
         <h1>欢迎，{{ auth.user?.full_name }}</h1>
-        <p class="lead">
-          一键生成 <strong>BYD 坎皮纳斯</strong> 完整协查样本：清单 → 法源 → 双语简报 → 法务复核 → Word 底稿。
+        <p class="lead" v-if="auth.isLegal">
+          法务工作台：处理业务提交的协查场景，完成复核并导出底稿；也可一键生成演示样本。
+        </p>
+        <p class="lead" v-else>
+          提交投资场景 → 生成核查清单与双语简报 → <strong>提交法务复核</strong>，由法务同事定稿导出。
         </p>
       </div>
       <div class="hero-stats">
@@ -100,8 +118,8 @@ const roadmap = [
     </section>
 
     <div class="grid-2">
-      <section class="panel sample-panel">
-        <h2>生成完整样本</h2>
+      <section class="panel sample-panel" v-if="auth.isLegal">
+        <h2>生成完整样本（法务演示）</h2>
         <p class="muted">自动完成 BYD 演示场景、法条绑定、双语简报，并进入法务复核工作台。</p>
         <p class="error" v-if="sampleError">{{ sampleError }}</p>
         <button type="button" class="btn-primary" :disabled="creatingSample" @click="runCreateSample">
@@ -109,7 +127,36 @@ const roadmap = [
         </button>
       </section>
 
-      <section class="panel">
+      <section class="panel sample-panel" v-else>
+        <h2>开始协查</h2>
+        <p class="muted">填写投资项目，生成清单与双语简报后，提交法务同事复核。</p>
+        <RouterLink to="/scenarios/new" class="btn-primary link-btn">提交协查场景</RouterLink>
+      </section>
+
+      <section class="panel" v-if="auth.isLegal">
+        <h2>待处理任务</h2>
+        <p class="muted">业务已提交、等待法务复核的场景。</p>
+        <ul v-if="pendingForLegal.length" class="scenario-list compact">
+          <li v-for="s in pendingForLegal" :key="s.id">
+            <div>
+              <strong>{{ s.project_name }}</strong>
+              <span class="muted">{{ s.submitter_name }} · {{ s.submitter_organization }}</span>
+            </div>
+            <RouterLink :to="scenarioLinks(s).review" class="btn-secondary link-btn sm">开始复核</RouterLink>
+          </li>
+        </ul>
+        <p class="muted" v-else>暂无待复核任务。</p>
+      </section>
+
+      <section class="panel" v-if="auth.isBusiness">
+        <h2>分步操作</h2>
+        <p class="muted">提交场景后，依次完成清单、简报，再提交法务复核。</p>
+        <div class="action-row">
+          <RouterLink to="/scenarios/new" class="btn-secondary link-btn">提交协查场景</RouterLink>
+        </div>
+      </section>
+
+      <section class="panel" v-else-if="auth.isLegal">
         <h2>分步操作</h2>
         <p class="muted">也可手动逐步提交场景、查看清单与简报。</p>
         <div class="action-row">
@@ -163,24 +210,28 @@ const roadmap = [
     </div>
 
     <section class="panel" v-if="scenarios.length">
-      <h2>最近协查场景</h2>
+      <h2>{{ auth.isLegal ? '全部协查场景' : '我的协查场景' }}</h2>
       <ul class="scenario-list">
         <li v-for="s in scenarios" :key="s.id">
           <div>
             <strong>{{ s.project_name }}</strong>
-            <span class="muted">{{ s.total_items }} 条清单 · {{ new Date(s.created_at).toLocaleDateString('zh-CN') }}</span>
+            <span class="muted">
+              <template v-if="auth.isLegal && s.submitter_name">{{ s.submitter_name }} · </template>
+              {{ s.total_items }} 条清单 · {{ statusLabel[s.status] || s.status }} ·
+              {{ new Date(s.created_at).toLocaleDateString('zh-CN') }}
+            </span>
           </div>
           <div class="scenario-actions">
             <RouterLink :to="scenarioLinks(s).checklist" class="btn-secondary link-btn sm">清单</RouterLink>
             <RouterLink
-              v-if="s.status.startsWith('brief_') || s.status.startsWith('review_')"
+              v-if="s.status.startsWith('brief_') || s.status === 'pending_legal_review' || s.status.startsWith('review_')"
               :to="scenarioLinks(s).brief"
               class="btn-secondary link-btn sm"
             >
               简报
             </RouterLink>
             <RouterLink
-              v-if="s.status.startsWith('review_')"
+              v-if="auth.isLegal && (s.status === 'pending_legal_review' || s.status.startsWith('review_'))"
               :to="scenarioLinks(s).review"
               class="btn-secondary link-btn sm"
             >

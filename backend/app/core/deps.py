@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.core.database import get_db
 from app.core.security import decode_access_token
+from app.core.roles import ROLE_ADMIN, ROLE_BUSINESS, ROLE_LEGAL, require_role
 from app.models.user import User
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -44,4 +45,14 @@ def get_current_user(user: User = Depends(get_authenticated_user)) -> User:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="请先阅读并同意免责声明与数据使用条款",
         )
+    return user
+
+
+def get_current_legal_user(user: User = Depends(get_current_user)) -> User:
+    require_role(user, (ROLE_LEGAL, ROLE_ADMIN))
+    return user
+
+
+def get_current_business_user(user: User = Depends(get_current_user)) -> User:
+    require_role(user, (ROLE_BUSINESS,))
     return user
