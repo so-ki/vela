@@ -1,14 +1,22 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRouter, RouterLink } from 'vue-router'
-import { createDemoScenario, createScenario, fetchDemoTemplate, fetchRulesCatalog } from '@/api/client'
+import { ref, onMounted, computed } from 'vue'
+import { useRoute, useRouter, RouterLink } from 'vue-router'
+import { createDemoScenario, createScenario, extractDocumentFromFile, fetchDemoTemplate, fetchRulesCatalog, fetchScenario, generateAndSubmitDemo, generateAndSubmitScenario, reviseAndResubmitScenario } from '@/api/client'
+import type { DocumentExtractResult } from '@/api/client'
+import { useAuthStore } from '@/stores/auth'
 import type { DimensionInfo, RulesCatalog, ScenarioFormData } from '@/types/scenario'
 
+const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
+const editMode = computed(() => route.name === 'scenario-edit')
+const editScenarioId = computed(() => (editMode.value ? Number(route.params.id) : null))
 const catalog = ref<RulesCatalog | null>(null)
 const loading = ref(false)
 const submitting = ref(false)
+const extracting = ref(false)
 const error = ref<string | null>(null)
+const extractResult = ref<DocumentExtractResult | null>(null)
 
 const form = ref<ScenarioFormData>({
   project_name: '',
@@ -34,10 +42,35 @@ onMounted(async () => {
   error.value = null
   try {
     catalog.value = await fetchRulesCatalog()
+    if (editMode.value && editScenarioId.value) {
+      const scenario = await fetchScenario(editScenarioId.value)
+      if (!scenario.can_revise) {
+        error.value = '该项目当前不可补充编辑，请返回进度页查看状态'
+        return
+      }
+      form.value = {
+        project_name: scenario.project_name,
+        country: scenario.country,
+        state: scenario.state,
+        city: scenario.city,
+        industry: scenario.industry,
+        action_type: scenario.action_type,
+        investment_structure: scenario.investment_structure || '',
+        description: scenario.description,
+        employee_count: scenario.employee_count ?? undefined,
+        capacity_notes: scenario.capacity_notes || '',
+        facility_notes: scenario.facility_notes || '',
+        compliance_dimensions: scenario.compliance_dimensions,
+        board_date: scenario.board_date || '',
+        start_date: scenario.start_date || '',
+        production_date: scenario.production_date || '',
+        remarks: scenario.remarks || '',
+      }
+      return
+    }
     if (form.value.compliance_dimensions.length === 0 && catalog.value) {
       form.value.compliance_dimensions = catalog.value.dimensions.map((d: DimensionInfo) => d.id)
     }
-    // 首次进入且表单为空时自动填入演示模板，避免空表单提交 422
     if (!form.value.project_name.trim() && !form.value.description.trim()) {
       await loadDemo()
     }
@@ -64,44 +97,56 @@ async function loadDemo() {
   }
 }
 
-function toggleDimension(id: string) {
-  const dims = form.value.compliance_dimensions
-  const idx = dims.indexOf(id)
-  if (idx >= 0) {
-    if (dims.length > 1) dims.splice(idx, 1)
-  } else {
-    dims.push(id)
+function ensureAllDimensions() {
+  if (catalog.value && form.value.compliance_dimensions.length === 0) {
+    form.value.compliance_dimensions = catalog.value.dimensions.map((d: DimensionInfo) => d.id)
   }
 }
 
-async function submit() {
+async function buildPayload() {
+  return {
+    ...form.value,
+    project_name: form.value.project_name.trim(),
+    description: form.value.description.trim(),
+    investment_structure: form.value.investment_structure?.trim() || null,
+    capacity_notes: form.value.capacity_notes?.trim() || null,
+    facility_notes: form.value.facility_notes?.trim() || null,
+    remarks: form.value.remarks?.trim() || null,
+    employee_count: form.value.employee_count || null,
+    board_date: form.value.board_date || null,
+    start_date: form.value.start_date || null,
+    production_date: form.value.production_date || null,
+  }
+}
+
+function validateForm(): boolean {
   if (!form.value.project_name.trim()) {
     error.value = '请填写项目名称'
-    return
+    return false
   }
   if (!form.value.description.trim() || form.value.description.trim().length < 10) {
     error.value = '业务描述至少需要 10 个字符，建议先点击「填入 BYD 演示模板」'
-    return
+    return false
   }
-  if (form.value.compliance_dimensions.length === 0) {
-    error.value = '请至少选择一个合规审查维度'
-    return
-  }
+  ensureAllDimensions()
+  return true
+}
+
+async function submit() {
+  if (!validateForm()) return
   submitting.value = true
   error.value = null
   try {
-    const payload = {
-      ...form.value,
-      project_name: form.value.project_name.trim(),
-      description: form.value.description.trim(),
-      investment_structure: form.value.investment_structure?.trim() || null,
-      capacity_notes: form.value.capacity_notes?.trim() || null,
-      facility_notes: form.value.facility_notes?.trim() || null,
-      remarks: form.value.remarks?.trim() || null,
-      employee_count: form.value.employee_count || null,
-      board_date: form.value.board_date || null,
-      start_date: form.value.start_date || null,
-      production_date: form.value.production_date || null,
+    const payload = await buildPayload()
+    if (editMode.value && editScenarioId.value) {
+      const scenario = await reviseAndResubmitScenario(editScenarioId.value, payload, false)
+      await router.push({ name: 'scenario-progress', params: { id: scenario.id } })
+      return
+    }
+    if (auth.isBusiness) {
+      const scenario = await generateAndSubmitScenario(payload, false)
+      await router.push({ name: 'scenario-progress', params: { id: scenario.id } })
+      return
     }
     const scenario = await createScenario(payload)
     router.push({ name: 'checklist', params: { id: scenario.id } })
@@ -116,6 +161,11 @@ async function submitDemoQuick() {
   submitting.value = true
   error.value = null
   try {
+    if (auth.isBusiness) {
+      const scenario = await generateAndSubmitDemo(false)
+      await router.push({ name: 'scenario-progress', params: { id: scenario.id } })
+      return
+    }
     const scenario = await createDemoScenario()
     router.push({ name: 'checklist', params: { id: scenario.id } })
   } catch (e: unknown) {
@@ -151,7 +201,40 @@ function extractApiError(e: unknown): string {
       return msgs.join('；')
     }
   }
-  return '提交失败，请检查填写内容'
+  return '操作失败，请稍后重试'
+}
+
+function applyExtractResult(result: DocumentExtractResult) {
+  if (result.project_name) form.value.project_name = result.project_name
+  if (result.investment_structure) form.value.investment_structure = result.investment_structure
+  if (result.description) form.value.description = result.description
+  if (result.employee_count) form.value.employee_count = result.employee_count
+  if (result.capacity_notes) form.value.capacity_notes = result.capacity_notes
+  if (result.facility_notes) form.value.facility_notes = result.facility_notes
+  if (result.remarks) form.value.remarks = result.remarks
+  if (result.compliance_dimensions?.length) {
+    form.value.compliance_dimensions = result.compliance_dimensions
+  }
+}
+
+async function onDocumentSelected(event: Event) {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+
+  extracting.value = true
+  error.value = null
+  extractResult.value = null
+  try {
+    const result = await extractDocumentFromFile(file)
+    extractResult.value = result
+    applyExtractResult(result)
+  } catch (e: unknown) {
+    error.value = extractApiError(e)
+  } finally {
+    extracting.value = false
+  }
 }
 </script>
 
@@ -159,13 +242,26 @@ function extractApiError(e: unknown): string {
   <div class="scenario-page">
     <header class="page-header">
       <div>
-        <p class="eyebrow dark">Step 2 · 规则库</p>
-        <h1>提交协查场景</h1>
-        <p class="muted">输入业务场景描述，系统将映射法律审查维度并生成《专项核查清单》。</p>
+        <p class="eyebrow dark">{{ editMode ? '业务协查 · 补充材料' : auth.isBusiness ? '业务协查' : 'Step 2 · 规则库' }}</p>
+        <h1>{{ editMode ? '补充项目材料' : auth.isBusiness ? '提交投资项目' : '提交协查场景' }}</h1>
+        <p class="muted" v-if="editMode">
+          法务已退回本项目。请根据下方批注意见修改描述或补充说明，保存后将<strong>重新生成清单并提交法务</strong>（仍是同一项目）。
+        </p>
+        <p class="muted" v-else-if="auth.isBusiness">
+          填写项目信息后，系统将自动生成清单、检索法条、汇编简报，并<strong>直接提交法务复核</strong>。您只需跟踪进度。
+        </p>
+        <p class="muted" v-else>输入业务场景描述，系统将映射法律审查维度并生成《专项核查清单》。</p>
+        <p class="industry-pack-note" v-if="catalog?.pack?.name">
+          当前行业专包：<strong>{{ catalog.pack.name }}</strong>
+          <span v-if="catalog.pack.focus"> · {{ catalog.pack.focus }}</span>
+        </p>
       </div>
-      <div class="header-actions">
+      <div class="header-actions" v-if="!editMode">
         <button type="button" class="btn-secondary" @click="loadDemo" :disabled="loading">填入 BYD 演示模板</button>
-        <button type="button" class="btn-secondary" @click="submitDemoQuick" :disabled="submitting">
+        <button v-if="auth.isBusiness" type="button" class="btn-secondary" @click="submitDemoQuick" :disabled="submitting">
+          {{ submitting ? '提交中…' : '演示项目一键提交法务' }}
+        </button>
+        <button v-else type="button" class="btn-secondary" @click="submitDemoQuick" :disabled="submitting">
           一键生成演示清单
         </button>
       </div>
@@ -173,6 +269,39 @@ function extractApiError(e: unknown): string {
 
     <form class="scenario-form panel" @submit.prevent="submit">
       <p class="error banner-error" v-if="error && !catalog">{{ error }}</p>
+
+      <div class="form-section doc-upload-section">
+        <h2>上传投资方案（可选）</h2>
+        <p class="muted">
+          支持 <strong>.txt / .md / .docx</strong>（≤2MB）。系统将抽取项目名称、用工、产能等事实预填表单；<strong>不会</strong>自动生成法律结论。
+        </p>
+        <div class="doc-upload-row">
+          <label class="btn-secondary file-upload-btn">
+            {{ extracting ? '抽取中…' : '选择方案文件' }}
+            <input
+              type="file"
+              accept=".txt,.md,.docx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              :disabled="extracting"
+              hidden
+              @change="onDocumentSelected"
+            />
+          </label>
+          <span class="muted" v-if="extractResult">
+            已解析 {{ extractResult.filename }} · {{ extractResult.mode === 'llm' ? 'AI 抽取' : '规则抽取' }}
+          </span>
+        </div>
+        <div class="extract-preview panel-inner" v-if="extractResult">
+          <p class="muted">{{ extractResult.disclaimer }}</p>
+          <ul class="extract-facts" v-if="extractResult.facts.length">
+            <li v-for="(fact, idx) in extractResult.facts.slice(0, 8)" :key="idx">
+              <strong>{{ fact.field }}</strong>：{{ fact.value }}
+              <span class="muted" v-if="fact.source_snippet">（{{ fact.source_snippet }}）</span>
+            </li>
+          </ul>
+          <p class="muted warn-text">提交前请核对预填内容，尤其是数字与地点。</p>
+        </div>
+      </div>
+
       <div class="form-section">
         <h2>基本信息</h2>
         <div class="form-grid">
@@ -236,26 +365,21 @@ function extractApiError(e: unknown): string {
         </div>
       </div>
 
-      <div class="form-section">
-        <h2>合规审查维度</h2>
-        <div class="dimension-grid" v-if="catalog">
-          <label
-            v-for="dim in catalog.dimensions"
-            :key="dim.id"
-            class="dimension-card"
-            :class="{ active: form.compliance_dimensions.includes(dim.id) }"
-          >
-            <input
-              type="checkbox"
-              :checked="form.compliance_dimensions.includes(dim.id)"
-              @change="toggleDimension(dim.id)"
-            />
-            <div>
+      <div class="form-section" v-if="catalog">
+        <h2>协查范围</h2>
+        <p class="muted">
+          本次提交将覆盖当前行业专包下的<strong>全部 {{ catalog.dimensions.length }} 个合规维度</strong>，无需业务侧勾选。
+          维度定义与核查项由<strong>法务在规则库</strong>中维护。
+        </p>
+        <div class="dimension-grid dimension-grid-readonly">
+          <div v-for="dim in catalog.dimensions" :key="dim.id" class="dimension-card readonly">
+            <span class="dimension-check" aria-hidden="true">✓</span>
+            <div class="dimension-body">
               <strong>{{ dim.name }}</strong>
               <span class="dim-pt">{{ dim.name_pt }}</span>
               <p>{{ dim.description }}</p>
             </div>
-          </label>
+          </div>
         </div>
       </div>
 
@@ -286,7 +410,15 @@ function extractApiError(e: unknown): string {
       <div class="form-actions">
         <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
         <button type="submit" class="btn-primary" :disabled="submitting">
-          {{ submitting ? '生成中…' : '生成专项核查清单' }}
+          {{
+            submitting
+              ? '处理中…'
+              : editMode
+                ? '保存并重新提交法务'
+                : auth.isBusiness
+                  ? '生成并提交法务'
+                  : '生成专项核查清单'
+          }}
         </button>
       </div>
     </form>

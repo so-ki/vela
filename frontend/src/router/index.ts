@@ -31,25 +31,43 @@ const router = createRouter({
           path: 'scenarios/new',
           name: 'scenario-create',
           component: () => import('@/views/ScenarioCreateView.vue'),
+          meta: { requiresDisclaimer: true, businessOnly: true },
+        },
+        {
+          path: 'scenarios/:id/edit',
+          name: 'scenario-edit',
+          component: () => import('@/views/ScenarioCreateView.vue'),
+          meta: { requiresDisclaimer: true, businessRevision: true },
+        },
+        {
+          path: 'scenarios/:id/progress',
+          name: 'scenario-progress',
+          component: () => import('@/views/BusinessProgressView.vue'),
           meta: { requiresDisclaimer: true },
         },
         {
           path: 'scenarios/:id/checklist',
           name: 'checklist',
           component: () => import('@/views/ChecklistView.vue'),
-          meta: { requiresDisclaimer: true },
+          meta: { requiresDisclaimer: true, legalOnly: true },
         },
         {
           path: 'scenarios/:id/brief',
           name: 'brief',
           component: () => import('@/views/BriefView.vue'),
-          meta: { requiresDisclaimer: true },
+          meta: { requiresDisclaimer: true, legalOnly: true },
         },
         {
           path: 'scenarios/:id/review',
           name: 'review',
           component: () => import('@/views/ReviewView.vue'),
-          meta: { requiresDisclaimer: true },
+          meta: { requiresDisclaimer: true, legalOnly: true },
+        },
+        {
+          path: 'legal/corpus',
+          name: 'legal-corpus',
+          component: () => import('@/views/LegalCorpusView.vue'),
+          meta: { requiresDisclaimer: true, legalOnly: true },
         },
       ],
     },
@@ -73,6 +91,22 @@ router.beforeEach(async (to) => {
 
   if (to.meta.requiresDisclaimer && auth.needsDisclaimer) {
     return true
+  }
+
+  if (auth.isBusiness && to.meta.legalOnly) {
+    const id = to.params.id
+    if (id) {
+      return { name: 'scenario-progress', params: { id } }
+    }
+    return { name: 'dashboard' }
+  }
+
+  if (auth.isLegal && to.meta.businessRevision) {
+    return { name: 'dashboard' }
+  }
+
+  if (auth.isLegal && to.meta.businessOnly) {
+    return { name: 'dashboard' }
   }
 
   return true

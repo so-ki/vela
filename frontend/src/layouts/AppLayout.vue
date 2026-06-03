@@ -18,7 +18,7 @@ const auth = useAuthStore()
       </div>
       <nav class="nav">
         <RouterLink to="/">工作台</RouterLink>
-        <RouterLink v-if="auth.isBusiness || auth.isLegal" to="/scenarios/new">提交场景</RouterLink>
+        <RouterLink v-if="auth.isLegal" to="/legal/corpus">法源维护</RouterLink>
       </nav>
       <div class="user-area" v-if="auth.user">
         <span class="role-badge">{{ auth.roleLabel }}</span>

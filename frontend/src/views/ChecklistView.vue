@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { fetchScenario, retrieveLegalSources } from '@/api/client'
 import type { ChecklistSection, Scenario } from '@/types/scenario'
@@ -62,6 +62,73 @@ function extractError(e: unknown): string {
 const checklist = computed(() => scenario.value?.checklist)
 const displaySections = computed(() => legalSections.value || checklist.value?.sections || [])
 
+const sectionOpen = ref<Record<string, boolean>>({})
+const itemOpen = ref<Record<string, boolean>>({})
+
+function initCollapseState(sections: ChecklistSection[]) {
+  if (!sections.length) return
+  const nextSection: Record<string, boolean> = { ...sectionOpen.value }
+  const nextItem: Record<string, boolean> = { ...itemOpen.value }
+  for (const section of sections) {
+    if (!(section.dimension_id in nextSection)) {
+      nextSection[section.dimension_id] = false
+    }
+    for (const item of section.items) {
+      if (!(item.code in nextItem)) {
+        nextItem[item.code] = false
+      }
+    }
+  }
+  sectionOpen.value = nextSection
+  itemOpen.value = nextItem
+}
+
+watch(
+  displaySections,
+  (sections) => {
+    initCollapseState(sections)
+  },
+  { immediate: true },
+)
+
+function isSectionOpen(id: string) {
+  return sectionOpen.value[id] ?? false
+}
+
+function isItemOpen(code: string) {
+  return itemOpen.value[code] ?? false
+}
+
+function toggleSection(id: string) {
+  sectionOpen.value = { ...sectionOpen.value, [id]: !isSectionOpen(id) }
+}
+
+function toggleItem(code: string) {
+  itemOpen.value = { ...itemOpen.value, [code]: !isItemOpen(code) }
+}
+
+function setAllSections(open: boolean) {
+  const next: Record<string, boolean> = { ...sectionOpen.value }
+  for (const section of displaySections.value) {
+    next[section.dimension_id] = open
+  }
+  sectionOpen.value = next
+}
+
+function setAllItems(open: boolean) {
+  const next: Record<string, boolean> = { ...itemOpen.value }
+  for (const section of displaySections.value) {
+    for (const item of section.items) {
+      next[item.code] = open
+    }
+  }
+  itemOpen.value = next
+}
+
+const openSectionCount = computed(
+  () => displaySections.value.filter((s) => isSectionOpen(s.dimension_id)).length,
+)
+
 async function goToBrief() {
   if (!scenario.value) return
   generatingBrief.value = true
@@ -86,14 +153,32 @@ async function goToBrief() {
           <p class="eyebrow dark">专项核查清单 · Step 3 法源绑定</p>
           <h1>{{ checklist.title }}</h1>
           <p class="meta">
-            识别行业：<strong>{{ checklist.detected_industry_name }}</strong> ·
+            行业专包：<strong>{{ checklist.industry_pack_name || checklist.detected_industry_name }}</strong> ·
             动作类型：<strong>{{ checklist.detected_action_type_name }}</strong> ·
             共 <strong>{{ checklist.total_items }}</strong> 条
+          </p>
+          <p class="meta sub-sectors" v-if="checklist.detected_sub_sectors?.length">
+            识别子赛道：
+            <span
+              v-for="sub in checklist.detected_sub_sectors"
+              :key="sub.id"
+              class="badge sub-sector"
+            >{{ sub.name }}</span>
           </p>
           <p class="meta" v-if="retrievalNote">{{ retrievalNote }}</p>
           <p class="meta warn" v-if="retrieving">正在检索 LexML / STF / STJ 法源…</p>
         </div>
-        <RouterLink to="/scenarios/new" class="btn-secondary link-btn">新建场景</RouterLink>
+        <div class="header-actions">
+          <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
+          <button
+            type="button"
+            class="btn-primary"
+            :disabled="generatingBrief || retrieving || !legalSections"
+            @click="goToBrief"
+          >
+            {{ generatingBrief ? '跳转中…' : '生成双语简报' }}
+          </button>
+        </div>
       </header>
 
       <div class="disclaimer-banner" v-if="legalSections">
@@ -105,72 +190,103 @@ async function goToBrief() {
 
       <p class="error banner-error" v-if="error">{{ error }}</p>
 
+      <div class="collapse-toolbar panel" v-if="displaySections.length">
+        <span class="muted">
+          共 {{ displaySections.length }} 个合规维度 · 已展开 {{ openSectionCount }} 个
+        </span>
+        <div class="collapse-toolbar-actions">
+          <button type="button" class="btn-text" @click="setAllSections(true)">展开全部维度</button>
+          <button type="button" class="btn-text" @click="setAllSections(false)">折叠全部维度</button>
+          <button type="button" class="btn-text" @click="setAllItems(true)">展开全部条目</button>
+          <button type="button" class="btn-text" @click="setAllItems(false)">折叠全部条目</button>
+        </div>
+      </div>
+
       <section
         v-for="section in displaySections"
         :key="section.dimension_id"
-        class="checklist-section panel"
+        class="checklist-section panel collapsible-section"
+        :class="{ 'is-open': isSectionOpen(section.dimension_id) }"
       >
-        <div class="section-head">
-          <div>
+        <button
+          type="button"
+          class="section-toggle"
+          :aria-expanded="isSectionOpen(section.dimension_id)"
+          @click="toggleSection(section.dimension_id)"
+        >
+          <span class="collapse-chevron" aria-hidden="true" />
+          <div class="section-toggle-main">
             <h2>{{ section.dimension_name }}</h2>
             <span class="dim-pt">{{ section.dimension_name_pt }}</span>
           </div>
           <span class="badge ok">{{ section.items.length }} 条</span>
-        </div>
-        <p class="section-desc">{{ section.description }}</p>
+        </button>
 
-        <div class="checklist-items">
-          <article v-for="item in section.items" :key="item.code" class="checklist-item">
-            <div class="item-head">
-              <span class="item-code">{{ item.code }}</span>
-              <span class="badge" :class="'pri-' + item.priority">
-                {{ priorityLabel[item.priority] || item.priority }}优先级
-              </span>
-              <span class="score">清单相关度 {{ item.relevance_score }}</span>
-            </div>
-            <h3>{{ item.title }}</h3>
-            <p class="item-desc">{{ item.description }}</p>
-            <p class="item-rationale">
-              <strong>纳入理由：</strong>{{ item.rationale }}
-            </p>
+        <div v-show="isSectionOpen(section.dimension_id)" class="section-body">
+          <p class="section-desc">{{ section.description }}</p>
 
-            <div v-if="item.legal_hits?.length" class="legal-hits">
-              <h4>相关法条（Top {{ item.legal_hits.length }}）</h4>
-              <div v-for="hit in item.legal_hits" :key="hit.id" class="legal-hit">
-                <div class="hit-head">
-                  <span class="source-badge">{{ hit.source_label }}</span>
-                  <span class="badge" :class="hit.requires_review ? 'pri-medium' : 'ok'">
-                    匹配度 {{ hit.match_score }}
-                    <template v-if="hit.requires_review"> · 需法务复核</template>
-                  </span>
+          <div class="checklist-items">
+            <article
+              v-for="item in section.items"
+              :key="item.code"
+              class="checklist-item collapsible-item"
+              :class="{ 'is-open': isItemOpen(item.code) }"
+            >
+              <button
+                type="button"
+                class="item-toggle"
+                :aria-expanded="isItemOpen(item.code)"
+                @click="toggleItem(item.code)"
+              >
+                <span class="collapse-chevron sm" aria-hidden="true" />
+                <div class="item-toggle-main">
+                  <div class="item-head">
+                    <span class="item-code">{{ item.code }}</span>
+                    <span
+                      v-for="tag in item.sub_sector_tags || []"
+                      :key="tag"
+                      class="badge sub-sector"
+                    >{{ tag }}</span>
+                    <span class="badge" :class="'pri-' + item.priority">
+                      {{ priorityLabel[item.priority] || item.priority }}优先级
+                    </span>
+                    <span class="score">清单相关度 {{ item.relevance_score }}</span>
+                  </div>
+                  <h3>{{ item.title }}</h3>
                 </div>
-                <strong>{{ hit.title_zh || hit.title_pt }}</strong>
-                <p class="hit-excerpt">{{ hit.excerpt_pt }}</p>
-                <p class="hit-excerpt zh" v-if="hit.excerpt_zh">{{ hit.excerpt_zh }}</p>
-                <p class="hit-meta">
-                  {{ hit.validity }} · {{ hit.level }} · {{ hit.published_at }}
+              </button>
+
+              <div v-show="isItemOpen(item.code)" class="item-body">
+                <p class="item-desc">{{ item.description }}</p>
+                <p class="item-rationale">
+                  <strong>纳入理由：</strong>{{ item.rationale }}
                 </p>
-                <a :href="hit.url" target="_blank" rel="noopener" class="hit-link">溯源：LexML / 法院门户 ↗</a>
+
+                <div v-if="item.legal_hits?.length" class="legal-hits">
+                  <h4>相关法条（Top {{ item.legal_hits.length }}）</h4>
+                  <div v-for="hit in item.legal_hits" :key="hit.id" class="legal-hit">
+                    <div class="hit-head">
+                      <span class="source-badge">{{ hit.source_label }}</span>
+                      <span class="badge" :class="hit.requires_review ? 'pri-medium' : 'ok'">
+                        匹配度 {{ hit.match_score }}
+                        <template v-if="hit.requires_review"> · 需法务复核</template>
+                      </span>
+                    </div>
+                    <strong>{{ hit.title_zh || hit.title_pt }}</strong>
+                    <p class="hit-excerpt">{{ hit.excerpt_pt }}</p>
+                    <p class="hit-excerpt zh" v-if="hit.excerpt_zh">{{ hit.excerpt_zh }}</p>
+                    <p class="hit-meta">
+                      {{ hit.validity }} · {{ hit.level }} · {{ hit.published_at }}
+                    </p>
+                    <a :href="hit.url" target="_blank" rel="noopener" class="hit-link">溯源：LexML / 法院门户 ↗</a>
+                  </div>
+                </div>
+                <p v-else class="no-hit muted">未检索到相关法条片段，建议扩大检索范围或外聘律所补充。</p>
               </div>
-            </div>
-            <p v-else class="no-hit muted">未检索到相关法条片段，建议扩大检索范围或外聘律所补充。</p>
-          </article>
+            </article>
+          </div>
         </div>
       </section>
-
-      <div class="next-step panel">
-        <h2>下一步（Step 5）</h2>
-        <p class="muted">条目级匹配度门控（阈值 70 分）通过后，自动汇编中葡双语法律风险简报。</p>
-        <button
-          type="button"
-          class="btn-primary"
-          :disabled="generatingBrief || retrieving || !legalSections"
-          @click="goToBrief"
-        >
-          {{ generatingBrief ? '跳转中…' : '生成双语简报' }}
-        </button>
-        <p class="muted hint" v-if="!legalSections && !retrieving">请先等待法源检索完成</p>
-      </div>
     </template>
   </div>
 </template>

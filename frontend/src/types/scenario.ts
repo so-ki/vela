@@ -7,8 +7,9 @@ export interface DimensionInfo {
 }
 
 export interface RulesCatalog {
+  pack?: { id: string; name: string; version?: string; focus?: string }
   jurisdiction: { id: string; name: string; name_pt: string }
-  industries: { id: string; name: string }[]
+  industries: { id: string; name: string; sub_sectors?: { id: string; name: string }[] }[]
   action_types: { id: string; name: string }[]
   dimensions: DimensionInfo[]
   supported_locations: {
@@ -66,6 +67,7 @@ export interface ChecklistItem {
   relevance_score: number
   rationale: string
   matched_triggers: string[]
+  sub_sector_tags?: string[]
   status: string
   legal_hits?: LegalHit[]
   retrieval_status?: string
@@ -85,8 +87,10 @@ export interface Checklist {
   version: string
   total_items: number
   jurisdiction: string
+  industry_pack_name?: string
   detected_industry: string
   detected_industry_name: string
+  detected_sub_sectors?: { id: string; name: string; matched_keywords?: string[] }[]
   detected_action_type: string
   detected_action_type_name: string
   selected_dimensions: string[]
@@ -116,6 +120,32 @@ export interface Scenario {
   status: string
   created_at: string
   checklist: Checklist | null
+  business_feedback?: BusinessFeedback | null
+  can_revise?: boolean
+  revision_round?: number
+}
+
+export interface BusinessFeedbackItem {
+  code: string
+  title: string
+  dimension_name: string
+  decision: string
+  comment: string | null
+  external_counsel_required: boolean
+  reviewed_at: string | null
+}
+
+export interface BusinessFeedback {
+  review_status: string
+  is_finalized: boolean
+  is_returned?: boolean
+  approved_count: number
+  rejected_count: number
+  pending_count: number
+  action_required: boolean
+  summary: string
+  return_note?: string | null
+  items: BusinessFeedbackItem[]
 }
 
 export interface LegalRetrievalResult {
@@ -137,6 +167,13 @@ export interface ScenarioSummary {
   created_at: string
   submitter_name?: string | null
   submitter_organization?: string | null
+  progress_status?: string | null
+  review_priority?: string | null
+  blocked_count?: number | null
+  passed_count?: number | null
+  legal_rejected_count?: number | null
+  feedback_action_required?: boolean | null
+  needs_revision?: boolean | null
 }
 
 export interface BriefCitation {
@@ -201,6 +238,8 @@ export interface ReviewItem {
   match_score: number
   decision: string
   comment?: string | null
+  external_counsel_required?: boolean
+  legal_hits?: LegalHit[]
   reviewed_at?: string | null
 }
 
@@ -216,4 +255,5 @@ export interface ReviewState {
   pending_count: number
   can_finalize: boolean
   can_export: boolean
+  can_return_to_business?: boolean
 }

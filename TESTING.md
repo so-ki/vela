@@ -58,6 +58,17 @@ python scripts/seed_demo_user.py
 
 ### 通用
 
+### 自动化验收（推荐）
+
+服务启动后运行：
+
+```bash
+chmod +x scripts/verify_e2e.sh
+./scripts/verify_e2e.sh
+```
+
+覆盖：行业专包 v2、BYD 24 条清单、子赛道差异化、法务驳回→业务可见、方案上传抽取、矿产 501。
+
 ## 样本文件
 
 仓库根目录含预生成 Word 样本（无需 API Key 也可查看效果）：

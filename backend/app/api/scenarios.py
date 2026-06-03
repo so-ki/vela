@@ -2,7 +2,7 @@ from typing import List
 import copy
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.orm.attributes import flag_modified
@@ -19,21 +19,26 @@ from app.schemas.scenario import (
     ScenarioSummary,
 )
 from app.schemas.brief import BriefGenerateResponse
+from app.schemas.document import DocumentExtractResponse
 from app.schemas.legal import LegalRetrievalResponse
-from app.schemas.review import ReviewItemUpdateRequest, ReviewResponse
+from app.schemas.review import ReviewItemUpdateRequest, ReviewResponse, ReviewReturnRequest
 from app.services.audit import write_audit_log
 from app.services.brief_generator import generate_brief
+from app.services.document_extractor import extract_facts_from_document
 from app.services.export_service import build_sample_docx, build_sample_pdf
 from app.services.legal_ingest import get_index_status, ingest_corpus
 from app.services.legal_rag import retrieve_for_checklist
 from app.services.review_service import (
     approve_all_pending,
+    business_feedback_from_review,
+    return_review_to_business,
     finalize_review,
     init_review,
     review_to_response,
     update_review_item,
 )
 from app.services.rule_engine import get_demo_scenario_template, get_mining_demo_scenario_template, get_rules_catalog
+from app.services.scenario_pipeline import run_generate_and_submit, run_revise_and_resubmit, scenario_summary_meta
 from app.services.scenario_service import create_scenario_with_checklist, get_demo_request, scenario_to_response
 
 router = APIRouter(tags=["协查场景"])
@@ -57,7 +62,25 @@ def demo_template(_: User = Depends(get_current_user)):
 
 @router.get("/rules/demo-template/mining")
 def mining_demo_template(_: User = Depends(get_current_user)):
-    return get_mining_demo_scenario_template()
+    try:
+        return get_mining_demo_scenario_template()
+    except ValueError as exc:
+        raise HTTPException(status_code=501, detail=str(exc)) from exc
+
+
+@router.post("/scenarios/extract-document", response_model=DocumentExtractResponse)
+async def extract_scenario_document(
+    file: UploadFile = File(..., description="投资方案 .txt / .md / .docx（≤2MB）"),
+    _: User = Depends(get_current_user),
+):
+    """从上传方案抽取客观事实，预填协查表单（规则引擎；配置 LLM 时优先 AI 抽取）。"""
+    filename = file.filename or "upload.txt"
+    content = await file.read()
+    try:
+        result = extract_facts_from_document(filename, content)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return DocumentExtractResponse(filename=filename, **result)
 
 
 @router.post("/scenarios", response_model=ScenarioResponse, status_code=201)
@@ -84,20 +107,41 @@ def list_scenarios(
         query = query.filter(InvestigationScenario.user_id == current_user.id)
 
     rows = query.order_by(InvestigationScenario.created_at.desc()).all()
-    return [
-        ScenarioSummary(
-            id=s.id,
-            project_name=s.project_name,
-            city=s.city,
-            industry=s.industry,
-            status=s.status,
-            total_items=s.checklist.total_items if s.checklist else None,
-            created_at=s.created_at,
-            submitter_name=owner.full_name if is_legal_role(current_user) else None,
-            submitter_organization=owner.organization if is_legal_role(current_user) else None,
+    summaries: list[ScenarioSummary] = []
+    for s, owner in rows:
+        payload = s.checklist.payload if s.checklist else {}
+        meta = scenario_summary_meta(s.status, payload)
+        bf = business_feedback_from_review(payload.get("review"))
+        summaries.append(
+            ScenarioSummary(
+                id=s.id,
+                project_name=s.project_name,
+                city=s.city,
+                industry=s.industry,
+                status=s.status,
+                total_items=s.checklist.total_items if s.checklist else None,
+                created_at=s.created_at,
+                submitter_name=owner.full_name if is_legal_role(current_user) else None,
+                submitter_organization=owner.organization if is_legal_role(current_user) else None,
+                progress_status=meta["progress_status"],
+                review_priority=meta["review_priority"],
+                blocked_count=meta["blocked_count"],
+                passed_count=meta["passed_count"],
+                legal_rejected_count=bf.get("rejected_count") if bf else None,
+                feedback_action_required=bf.get("action_required") if bf else None,
+                needs_revision=meta.get("needs_revision"),
+            )
         )
-        for s, owner in rows
-    ]
+
+    if is_legal_role(current_user):
+        summaries.sort(
+            key=lambda item: (
+                0 if item.status == "pending_legal_review" else 1,
+                {"high": 0, "medium": 1, "low": 2}.get(item.review_priority or "low", 9),
+                -item.created_at.timestamp(),
+            )
+        )
+    return summaries
 
 
 @router.get("/scenarios/{scenario_id}", response_model=ScenarioResponse)
@@ -117,6 +161,49 @@ def create_demo_scenario(
 ):
     payload = get_demo_request()
     scenario = create_scenario_with_checklist(db, current_user, payload)
+    return scenario_to_response(scenario)
+
+
+@router.post("/scenarios/generate-and-submit", response_model=ScenarioResponse, status_code=201)
+def generate_and_submit_scenario(
+    payload: ScenarioCreateRequest,
+    polish: bool = Query(default=False, description="启用 LLM 润色（较慢，可选）"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """业务一键：生成清单 + 法源 + 简报并提交法务复核。"""
+    require_role(current_user, (ROLE_BUSINESS,))
+    scenario = run_generate_and_submit(db, current_user, payload, polish=polish)
+    return scenario_to_response(scenario)
+
+
+@router.post("/scenarios/demo/generate-and-submit", response_model=ScenarioResponse, status_code=201)
+def generate_and_submit_demo(
+    polish: bool = Query(default=False),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """业务一键：BYD 演示模板并提交法务复核。"""
+    require_role(current_user, (ROLE_BUSINESS,))
+    scenario = run_generate_and_submit(db, current_user, get_demo_request(), polish=polish)
+    return scenario_to_response(scenario)
+
+
+@router.post("/scenarios/{scenario_id}/revise-and-resubmit", response_model=ScenarioResponse)
+def revise_and_resubmit_scenario(
+    scenario_id: int,
+    payload: ScenarioCreateRequest,
+    polish: bool = Query(default=False),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """业务：法务退回后在同一项目补充材料并重新提交。"""
+    require_role(current_user, (ROLE_BUSINESS,))
+    scenario = _load_owned_scenario(db, scenario_id, current_user.id)
+    try:
+        scenario = run_revise_and_resubmit(db, current_user, scenario, payload, polish=polish)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return scenario_to_response(scenario)
 
 
@@ -370,11 +457,9 @@ def create_full_sample(
 def get_review(
     scenario_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_legal_user),
 ):
     scenario = _load_accessible_scenario(db, scenario_id, current_user)
-    if not is_legal_role(current_user):
-        require_role(current_user, (ROLE_BUSINESS,))
     review = scenario.checklist.payload.get("review")
     if not review:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="尚未初始化复核，请从简报页进入")
@@ -428,6 +513,7 @@ def patch_review_item(
             code=item_code,
             decision=body.decision,
             comment=body.comment,
+            external_counsel_required=body.external_counsel_required,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -459,6 +545,42 @@ def approve_all_review_items(
     payload["review"] = review
     _save_payload(db, scenario, payload)
     return ReviewResponse(**review_to_response(scenario_id, review))
+
+
+@router.post("/scenarios/{scenario_id}/review/return-to-business", response_model=ScenarioResponse)
+def return_scenario_to_business(
+    scenario_id: int,
+    body: ReviewReturnRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_legal_user),
+):
+    """法务：将含驳回条目的复核退回业务，在同一项目补充后重新提交。"""
+    scenario = _load_accessible_scenario(db, scenario_id, current_user)
+    review = scenario.checklist.payload.get("review")
+    if not review:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="复核尚未初始化")
+
+    try:
+        review = return_review_to_business(copy.deepcopy(review), current_user, note=body.note)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    payload = copy.deepcopy(scenario.checklist.payload)
+    payload["review"] = review
+    scenario.status = "returned_for_revision"
+    _save_payload(db, scenario, payload)
+
+    write_audit_log(
+        db,
+        user=current_user,
+        action="review.return_to_business",
+        resource_type="scenario",
+        resource_id=str(scenario.id),
+        detail=f"退回业务补充：{scenario.project_name}（驳回 {review.get('return_snapshot', {}).get('rejected_count', 0)} 条）",
+    )
+
+    db.refresh(scenario)
+    return scenario_to_response(scenario)
 
 
 @router.post("/scenarios/{scenario_id}/review/finalize", response_model=ReviewResponse)

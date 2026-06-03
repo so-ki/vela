@@ -15,6 +15,7 @@ class DimensionInfo(BaseModel):
 
 
 class RulesCatalogResponse(BaseModel):
+    pack: dict = Field(default_factory=dict)
     jurisdiction: dict
     industries: List[dict]
     action_types: List[dict]
@@ -60,14 +61,39 @@ class ChecklistSectionResponse(BaseModel):
     items: List[ChecklistItemResponse]
 
 
+class BusinessFeedbackItem(BaseModel):
+    code: str
+    title: str
+    dimension_name: str = ""
+    decision: str
+    comment: Optional[str] = None
+    external_counsel_required: bool = False
+    reviewed_at: Optional[str] = None
+
+
+class BusinessFeedback(BaseModel):
+    review_status: str
+    is_finalized: bool
+    is_returned: bool = False
+    approved_count: int
+    rejected_count: int
+    pending_count: int
+    action_required: bool
+    summary: str
+    return_note: Optional[str] = None
+    items: List[BusinessFeedbackItem] = Field(default_factory=list)
+
+
 class ChecklistResponse(BaseModel):
     id: int
     title: str
     version: str
     total_items: int
     jurisdiction: str
+    industry_pack_name: Optional[str] = None
     detected_industry: str
     detected_industry_name: str
+    detected_sub_sectors: List[dict] = Field(default_factory=list)
     detected_action_type: str
     detected_action_type_name: str
     selected_dimensions: List[str]
@@ -97,6 +123,9 @@ class ScenarioResponse(BaseModel):
     status: str
     created_at: datetime
     checklist: Optional[ChecklistResponse] = None
+    business_feedback: Optional[BusinessFeedback] = None
+    can_revise: bool = False
+    revision_round: int = 0
 
     model_config = {"from_attributes": True}
 
@@ -111,5 +140,12 @@ class ScenarioSummary(BaseModel):
     created_at: datetime
     submitter_name: Optional[str] = None
     submitter_organization: Optional[str] = None
+    progress_status: Optional[str] = None
+    review_priority: Optional[str] = None
+    blocked_count: Optional[int] = None
+    passed_count: Optional[int] = None
+    legal_rejected_count: Optional[int] = None
+    feedback_action_required: Optional[bool] = None
+    needs_revision: Optional[bool] = None
 
     model_config = {"from_attributes": True}

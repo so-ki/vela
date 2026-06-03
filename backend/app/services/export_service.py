@@ -71,7 +71,12 @@ def build_sample_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
 
     doc.add_paragraph(f"项目名称：{scenario_obj.project_name}")
     doc.add_paragraph(f"地点：{scenario_obj.city} · {scenario_obj.state} · {scenario_obj.country}")
-    doc.add_paragraph(f"行业：{checklist.get('detected_industry_name', scenario_obj.industry)}")
+    doc.add_paragraph(f"行业专包：{checklist.get('industry_pack_name') or checklist.get('detected_industry_name', scenario_obj.industry)}")
+    sub_sectors = checklist.get("detected_sub_sectors") or []
+    if sub_sectors:
+        names = "、".join(s.get("name", "") for s in sub_sectors if s.get("name"))
+        if names:
+            doc.add_paragraph(f"识别子赛道：{names}")
     doc.add_paragraph(f"动作类型：{checklist.get('detected_action_type_name', scenario_obj.action_type)}")
     doc.add_paragraph(f"导出时间：{datetime.now().strftime('%Y-%m-%d %H:%M')}")
     doc.add_paragraph(f"场景状态：{scenario_obj.status}")

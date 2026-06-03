@@ -39,11 +39,24 @@ def load_rules() -> dict[str, Any]:
 
 def get_rules_catalog() -> dict[str, Any]:
     rules = load_rules()
+    pack = rules.get("pack", {})
+    industries_out = []
+    for k, v in rules["industries"].items():
+        sub_defs = v.get("sub_sector_defs", {})
+        industries_out.append(
+            {
+                "id": k,
+                "name": v["name"],
+                "sub_sectors": [
+                    {"id": sid, "name": sdef["name"]}
+                    for sid, sdef in sub_defs.items()
+                ],
+            }
+        )
     return {
+        "pack": pack,
         "jurisdiction": rules["jurisdiction"],
-        "industries": [
-            {"id": k, "name": v["name"]} for k, v in rules["industries"].items()
-        ],
+        "industries": industries_out,
         "action_types": [
             {"id": k, "name": v["name"]} for k, v in rules["action_types"].items()
         ],
@@ -124,6 +137,34 @@ def detect_action_type(description: str, action_type: str) -> str:
     return action_type or "greenfield_plant"
 
 
+def detect_sub_sectors(corpus: str, industry_id: str) -> list[dict[str, str]]:
+    """从场景描述识别新能源子赛道（电动客车 / 电池 / 光伏 / 储能 / 研发）。"""
+    rules = load_rules()
+    industry = rules["industries"].get(industry_id, {})
+    sub_defs = industry.get("sub_sector_defs", {})
+    normalized = _normalize_text(corpus)
+    detected: list[dict[str, str]] = []
+    for sid, sdef in sub_defs.items():
+        keywords = sdef.get("keywords", [])
+        matched = [kw for kw in keywords if kw.lower() in normalized or kw in corpus]
+        if matched:
+            detected.append(
+                {
+                    "id": sid,
+                    "name": sdef.get("name", sid),
+                    "matched_keywords": matched[:5],
+                }
+            )
+    return detected
+
+
+def _item_matches_sub_sectors(item: dict[str, Any], detected_sub_sector_ids: set[str]) -> bool:
+    item_sectors = item.get("sub_sectors")
+    if not item_sectors:
+        return True
+    return bool(set(item_sectors) & detected_sub_sector_ids)
+
+
 def generate_checklist(scenario: ScenarioInput) -> dict[str, Any]:
     rules = load_rules()
     corpus = _normalize_text(
@@ -167,10 +208,25 @@ def generate_checklist(scenario: ScenarioInput) -> dict[str, Any]:
     if not selected:
         selected = valid_dimensions
 
+    detected_industry = detect_industry(scenario.description, scenario.industry)
+    detected_sub_sectors = detect_sub_sectors(corpus, detected_industry)
+    detected_sub_sector_ids = {s["id"] for s in detected_sub_sectors}
+
     scored_items: list[dict[str, Any]] = []
     for item in rules["checklist_items"]:
+        if not _item_matches_sub_sectors(item, detected_sub_sector_ids):
+            continue
         result = _score_item(item, corpus, selected)
         if result:
+            item_sectors = item.get("sub_sectors") or []
+            if item_sectors:
+                matched_sector_names = [
+                    s["name"]
+                    for s in detected_sub_sectors
+                    if s["id"] in item_sectors
+                ]
+                if matched_sector_names:
+                    result["sub_sector_tags"] = matched_sector_names
             scored_items.append(result)
 
     # State/city overlay: ensure referenced items included
@@ -219,6 +275,7 @@ def generate_checklist(scenario: ScenarioInput) -> dict[str, Any]:
                         "relevance_score": i["relevance_score"],
                         "rationale": i["rationale"],
                         "matched_triggers": i.get("matched_triggers", []),
+                        "sub_sector_tags": i.get("sub_sector_tags", []),
                         "status": "pending",
                     }
                     for i in items
@@ -226,14 +283,17 @@ def generate_checklist(scenario: ScenarioInput) -> dict[str, Any]:
             }
         )
 
-    detected_industry = detect_industry(scenario.description, scenario.industry)
     detected_action = detect_action_type(scenario.description, scenario.action_type)
+    pack = rules.get("pack", {})
 
     return {
         "title": f"《拉美投资合规专项核查清单》— {scenario.project_name}",
         "jurisdiction": rules["jurisdiction"]["name"],
+        "industry_pack_id": pack.get("id", "brazil_new_energy"),
+        "industry_pack_name": pack.get("name", "巴西 · 新能源制造"),
         "detected_industry": detected_industry,
         "detected_industry_name": rules["industries"].get(detected_industry, {}).get("name", detected_industry),
+        "detected_sub_sectors": detected_sub_sectors,
         "detected_action_type": detected_action,
         "detected_action_type_name": rules["action_types"].get(detected_action, {}).get("name", detected_action),
         "selected_dimensions": list(selected),
@@ -278,22 +338,8 @@ def get_demo_scenario_template() -> dict[str, Any]:
 
 
 def get_mining_demo_scenario_template() -> dict[str, Any]:
-    """矿产投资场景模板（行业定制 MVP）。"""
-    return {
-        "project_name": "巴西铁矿绿地投资（演示模板）",
-        "country": "brazil",
-        "state": "minas_gerais",
-        "city": "belo_horizonte",
-        "industry": "new_energy",
-        "action_type": "greenfield_plant",
-        "investment_structure": "合资 SPV，外资占比 70%",
-        "description": (
-            "中资矿业企业在米纳斯吉拉斯州考察铁矿选矿与物流枢纽项目，"
-            "涉及环境许可、原住民土地咨询、外资登记及州级税制优惠申请。"
-        ),
-        "employee_count": 120,
-        "capacity_notes": "年处理矿石 200 万吨",
-        "facility_notes": "选矿厂 + 铁路装车设施",
-        "compliance_dimensions": ["foreign_investment", "tax", "industry_access", "labor"],
-        "remarks": "行业模板演示：规则库仍以新能源条目为主，展示多场景输入能力",
-    }
+    """已暂停：矿产行业专包尚未建设，请勿用于正式协查。"""
+    raise ValueError(
+        "矿产行业专包尚未上线。当前仅支持「巴西 · 新能源制造（设厂专包）」。"
+        "请使用 GET /api/v1/rules/demo-template 或新能源场景表单。"
+    )

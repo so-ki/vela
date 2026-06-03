@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, nextTick, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { fetchBrief, fetchLlmStatus, fetchScenario, generateBrief, submitScenarioForReview } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
@@ -52,8 +52,27 @@ onMounted(async () => {
     error.value = '无法加载简报'
   } finally {
     loading.value = false
+    scrollToBriefAnchor()
   }
 })
+
+function briefAnchorId(code: string) {
+  return `brief-${code}`
+}
+
+function scrollToBriefAnchor() {
+  const hash = route.hash
+  if (!hash) return
+  nextTick(() => {
+    const el = document.querySelector(hash)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    el.classList.add('brief-item-focus')
+    window.setTimeout(() => el.classList.remove('brief-item-focus'), 2800)
+  })
+}
+
+watch(() => route.hash, () => scrollToBriefAnchor())
 
 async function runGenerate(id: number, polish = true) {
   generating.value = true
@@ -135,7 +154,15 @@ const passedItems = computed(() =>
           </p>
         </div>
         <div class="header-actions">
+          <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
           <RouterLink :to="`/scenarios/${scenario.id}/checklist`" class="btn-secondary link-btn">返回清单</RouterLink>
+          <RouterLink
+            v-if="auth.isLegal"
+            :to="{ name: 'review', params: { id: scenario.id } }"
+            class="btn-secondary link-btn"
+          >
+            进入复核
+          </RouterLink>
           <button type="button" class="btn-primary" :disabled="generating" @click="runGenerate(scenario.id, true)">
             {{ generating ? '生成中…' : 'LLM 润色生成' }}
           </button>
@@ -150,6 +177,13 @@ const passedItems = computed(() =>
       </div>
 
       <p class="error banner-error" v-if="error">{{ error }}</p>
+
+      <div v-if="route.query.from === 'review'" class="from-review-banner panel">
+        <span>已从法务复核跳转至对应简报片段</span>
+        <RouterLink :to="{ name: 'review', params: { id: scenario.id } }" class="btn-secondary link-btn sm">
+          返回复核
+        </RouterLink>
+      </div>
 
       <section class="brief-summary panel">
         <h2>执行摘要</h2>
@@ -188,6 +222,7 @@ const passedItems = computed(() =>
           <article
             v-for="item in section.items"
             :key="item.code"
+            :id="briefAnchorId(item.code)"
             class="brief-item"
             :class="{ blocked: item.gate_status === 'blocked' }"
           >
@@ -252,10 +287,25 @@ const passedItems = computed(() =>
         </template>
         <template v-else>
           <p class="muted">对每条核查项进行确认 / 驳回 / 批注，定稿后可导出 Word / PDF 协查底稿。</p>
-          <button type="button" class="btn-primary" @click="router.push({ name: 'review', params: { id: scenario.id } })">
-            进入法务复核
-          </button>
+          <div class="action-row stack-actions">
+            <RouterLink
+              :to="{ name: 'review', params: { id: scenario.id } }"
+              class="btn-primary link-btn full"
+            >
+              进入法务复核
+            </RouterLink>
+            <RouterLink to="/" class="btn-secondary link-btn full">返回工作台</RouterLink>
+          </div>
         </template>
+      </div>
+
+      <div v-if="route.query.from === 'review'" class="review-return-bar">
+        <RouterLink
+          :to="{ name: 'review', params: { id: scenario.id } }"
+          class="btn-primary link-btn review-return-btn"
+        >
+          ← 返回继续复核
+        </RouterLink>
       </div>
     </template>
   </div>

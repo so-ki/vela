@@ -1,4 +1,10 @@
 {
+  "pack": {
+    "id": "brazil_new_energy",
+    "name": "巴西 · 新能源制造（设厂专包）",
+    "version": "2.0",
+    "focus": "境外绿地设厂 · 电动客车 / 动力电池 / 光伏储能 / 研发中心"
+  },
   "jurisdiction": {
     "id": "brazil",
     "name": "巴西",
@@ -8,9 +14,35 @@
   "industries": {
     "new_energy": {
       "id": "new_energy",
-      "name": "新能源",
+      "name": "新能源制造",
       "keywords": ["新能源", "电动", "电池", "光伏", "储能", "客车", "大巴", "铁锂", "零排放", "renewable", "battery", "ev", "bus"],
-      "sub_sectors": ["electric_bus", "battery_pack", "solar", "energy_storage", "rd_center"]
+      "sub_sector_defs": {
+        "electric_bus": {
+          "id": "electric_bus",
+          "name": "电动客车",
+          "keywords": ["客车", "大巴", "公交", "纯电动", "电动大巴", "ônibus", "bus", "1000"]
+        },
+        "battery_pack": {
+          "id": "battery_pack",
+          "name": "动力电池",
+          "keywords": ["电池", "磷酸铁锂", "铁锂", "battery", "pack", "lithium", "回收", "防火"]
+        },
+        "solar": {
+          "id": "solar",
+          "name": "光伏组件",
+          "keywords": ["光伏", "太阳能", "solar", "panel", "组件"]
+        },
+        "energy_storage": {
+          "id": "energy_storage",
+          "name": "储能系统",
+          "keywords": ["储能", "storage", "系统", "电网"]
+        },
+        "rd_center": {
+          "id": "rd_center",
+          "name": "研发中心",
+          "keywords": ["研发", "research", "development", "R&D", "研发中心", "智能电网", "LED"]
+        }
+      }
     }
   },
   "action_types": {
@@ -197,7 +229,98 @@
       "description": "首年 1000 台客车及电池产能分期投产时，各阶段许可范围与扩产备案要求。",
       "priority": "medium",
       "always_include": false,
+      "sub_sectors": ["electric_bus", "battery_pack"],
       "triggers": ["产能", "1000", "投产", "首年"]
+    },
+    {
+      "id": "IND-006",
+      "dimension": "industry_access",
+      "title": "电动客车型式认证（CONTRAN / INMETRO）",
+      "description": "核查纯电动客车在巴西市场的型式认证、安全标准（CONTRAN 决议）及 INMETRO 强制认证路径，含出口 CKD/SKD 与本地组装差异。",
+      "priority": "high",
+      "always_include": false,
+      "sub_sectors": ["electric_bus"],
+      "triggers": ["客车", "大巴", "公交", "组装", "1000", "电动"]
+    },
+    {
+      "id": "IND-007",
+      "dimension": "industry_access",
+      "title": "锂化合物与电池进口危化品合规",
+      "description": "磷酸铁锂及电解液等进口涉及的 ANVISA/IBAMA 分类、危险品运输（IMDG）、仓储与口岸申报要求。",
+      "priority": "high",
+      "always_include": false,
+      "sub_sectors": ["battery_pack"],
+      "triggers": ["电池", "磷酸铁锂", "进口", "铁锂", "lithium"]
+    },
+    {
+      "id": "IND-008",
+      "dimension": "industry_access",
+      "title": "光伏组件能效与 PROINFA/PROCEL 合规",
+      "description": "太阳能电池板生产的 INMETRO 能效标签、PROCEL 认证及并网前 ANEEL 登记要求。",
+      "priority": "medium",
+      "always_include": false,
+      "sub_sectors": ["solar"],
+      "triggers": ["光伏", "太阳能", "panel", "组件"]
+    },
+    {
+      "id": "IND-009",
+      "dimension": "industry_access",
+      "title": "储能系统并网与 ANEEL 规范",
+      "description": "工业级储能系统接入巴西电网的技术规范、并网许可及分布式发电登记义务。",
+      "priority": "medium",
+      "always_include": false,
+      "sub_sectors": ["energy_storage"],
+      "triggers": ["储能", "storage", "电网", "系统"]
+    },
+    {
+      "id": "IND-010",
+      "dimension": "industry_access",
+      "title": "延伸生产者责任（PNRS）与电池回收",
+      "description": "动力电池及包装物须符合国家固体废物政策（PNRS），评估回收计划、逆向物流及与制造许可的联动。",
+      "priority": "medium",
+      "always_include": false,
+      "sub_sectors": ["battery_pack"],
+      "triggers": ["电池", "回收", "可回收", "pack"]
+    },
+    {
+      "id": "IND-011",
+      "dimension": "industry_access",
+      "title": "大型工业项目环评（EIA/RIMA）",
+      "description": "32,000 m² 级制造设施须评估是否需要完整环境影响评估（EIA/RIMA）、IBAMA/州环境厅审批周期及公众参与程序。",
+      "priority": "high",
+      "always_include": false,
+      "sub_sectors": ["electric_bus", "battery_pack"],
+      "triggers": ["厂房", "平方米", "m²", "32,000", "20,000", "建设", "工厂"]
+    },
+    {
+      "id": "TAX-005",
+      "dimension": "tax",
+      "title": "PADIS / PRODEIC 等新能源制造激励资格",
+      "description": "筛查信息技术/自动化（PADIS）、圣保罗州 PRODEIC 等联邦/州激励对客车、电池、光伏产线的适用条件与合规义务。",
+      "priority": "high",
+      "always_include": false,
+      "sub_sectors": ["electric_bus", "battery_pack", "solar", "energy_storage"],
+      "triggers": ["制造", "电池", "客车", "光伏", "储能", "研发"]
+    },
+    {
+      "id": "FOR-004",
+      "dimension": "foreign_investment",
+      "title": "本地化含量与技术转让安排",
+      "description": "评估汽车工业本地成分、技术许可及与母公司之间的跨境技术转让、知识产权备案是否符合外资与技术进口规则。",
+      "priority": "medium",
+      "always_include": false,
+      "sub_sectors": ["electric_bus", "battery_pack"],
+      "triggers": ["制造", "组装", "技术", "电池", "客车", "比亚迪"]
+    },
+    {
+      "id": "LAB-005",
+      "dimension": "labor",
+      "title": "NR-12 机械设备与产线安全培训",
+      "description": "客车与电池产线涉及自动化设备，须落实 NR-12 机械安全、操作培训记录及第三方检测安排。",
+      "priority": "medium",
+      "always_include": false,
+      "sub_sectors": ["electric_bus", "battery_pack"],
+      "triggers": ["制造", "组装", "电池", "客车", "生产", "450"]
     }
   ],
   "state_overlays": {

@@ -59,7 +59,7 @@ class LegalIndexResponse(BaseModel):
     message: str
     indexed: int
     collection: Optional[str] = None
-    sources_breakdown: Optional[dict[str, int]] = None
+    sources_breakdown: Optional[dict[str, Any]] = None
 
 
 class LegalStatusResponse(BaseModel):
@@ -104,4 +104,98 @@ class LegalMonitorScanResponse(BaseModel):
     corpus_fingerprint: str
     new_alerts: List[LegalMonitorAlert]
     alerts: List[LegalMonitorAlert]
+    index: LegalIndexResponse
+
+
+class LegalCorpusDocument(BaseModel):
+    id: str
+    source: str
+    urn: str
+    url: str
+    title_pt: str
+    title_zh: str
+    dimension: str
+    level: str
+    validity: str
+    published_at: str
+    tags: List[str] = Field(default_factory=list)
+    checklist_codes: List[str] = Field(default_factory=list)
+    text_pt: str
+    text_zh: str
+
+
+class LegalCorpusDocumentCreate(BaseModel):
+    id: Optional[str] = None
+    source: str = "lexml"
+    urn: str
+    url: str
+    title_pt: str
+    title_zh: str
+    dimension: str
+    level: str = "federal"
+    validity: str = "vigente"
+    published_at: str
+    tags: List[str] = Field(default_factory=list)
+    checklist_codes: List[str] = Field(default_factory=list)
+    text_pt: str
+    text_zh: str
+
+
+class LegalCorpusDocumentUpdate(BaseModel):
+    source: Optional[str] = None
+    urn: Optional[str] = None
+    url: Optional[str] = None
+    title_pt: Optional[str] = None
+    title_zh: Optional[str] = None
+    dimension: Optional[str] = None
+    level: Optional[str] = None
+    validity: Optional[str] = None
+    published_at: Optional[str] = None
+    tags: Optional[List[str]] = None
+    checklist_codes: Optional[List[str]] = None
+    text_pt: Optional[str] = None
+    text_zh: Optional[str] = None
+
+
+class LegalCorpusListResponse(BaseModel):
+    version: str
+    total: int
+    items: List[LegalCorpusDocument]
+
+
+class LegalCorpusMutationResponse(BaseModel):
+    item: LegalCorpusDocument
+    version: str
+    document_count: int
+
+
+class LegalCorpusDeleteResponse(BaseModel):
+    deleted_id: str
+    version: str
+    document_count: int
+
+
+class LegalCorpusMetaDimension(BaseModel):
+    id: str
+    name: str
+
+
+class LegalCorpusMetaChecklistCode(BaseModel):
+    id: str
+    title: str
+    dimension: str
+
+
+class LegalCorpusMetaResponse(BaseModel):
+    version: str
+    jurisdiction: str
+    document_count: int
+    sources: List[str]
+    levels: List[str]
+    dimensions: List[LegalCorpusMetaDimension]
+    checklist_codes: List[LegalCorpusMetaChecklistCode]
+
+
+class LegalCorpusReindexResponse(BaseModel):
+    version: str
     index: LegalIndexResponse

@@ -112,9 +112,17 @@ def _section_summary_pt(dimension_name_pt: str, items: list[dict[str, Any]]) -> 
 
 
 def _executive_summary_zh(scenario: InvestigationScenario, checklist: dict[str, Any], passed: int, blocked: int) -> str:
+    sub_sectors = checklist.get("detected_sub_sectors") or []
+    sub_label = ""
+    if sub_sectors:
+        names = "、".join(s.get("name", "") for s in sub_sectors if s.get("name"))
+        if names:
+            sub_label = f"识别子赛道：{names}。"
+    pack = checklist.get("industry_pack_name") or "巴西 · 新能源制造"
     return (
-        f"本简报针对项目「{scenario.project_name}」（{checklist.get('detected_industry_name', scenario.industry)} · "
+        f"本简报针对项目「{scenario.project_name}」（{pack} · "
         f"{checklist.get('detected_action_type_name', scenario.action_type)}），"
+        f"{sub_label}"
         f"基于专项核查清单与 LexML/STF/STJ 法源检索结果汇编。"
         f"共 {passed + blocked} 条核查项，{passed} 条已自动纳入风险摘要，{blocked} 条因匹配度不足或未命中法条而标注「需法务复核」。"
         f"本文件为协查底稿，不构成正式法律意见。"

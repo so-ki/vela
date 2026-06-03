@@ -24,6 +24,17 @@ def _flatten_brief_items(brief: dict[str, Any]) -> list[dict[str, Any]]:
     return items
 
 
+def _legal_hits_by_code(payload: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    mapping: dict[str, list[dict[str, Any]]] = {}
+    sections = payload.get("sections_with_legal") or payload.get("sections") or []
+    for section in sections:
+        for item in section.get("items", []):
+            code = item.get("code")
+            if code:
+                mapping[code] = item.get("legal_hits") or []
+    return mapping
+
+
 def init_review(scenario: InvestigationScenario, user: User) -> dict[str, Any]:
     payload = scenario.checklist.payload
     brief = payload.get("brief")
@@ -34,6 +45,7 @@ def init_review(scenario: InvestigationScenario, user: User) -> dict[str, Any]:
     if existing and existing.get("items"):
         return existing
 
+    hits_by_code = _legal_hits_by_code(payload)
     review_items = []
     for item in _flatten_brief_items(brief):
         review_items.append(
@@ -45,6 +57,8 @@ def init_review(scenario: InvestigationScenario, user: User) -> dict[str, Any]:
                 "match_score": float(item.get("match_score", 0)),
                 "decision": "pending",
                 "comment": None,
+                "external_counsel_required": False,
+                "legal_hits": hits_by_code.get(item["code"], [])[:3],
                 "reviewed_at": None,
             }
         )
@@ -72,6 +86,7 @@ def update_review_item(
     code: str,
     decision: str,
     comment: Optional[str],
+    external_counsel_required: Optional[bool] = None,
 ) -> dict[str, Any]:
     if review.get("status") in ("approved", "rejected", "partial"):
         raise ValueError("复核已定稿，无法修改")
@@ -86,6 +101,8 @@ def update_review_item(
 
     target["decision"] = decision
     target["comment"] = comment.strip() if comment else None
+    if external_counsel_required is not None:
+        target["external_counsel_required"] = external_counsel_required
     target["reviewed_at"] = _utcnow().isoformat() if decision != "pending" else None
     return review
 
@@ -132,6 +149,7 @@ def review_to_response(scenario_id: int, review: dict[str, Any]) -> dict[str, An
     status = review.get("status", "in_progress")
     can_finalize = status == "in_progress" and pending == 0 and len(items) > 0
     can_export = status in ("approved", "partial", "rejected")
+    can_return = status == "in_progress" and rejected > 0
 
     return {
         "scenario_id": scenario_id,
@@ -145,4 +163,120 @@ def review_to_response(scenario_id: int, review: dict[str, Any]) -> dict[str, An
         "pending_count": pending,
         "can_finalize": can_finalize,
         "can_export": can_export,
+        "can_return_to_business": can_return,
+    }
+
+
+def return_review_to_business(
+    review: dict[str, Any],
+    user: User,
+    *,
+    note: Optional[str] = None,
+) -> dict[str, Any]:
+    """法务将含驳回条目的复核退回业务补充（同一项目）。"""
+    if review.get("status") != "in_progress":
+        raise ValueError("仅「复核进行中」可退回业务补充")
+
+    approved, rejected, pending = _counts(review.get("items", []))
+    if rejected == 0:
+        raise ValueError("须至少有一条「已驳回」条目方可退回业务")
+
+    rejected_items = [
+        {
+            "code": i.get("code"),
+            "title": i.get("title"),
+            "comment": i.get("comment"),
+            "external_counsel_required": i.get("external_counsel_required"),
+        }
+        for i in review.get("items", [])
+        if i.get("decision") == "rejected"
+    ]
+
+    review["status"] = "returned"
+    review["returned_at"] = _utcnow().isoformat()
+    review["returned_by"] = user.full_name
+    review["returned_by_id"] = user.id
+    review["return_note"] = note.strip() if note else None
+    review["return_snapshot"] = {
+        "approved_count": approved,
+        "rejected_count": rejected,
+        "pending_count": pending,
+        "rejected_items": rejected_items,
+    }
+    return review
+
+
+def business_feedback_from_review(review: dict[str, Any] | None) -> dict[str, Any] | None:
+    """面向业务提交人的复核摘要：仅含驳回批注与需外聘标记，不含完整法条片段。"""
+    if not review or not review.get("items"):
+        return None
+
+    items = review.get("items", [])
+    approved, rejected, pending = _counts(items)
+    status = review.get("status", "in_progress")
+
+    feedback_items: list[dict[str, Any]] = []
+    for item in items:
+        decision = item.get("decision")
+        external = bool(item.get("external_counsel_required"))
+        comment = (item.get("comment") or "").strip()
+        if decision == "rejected" or external:
+            feedback_items.append(
+                {
+                    "code": item.get("code"),
+                    "title": item.get("title"),
+                    "dimension_name": item.get("dimension_name", ""),
+                    "decision": decision,
+                    "comment": comment or None,
+                    "external_counsel_required": external,
+                    "reviewed_at": item.get("reviewed_at"),
+                }
+            )
+
+    if not feedback_items and status == "in_progress" and pending == len(items):
+        return {
+            "review_status": status,
+            "is_finalized": False,
+            "is_returned": False,
+            "approved_count": approved,
+            "rejected_count": rejected,
+            "pending_count": pending,
+            "action_required": False,
+            "summary": "法务已开始复核，暂无需要您处理的反馈。",
+            "items": [],
+        }
+
+    action_required = rejected > 0 or any(i.get("external_counsel_required") for i in feedback_items)
+    is_finalized = status in ("approved", "partial", "rejected")
+    is_returned = status == "returned"
+
+    if is_returned:
+        summary = (
+            f"法务已退回补充：{rejected} 条驳回须处理。"
+            + (f" 说明：{review.get('return_note')}" if review.get("return_note") else "")
+            + " 请在本项目补充材料后重新提交。"
+        )
+    elif is_finalized:
+        if rejected > 0:
+            summary = f"法务已定稿：{rejected} 条协查结论被驳回，请根据批注补充材料。"
+        elif any(i.get("external_counsel_required") for i in feedback_items):
+            summary = "法务已定稿：部分条目标记需外聘巴西律所，请按批注安排。"
+        else:
+            summary = "法务已定稿，协查流程已完成。"
+    elif rejected > 0 or feedback_items:
+        summary = f"法务复核中：{rejected} 条已驳回，请查看批注并与法务沟通。"
+    else:
+        summary = "法务复核中，暂无需要您处理的反馈。"
+
+    return {
+        "review_status": status,
+        "is_finalized": is_finalized,
+        "is_returned": is_returned,
+        "approved_count": approved,
+        "rejected_count": rejected,
+        "pending_count": pending,
+        "action_required": action_required or is_returned,
+        "summary": summary,
+        "items": feedback_items,
+        "return_note": review.get("return_note"),
     }

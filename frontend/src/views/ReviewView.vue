@@ -1,18 +1,20 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import {
   approveAllReview,
   downloadDocxExport,
   downloadPdfExport,
+  fetchBrief,
   fetchReview,
   fetchScenario,
   finalizeReview,
   initReview,
+  returnScenarioToBusiness,
   updateReviewItem,
 } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
-import type { ReviewState, Scenario } from '@/types/scenario'
+import type { BriefItem, LegalHit, ReviewItem, ReviewState, RiskBrief, Scenario } from '@/types/scenario'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,21 +24,61 @@ const review = ref<ReviewState | null>(null)
 const loading = ref(true)
 const saving = ref<string | null>(null)
 const finalizing = ref(false)
+const returning = ref(false)
 const exporting = ref(false)
 const exportingPdf = ref(false)
 const error = ref<string | null>(null)
 const comments = ref<Record<string, string>>({})
+const briefCache = ref<RiskBrief | null>(null)
+const loadingSnippetCode = ref<string | null>(null)
+const snippetPanel = ref<{
+  open: boolean
+  code: string | null
+  item: BriefItem | null
+  dimensionName: string | null
+  legalHits: LegalHit[]
+}>({
+  open: false,
+  code: null,
+  item: null,
+  dimensionName: null,
+  legalHits: [],
+})
+
+const reviewFilter = ref<'all' | 'pending' | 'gate' | 'external'>('all')
+const GATE_THRESHOLD = 70
+
+const priorityLabel: Record<string, string> = {
+  high: '高',
+  medium: '中',
+  low: '低',
+}
 
 const statusLabel: Record<string, string> = {
   in_progress: '复核中',
   approved: '已全部确认',
   partial: '部分确认',
   rejected: '已驳回',
+  returned: '已退回业务',
 }
 
 const isLocked = computed(() =>
   review.value ? !['in_progress'].includes(review.value.status) || !auth.isLegal : true,
 )
+
+const filteredItems = computed(() => {
+  const items = review.value?.items || []
+  switch (reviewFilter.value) {
+    case 'pending':
+      return items.filter((i) => i.decision === 'pending')
+    case 'gate':
+      return items.filter((i) => i.gate_status !== 'passed' || i.match_score < GATE_THRESHOLD)
+    case 'external':
+      return items.filter((i) => i.external_counsel_required)
+    default:
+      return items
+  }
+})
 
 onMounted(async () => {
   const id = Number(route.params.id)
@@ -59,6 +101,12 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+  window.addEventListener('keydown', onSnippetKeydown)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', onSnippetKeydown)
+  unlockBodyScroll()
 })
 
 async function setDecision(code: string, decision: 'approved' | 'rejected') {
@@ -69,6 +117,7 @@ async function setDecision(code: string, decision: 'approved' | 'rejected') {
     review.value = await updateReviewItem(scenario.value.id, code, {
       decision,
       comment: comments.value[code] || undefined,
+      external_counsel_required: review.value?.items.find((i) => i.code === code)?.external_counsel_required,
     })
   } catch (e: unknown) {
     error.value = extractError(e)
@@ -86,6 +135,21 @@ async function saveComment(code: string) {
     review.value = await updateReviewItem(scenario.value.id, code, {
       decision: item.decision,
       comment: comments.value[code] || undefined,
+      external_counsel_required: item.external_counsel_required,
+    })
+  } finally {
+    saving.value = null
+  }
+}
+
+async function toggleExternalCounsel(item: ReviewItem, value: boolean) {
+  if (!scenario.value || isLocked.value) return
+  saving.value = item.code
+  try {
+    review.value = await updateReviewItem(scenario.value.id, item.code, {
+      decision: item.decision,
+      comment: comments.value[item.code] || undefined,
+      external_counsel_required: value,
     })
   } finally {
     saving.value = null
@@ -116,6 +180,21 @@ async function runFinalize() {
     error.value = extractError(e)
   } finally {
     finalizing.value = false
+  }
+}
+
+async function runReturnToBusiness() {
+  if (!scenario.value || !review.value?.can_return_to_business) return
+  const note = window.prompt('退回说明（可选，将展示给业务）：') ?? ''
+  returning.value = true
+  error.value = null
+  try {
+    scenario.value = await returnScenarioToBusiness(scenario.value.id, note || undefined)
+    await router.push({ name: 'dashboard' })
+  } catch (e: unknown) {
+    error.value = extractError(e)
+  } finally {
+    returning.value = false
   }
 }
 
@@ -168,6 +247,104 @@ function extractError(e: unknown): string {
 function goBrief() {
   router.push({ name: 'brief', params: { id: route.params.id } })
 }
+
+function findBriefItem(brief: RiskBrief, code: string): { item: BriefItem; dimensionName: string } | null {
+  for (const section of brief.sections) {
+    const found = section.items.find((i) => i.code === code)
+    if (found) return { item: found, dimensionName: section.dimension_name }
+  }
+  const blocked = brief.blocked_items.find((i) => i.code === code)
+  if (blocked) return { item: blocked, dimensionName: '需法务复核' }
+  return null
+}
+
+async function openBriefSnippet(code: string) {
+  if (!scenario.value) return
+  const reviewItem = review.value?.items.find((i) => i.code === code)
+  loadingSnippetCode.value = code
+  error.value = null
+  try {
+    if (!briefCache.value) {
+      briefCache.value = await fetchBrief(scenario.value.id)
+    }
+    const match = findBriefItem(briefCache.value, code)
+    if (!match) {
+      error.value = `简报中未找到条目 ${code}`
+      return
+    }
+    snippetPanel.value = {
+      open: true,
+      code,
+      item: match.item,
+      dimensionName: match.dimensionName,
+      legalHits: reviewItem?.legal_hits || [],
+    }
+  } catch {
+    error.value = '无法加载简报片段，请确认已生成双语简报'
+  } finally {
+    loadingSnippetCode.value = null
+  }
+}
+
+function closeSnippet() {
+  snippetPanel.value = { open: false, code: null, item: null, dimensionName: null, legalHits: [] }
+}
+
+let bodyScrollLocked = false
+let savedScrollY = 0
+
+function lockBodyScroll() {
+  if (bodyScrollLocked) return
+  savedScrollY = window.scrollY
+  document.body.style.overflow = 'hidden'
+  document.body.style.position = 'fixed'
+  document.body.style.top = `-${savedScrollY}px`
+  document.body.style.left = '0'
+  document.body.style.right = '0'
+  document.body.style.width = '100%'
+  bodyScrollLocked = true
+}
+
+function unlockBodyScroll() {
+  if (!bodyScrollLocked) return
+  document.body.style.overflow = ''
+  document.body.style.position = ''
+  document.body.style.top = ''
+  document.body.style.left = ''
+  document.body.style.right = ''
+  document.body.style.width = ''
+  window.scrollTo(0, savedScrollY)
+  bodyScrollLocked = false
+}
+
+watch(
+  () => snippetPanel.value.open,
+  (open) => {
+    if (open) lockBodyScroll()
+    else unlockBodyScroll()
+  },
+)
+
+async function decideFromSnippet(decision: 'approved' | 'rejected') {
+  const code = snippetPanel.value.code
+  if (!code) return
+  await setDecision(code, decision)
+  closeSnippet()
+}
+
+function openFullBrief(code: string) {
+  closeSnippet()
+  router.push({
+    name: 'brief',
+    params: { id: route.params.id },
+    hash: `#brief-${code}`,
+    query: { from: 'review' },
+  })
+}
+
+function onSnippetKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') closeSnippet()
+}
 </script>
 
 <template>
@@ -192,6 +369,8 @@ function goBrief() {
           </p>
         </div>
         <div class="header-actions" v-if="auth.isLegal">
+          <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
+          <RouterLink :to="{ name: 'checklist', params: { id: scenario.id } }" class="btn-secondary link-btn">查看清单</RouterLink>
           <button type="button" class="btn-secondary" @click="goBrief">查看简报</button>
           <button
             v-if="!isLocked"
@@ -201,6 +380,15 @@ function goBrief() {
             @click="runApproveAll"
           >
             全部确认
+          </button>
+          <button
+            v-if="!isLocked && review.can_return_to_business"
+            type="button"
+            class="btn-secondary reject"
+            :disabled="returning"
+            @click="runReturnToBusiness"
+          >
+            {{ returning ? '退回中…' : '退回业务补充' }}
           </button>
           <button
             type="button"
@@ -240,8 +428,26 @@ function goBrief() {
 
       <p class="error banner-error" v-if="error">{{ error }}</p>
 
+      <div class="review-filters panel">
+        <button
+          v-for="f in [
+            { id: 'all', label: '全部' },
+            { id: 'pending', label: '待处理' },
+            { id: 'gate', label: '门控未过线' },
+            { id: 'external', label: '需外聘律所' },
+          ]"
+          :key="f.id"
+          type="button"
+          class="btn-secondary sm"
+          :class="{ active: reviewFilter === f.id }"
+          @click="reviewFilter = f.id as typeof reviewFilter"
+        >
+          {{ f.label }}
+        </button>
+      </div>
+
       <section class="review-items panel">
-        <article v-for="item in review.items" :key="item.code" class="review-item" :class="item.decision">
+        <article v-for="item in filteredItems" :key="item.code" class="review-item" :class="item.decision">
           <div class="item-head">
             <span class="item-code">{{ item.code }}</span>
             <span class="muted">{{ item.dimension_name }}</span>
@@ -253,23 +459,33 @@ function goBrief() {
             </span>
           </div>
           <h3>{{ item.title }}</h3>
-          <div class="review-actions" v-if="!isLocked">
+          <div class="review-actions">
             <button
               type="button"
-              class="btn-secondary sm"
-              :disabled="saving === item.code"
-              @click="setDecision(item.code, 'approved')"
+              class="btn-secondary sm link-brief-snippet"
+              @click="openBriefSnippet(item.code)"
+              :disabled="loadingSnippetCode === item.code"
             >
-              确认
+              {{ loadingSnippetCode === item.code ? '加载中…' : '查看简报片段' }}
             </button>
-            <button
-              type="button"
-              class="btn-secondary sm reject"
-              :disabled="saving === item.code"
-              @click="setDecision(item.code, 'rejected')"
-            >
-              驳回
-            </button>
+            <template v-if="!isLocked">
+              <button
+                type="button"
+                class="btn-secondary sm"
+                :disabled="saving === item.code"
+                @click="setDecision(item.code, 'approved')"
+              >
+                确认
+              </button>
+              <button
+                type="button"
+                class="btn-secondary sm reject"
+                :disabled="saving === item.code"
+                @click="setDecision(item.code, 'rejected')"
+              >
+                驳回
+              </button>
+            </template>
           </div>
           <label class="comment-field">
             <span>批注</span>
@@ -280,14 +496,140 @@ function goBrief() {
               @blur="saveComment(item.code)"
             />
           </label>
+          <label class="external-counsel-field" v-if="!isLocked">
+            <input
+              type="checkbox"
+              :checked="!!item.external_counsel_required"
+              @change="toggleExternalCounsel(item, ($event.target as HTMLInputElement).checked)"
+            />
+            <span>需外聘当地律所补充意见</span>
+          </label>
+          <p class="muted external-flag" v-else-if="item.external_counsel_required">已标记：需外聘律所</p>
         </article>
+        <p class="muted" v-if="!filteredItems.length">当前筛选下暂无条目。</p>
       </section>
 
-      <div class="next-step panel" v-if="review.can_export">
-        <h2>样本已完成</h2>
-        <p class="muted">协查底稿已定稿，可导出 Word 文件作为完整样本交付物。</p>
-        <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
+      <div class="next-step panel">
+        <h2>导航</h2>
+        <p class="muted" v-if="review.can_export">
+          协查底稿已定稿，可继续导出或返回工作台处理其他待办。
+        </p>
+        <p class="muted" v-else>
+          复核进行中：可随时返回清单或简报对照，处理完所有条目后再定稿。
+        </p>
+        <div class="action-row">
+          <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
+          <RouterLink :to="{ name: 'checklist', params: { id: scenario.id } }" class="btn-secondary link-btn">
+            查看清单
+          </RouterLink>
+          <button type="button" class="btn-secondary" @click="goBrief">查看简报</button>
+        </div>
       </div>
+
+      <!-- 简报片段侧栏：不离开复核页 -->
+      <Teleport to="body">
+        <div
+          v-if="snippetPanel.open && snippetPanel.item"
+          class="snippet-overlay"
+          @click.self="closeSnippet"
+          @wheel.self.prevent
+          @touchmove.self.prevent
+        >
+          <aside class="snippet-drawer" role="dialog" aria-label="简报片段" @click.stop>
+            <header class="snippet-drawer-head">
+              <div>
+                <span class="item-code">{{ snippetPanel.code }}</span>
+                <span class="muted">{{ snippetPanel.dimensionName }}</span>
+              </div>
+              <button type="button" class="btn-text" @click="closeSnippet">✕</button>
+            </header>
+
+            <div class="snippet-drawer-body">
+              <div class="item-head">
+                <span class="badge" :class="snippetPanel.item.gate_status === 'passed' ? 'ok' : 'pri-medium'">
+                  {{ snippetPanel.item.gate_status === 'passed' ? '已通过门控' : '需法务复核' }}
+                </span>
+                <span class="badge" :class="'pri-' + snippetPanel.item.priority">
+                  {{ priorityLabel[snippetPanel.item.priority] || snippetPanel.item.priority }}优先级
+                </span>
+                <span class="score">匹配度 {{ snippetPanel.item.match_score }}</span>
+              </div>
+              <h3>{{ snippetPanel.item.title }}</h3>
+              <p v-if="snippetPanel.item.block_reason" class="block-reason">
+                门控原因：{{ snippetPanel.item.block_reason }}
+              </p>
+              <p class="gate-line muted">
+                门控阈值 {{ GATE_THRESHOLD }} 分 · 当前匹配度 {{ snippetPanel.item.match_score }}
+                <template v-if="snippetPanel.item.match_score < GATE_THRESHOLD">（未过线，须人工复核）</template>
+              </p>
+              <div class="snippet-section-title">简报风险说明</div>
+              <div class="bilingual-grid">
+                <article>
+                  <h4>中文</h4>
+                  <p>{{ snippetPanel.item.risk_zh }}</p>
+                </article>
+                <article>
+                  <h4>Português</h4>
+                  <p class="dim-pt">{{ snippetPanel.item.risk_pt }}</p>
+                </article>
+              </div>
+              <div v-if="snippetPanel.item.citations.length" class="brief-citations">
+                <h4>简报引用法条</h4>
+                <div v-for="cite in snippetPanel.item.citations" :key="cite.id" class="citation-row">
+                  <span class="source-badge">{{ cite.source_label }}</span>
+                  <span>{{ cite.title_zh || cite.title_pt }}</span>
+                  <a :href="cite.url" target="_blank" rel="noopener" class="hit-link">溯源 ↗</a>
+                </div>
+              </div>
+
+              <div v-if="snippetPanel.legalHits.length" class="brief-citations legal-hits-panel">
+                <h4>法源检索原文片段</h4>
+                <div v-for="hit in snippetPanel.legalHits" :key="hit.id" class="legal-hit compact">
+                  <div class="hit-head">
+                    <span class="source-badge">{{ hit.source_label }}</span>
+                    <span class="badge" :class="hit.requires_review ? 'pri-medium' : 'ok'">
+                      匹配度 {{ hit.match_score }}
+                    </span>
+                  </div>
+                  <strong>{{ hit.title_zh || hit.title_pt }}</strong>
+                  <p class="hit-excerpt">{{ hit.excerpt_pt }}</p>
+                  <p class="hit-excerpt zh" v-if="hit.excerpt_zh">{{ hit.excerpt_zh }}</p>
+                  <a :href="hit.url" target="_blank" rel="noopener" class="hit-link">LexML / 法院门户 ↗</a>
+                </div>
+              </div>
+            </div>
+
+            <footer class="snippet-drawer-foot">
+              <button type="button" class="btn-primary" @click="closeSnippet">关闭，继续复核</button>
+              <template v-if="!isLocked">
+                <button
+                  type="button"
+                  class="btn-secondary"
+                  :disabled="saving === snippetPanel.code"
+                  @click="decideFromSnippet('approved')"
+                >
+                  确认本条
+                </button>
+                <button
+                  type="button"
+                  class="btn-secondary reject"
+                  :disabled="saving === snippetPanel.code"
+                  @click="decideFromSnippet('rejected')"
+                >
+                  驳回本条
+                </button>
+              </template>
+              <button
+                type="button"
+                class="btn-text"
+                @click="openFullBrief(snippetPanel.code!)"
+              >
+                在完整简报中打开
+              </button>
+            </footer>
+          </aside>
+        </div>
+      </Teleport>
     </template>
   </div>
 </template>
