@@ -46,7 +46,11 @@ onMounted(async () => {
     try {
       brief.value = await fetchBrief(id)
     } catch {
-      await runGenerate(id, true)
+      if (auth.isLegal) {
+        await runGenerate(id, true)
+      } else {
+        error.value = '简报尚未生成或仍在处理中，请稍后刷新；系统提交法务时会自动生成简报。'
+      }
     }
   } catch {
     error.value = '无法加载简报'
@@ -124,7 +128,9 @@ const passedItems = computed(() =>
     <template v-else-if="brief && scenario">
       <header class="page-header">
         <div>
-          <p class="eyebrow dark">Step 5 · 双语法律风险简报</p>
+          <p class="eyebrow dark">
+            {{ auth.isBusiness ? '业务协查 · 双语简报（只读）' : 'Step 5 · 双语法律风险简报' }}
+          </p>
           <h1>{{ brief.title_zh }}</h1>
           <p class="meta dim-pt">{{ brief.title_pt }}</p>
           <p class="meta">
@@ -155,7 +161,21 @@ const passedItems = computed(() =>
         </div>
         <div class="header-actions">
           <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
-          <RouterLink :to="`/scenarios/${scenario.id}/checklist`" class="btn-secondary link-btn">返回清单</RouterLink>
+          <RouterLink
+            v-if="auth.isBusiness"
+            :to="{ name: 'scenario-progress', params: { id: scenario.id } }"
+            class="btn-secondary link-btn"
+          >
+            查看进度
+          </RouterLink>
+          <RouterLink
+            v-if="auth.isBusiness"
+            :to="{ name: 'checklist', params: { id: scenario.id } }"
+            class="btn-secondary link-btn"
+          >
+            查看清单
+          </RouterLink>
+          <RouterLink v-if="auth.isLegal" :to="`/scenarios/${scenario.id}/checklist`" class="btn-secondary link-btn">返回清单</RouterLink>
           <RouterLink
             v-if="auth.isLegal"
             :to="{ name: 'review', params: { id: scenario.id } }"
@@ -163,17 +183,24 @@ const passedItems = computed(() =>
           >
             进入复核
           </RouterLink>
-          <button type="button" class="btn-primary" :disabled="generating" @click="runGenerate(scenario.id, true)">
-            {{ generating ? '生成中…' : 'LLM 润色生成' }}
-          </button>
-          <button type="button" class="btn-secondary" :disabled="generating" @click="runGenerate(scenario.id, false)">
-            仅模板
-          </button>
+          <template v-if="auth.isLegal">
+            <button type="button" class="btn-primary" :disabled="generating" @click="runGenerate(scenario.id, true)">
+              {{ generating ? '生成中…' : 'LLM 润色生成' }}
+            </button>
+            <button type="button" class="btn-secondary" :disabled="generating" @click="runGenerate(scenario.id, false)">
+              仅模板
+            </button>
+          </template>
         </div>
       </header>
 
       <div class="disclaimer-banner">
-        本简报由核查清单与法源检索结果自动汇编，匹配度低于 {{ brief.threshold }} 分的条目不得自动定稿，须标注「需法务复核」。
+        <template v-if="auth.isBusiness">
+          本页仅供业务侧<strong>查阅</strong>系统自动生成的双语简报，不构成正式法律意见；复核与定稿须由法务完成。
+        </template>
+        <template v-else>
+          本简报由核查清单与法源检索结果自动汇编，匹配度低于 {{ brief.threshold }} 分的条目不得自动定稿，须标注「需法务复核」。
+        </template>
       </div>
 
       <p class="error banner-error" v-if="error">{{ error }}</p>
@@ -272,18 +299,21 @@ const passedItems = computed(() =>
       </section>
 
       <div class="next-step panel">
-        <h2>下一步（Step 6）</h2>
+        <h2>{{ auth.isBusiness ? '说明' : '下一步（Step 6）' }}</h2>
         <template v-if="auth.isBusiness">
-          <p class="muted" v-if="scenario?.status === 'pending_legal_review' || submitted">
-            已提交法务复核，请等待法务同事处理。您可在工作台查看进度。
+          <p class="muted">
+            本项目已通过「生成并提交法务」进入复核流程。您可在此查阅简报与法条依据；法务反馈请见
+            <RouterLink :to="{ name: 'scenario-progress', params: { id: scenario.id } }">进度页</RouterLink>。
           </p>
-          <template v-else>
-            <p class="muted">确认简报内容后，提交法务同事进行逐条复核与定稿。</p>
-            <button type="button" class="btn-primary" :disabled="submitting || !brief" @click="runSubmit">
-              {{ submitting ? '提交中…' : '提交法务复核' }}
-            </button>
-          </template>
-          <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
+          <div class="action-row stack-actions">
+            <RouterLink
+              :to="{ name: 'scenario-progress', params: { id: scenario.id } }"
+              class="btn-primary link-btn full"
+            >
+              返回进度跟踪
+            </RouterLink>
+            <RouterLink to="/" class="btn-secondary link-btn full">返回工作台</RouterLink>
+          </div>
         </template>
         <template v-else>
           <p class="muted">对每条核查项进行确认 / 驳回 / 批注，定稿后可导出 Word / PDF 协查底稿。</p>

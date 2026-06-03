@@ -361,6 +361,18 @@ a:hover {
   gap: 1.25rem;
 }
 
+.dashboard.legal-workbench-order .scenario-catalog-panel {
+  order: 1;
+}
+
+.dashboard.legal-workbench-order .recycle-bin-panel {
+  order: 2;
+}
+
+.dashboard.legal-workbench-order .legal-workbench-grid {
+  order: 3;
+}
+
 .hero-card {
   background: linear-gradient(135deg, var(--primary) 0%, #2d5a87 100%);
   color: #fff;
@@ -624,6 +636,10 @@ a:hover {
 
 .checklist-page .disclaimer-banner {
   margin-top: 0.15rem;
+}
+
+.checklist-page.with-review-return {
+  padding-bottom: 4.5rem;
 }
 
 .banner-error {
@@ -960,7 +976,8 @@ a:hover {
 }
 
 .collapsible-section.is-open .section-toggle .collapse-chevron::before,
-.collapsible-item.is-open .item-toggle .collapse-chevron::before {
+.collapsible-item.is-open .item-toggle .collapse-chevron::before,
+.collapsible-workbench.is-open > .workbench-panel-toggle .collapse-chevron::before {
   transform: translate(-50%, -35%) rotate(90deg);
 }
 
@@ -1142,6 +1159,126 @@ a:hover {
   background: #fafbff;
 }
 
+.doc-upload-section.has-extract {
+  border-color: var(--primary);
+  background: #f4f8ff;
+}
+
+.extract-preview-expanded {
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.08);
+}
+
+.extract-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.extract-preview-head h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--primary);
+}
+
+.extract-summary {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+  font-size: 0.9rem;
+}
+
+.extract-summary div {
+  display: grid;
+  grid-template-columns: 5.5rem 1fr;
+  gap: 0.5rem;
+}
+
+.extract-summary dt {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.extract-summary dd {
+  margin: 0;
+}
+
+.validation-missing {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: #fff8f0;
+  border: 1px solid #f0d8b8;
+  border-radius: 8px;
+}
+
+.validation-missing ul {
+  margin: 0.5rem 0 0.75rem;
+  padding-left: 1.2rem;
+  color: var(--err);
+}
+
+.extract-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  align-items: center;
+}
+
+.extract-fields-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9rem;
+  margin-top: 0.75rem;
+}
+
+.extract-fields-table th,
+.extract-fields-table td {
+  border: 1px solid var(--border);
+  padding: 0.55rem 0.75rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.extract-fields-table thead th {
+  background: #f4f7fb;
+  font-weight: 600;
+}
+
+.extract-fields-table tbody th[scope='row'] {
+  width: 8rem;
+  background: #fafbfc;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.extract-facts-table tbody th[scope='row'] {
+  width: 6.5rem;
+}
+
+.extract-table-panel h2 {
+  margin-top: 0;
+}
+
+.form-details-section {
+  margin-top: 0.5rem;
+}
+
+label.field-missing input,
+label.field-missing textarea {
+  border-color: var(--err);
+  background: #fffaf8;
+}
+
+label.field-missing > span::after {
+  content: ' · 必填';
+  color: var(--err);
+  font-size: 0.75rem;
+}
+
 .doc-upload-row {
   display: flex;
   flex-wrap: wrap;
@@ -1234,6 +1371,46 @@ a:hover {
 
 .scenario-list .muted {
   font-size: 0.8rem;
+}
+
+.panel-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.75rem;
+}
+
+.panel-section-head h2 {
+  margin: 0;
+}
+
+.toggle-archived {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.list-empty-hint {
+  margin: 0 0 0.5rem;
+}
+
+.scenario-list li.scenario-archived {
+  opacity: 0.72;
+}
+
+.badge.muted-badge {
+  background: #eef1f5;
+  color: var(--muted);
+}
+
+.dismiss-btn {
+  color: var(--muted);
 }
 
 .next-step {
@@ -1576,8 +1753,100 @@ a:hover {
   background: linear-gradient(135deg, #f0f4f8 0%, #fff 100%);
 }
 
-.workbench-panel-compact {
-  border-color: rgba(45, 90, 135, 0.35);
+.collapsible-workbench {
+  padding: 0;
+  overflow: hidden;
+}
+
+.workbench-panel-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  padding: 1rem 1.15rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workbench-panel-toggle:hover {
+  background: rgba(45, 90, 135, 0.04);
+}
+
+.workbench-panel-toggle-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.workbench-panel-toggle-main h2 {
+  margin: 0;
+}
+
+.workbench-panel-summary {
+  font-size: 0.85rem;
+}
+
+.workbench-panel-body {
+  padding: 0 1.15rem 1.15rem;
+  border-top: 1px solid rgba(45, 90, 135, 0.12);
+}
+
+.workbench-panel-body > .muted:first-child {
+  margin-top: 0.85rem;
+}
+
+.scenario-catalog-panel {
+  padding: 0;
+  overflow: hidden;
+}
+
+.scenario-catalog-toggle {
+  padding: 1rem 1.15rem;
+}
+
+.scenario-catalog-meta {
+  font-size: 0.85rem;
+}
+
+.scenario-catalog-body.workbench-panel-body {
+  padding-top: 0;
+}
+
+.scenario-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.scenario-group.nested {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #fff;
+  overflow: hidden;
+}
+
+.scenario-group-toggle {
+  padding: 0.75rem 1rem;
+}
+
+.scenario-group-toggle h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--primary);
+}
+
+.scenario-group-body {
+  padding-top: 0;
+}
+
+.scenario-group-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
 }
 
 .workbench-panel .panel-hints {
@@ -1652,8 +1921,40 @@ a:hover {
 .review-item {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 1rem;
+  padding: 0;
   background: #fff;
+  overflow: hidden;
+}
+
+.review-item .item-toggle {
+  width: 100%;
+  text-align: left;
+}
+
+.review-page .review-item-body,
+.review-page .checklist-item.review-item .item-body {
+  padding: 0.85rem 1rem 1rem 2.5rem;
+  border-top: 1px dashed var(--border);
+}
+
+.review-item-inline-snippet {
+  padding: 0.75rem 0 0;
+}
+
+.review-item-inline-snippet h4 {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 0.35rem;
+}
+
+.review-item-inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 1rem 0 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
 }
 
 .review-item.approved {

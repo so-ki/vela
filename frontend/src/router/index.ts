@@ -52,15 +52,27 @@ const router = createRouter({
           meta: { requiresDisclaimer: true },
         },
         {
+          path: 'scenarios/:id/extract',
+          name: 'scenario-extract',
+          component: () => import('@/views/BusinessExtractView.vue'),
+          meta: { requiresDisclaimer: true, businessReadOnly: true },
+        },
+        {
           path: 'scenarios/:id/checklist',
           name: 'checklist',
           component: () => import('@/views/ChecklistView.vue'),
-          meta: { requiresDisclaimer: true, legalOnly: true },
+          meta: { requiresDisclaimer: true, businessReadOnly: true },
         },
         {
           path: 'scenarios/:id/brief',
           name: 'brief',
           component: () => import('@/views/BriefView.vue'),
+          meta: { requiresDisclaimer: true, businessReadOnly: true },
+        },
+        {
+          path: 'scenarios/:id/scope',
+          name: 'legal-scope',
+          component: () => import('@/views/LegalScopeView.vue'),
           meta: { requiresDisclaimer: true, legalOnly: true },
         },
         {
@@ -84,7 +96,16 @@ router.beforeEach(async (to) => {
   const auth = useAuthStore()
 
   if (auth.token && !auth.user) {
-    await auth.loadUser()
+    try {
+      await Promise.race([
+        auth.loadUser(),
+        new Promise<null>((_, reject) => {
+          window.setTimeout(() => reject(new Error('loadUser timeout')), 8000)
+        }),
+      ])
+    } catch {
+      auth.logout()
+    }
   }
 
   if (to.meta.guest && auth.isAuthenticated && auth.user?.disclaimer_accepted) {

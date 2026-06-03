@@ -17,7 +17,7 @@ Authorization: Bearer <JWT>
 
 | 顺序 | 方法 | 路径 | 说明 |
 |------|------|------|------|
-| 1 | POST | `/scenarios/extract-document` | 上传方案 `.txt/.md/.docx`，抽取事实预填表单 |
+| 1 | POST | `/scenarios/extract-document` | 上传方案 `.txt/.md/.docx/.pdf`，抽取事实预填表单 |
 | 1 | POST | `/scenarios` | 提交场景并生成核查清单（含 LLM 意图解析，可选） |
 | 2 | POST | `/scenarios/{id}/retrieve` | 法源 RAG 绑定 |
 | 3 | POST | `/scenarios/{id}/brief?polish=true` | 生成双语简报 |

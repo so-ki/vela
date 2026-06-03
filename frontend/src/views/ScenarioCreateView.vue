@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
-import { createDemoScenario, createScenario, extractDocumentFromFile, fetchDemoTemplate, fetchRulesCatalog, fetchScenario, generateAndSubmitDemo, generateAndSubmitScenario, reviseAndResubmitScenario } from '@/api/client'
+import { createDemoScenario, createScenario, extractDocumentFromFile, fetchDemoTemplate, fetchRulesCatalog, fetchScenario, generateAndSubmitDemo, reviseAndResubmitScenario, submitMaterialsDemo, submitMaterialsScenario } from '@/api/client'
 import type { DocumentExtractResult } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import type { DimensionInfo, RulesCatalog, ScenarioFormData } from '@/types/scenario'
@@ -17,6 +17,22 @@ const submitting = ref(false)
 const extracting = ref(false)
 const error = ref<string | null>(null)
 const extractResult = ref<DocumentExtractResult | null>(null)
+const extractPreviewEl = ref<HTMLElement | null>(null)
+const showFormDetails = ref(false)
+
+const FIELD_LABELS: Record<string, string> = {
+  project_name: '项目名称',
+  description: '业务描述',
+  investment_structure: '投资结构',
+  employee_count: '雇员规模',
+  capacity_notes: '产能说明',
+  facility_notes: '厂房说明',
+  remarks: '备注',
+}
+
+const validationIssues = computed(() => collectValidationIssues())
+
+const canConfirmSubmit = computed(() => validationIssues.value.length === 0 && !submitting.value)
 
 const form = ref<ScenarioFormData>({
   project_name: '',
@@ -60,7 +76,7 @@ onMounted(async () => {
         employee_count: scenario.employee_count ?? undefined,
         capacity_notes: scenario.capacity_notes || '',
         facility_notes: scenario.facility_notes || '',
-        compliance_dimensions: scenario.compliance_dimensions,
+        compliance_dimensions: [],
         board_date: scenario.board_date || '',
         start_date: scenario.start_date || '',
         production_date: scenario.production_date || '',
@@ -68,10 +84,10 @@ onMounted(async () => {
       }
       return
     }
-    if (form.value.compliance_dimensions.length === 0 && catalog.value) {
+    if (!auth.isBusiness && form.value.compliance_dimensions.length === 0 && catalog.value) {
       form.value.compliance_dimensions = catalog.value.dimensions.map((d: DimensionInfo) => d.id)
     }
-    if (!form.value.project_name.trim() && !form.value.description.trim()) {
+    if (!auth.isBusiness && !form.value.project_name.trim() && !form.value.description.trim()) {
       await loadDemo()
     }
   } catch (e: unknown) {
@@ -98,13 +114,23 @@ async function loadDemo() {
 }
 
 function ensureAllDimensions() {
-  if (catalog.value && form.value.compliance_dimensions.length === 0) {
+  if (!auth.isBusiness && catalog.value && form.value.compliance_dimensions.length === 0) {
     form.value.compliance_dimensions = catalog.value.dimensions.map((d: DimensionInfo) => d.id)
   }
 }
 
+function toggleDimension(id: string) {
+  const set = new Set(form.value.compliance_dimensions)
+  if (set.has(id)) {
+    set.delete(id)
+  } else {
+    set.add(id)
+  }
+  form.value.compliance_dimensions = [...set]
+}
+
 async function buildPayload() {
-  return {
+  const base = {
     ...form.value,
     project_name: form.value.project_name.trim(),
     description: form.value.description.trim(),
@@ -117,18 +143,125 @@ async function buildPayload() {
     start_date: form.value.start_date || null,
     production_date: form.value.production_date || null,
   }
+  if (auth.isBusiness) {
+    const { compliance_dimensions: _dims, ...businessBase } = base as typeof base & { compliance_dimensions?: string[] }
+    if (extractResult.value) {
+      return {
+        ...businessBase,
+        document_extract: {
+          filename: extractResult.value.filename,
+          mode: extractResult.value.mode,
+          source: 'upload',
+          project_name: extractResult.value.project_name ?? businessBase.project_name,
+          investment_structure: extractResult.value.investment_structure ?? businessBase.investment_structure,
+          description: extractResult.value.description ?? businessBase.description,
+          employee_count: extractResult.value.employee_count ?? businessBase.employee_count,
+          capacity_notes: extractResult.value.capacity_notes ?? businessBase.capacity_notes,
+          facility_notes: extractResult.value.facility_notes ?? businessBase.facility_notes,
+          remarks: extractResult.value.remarks ?? businessBase.remarks,
+          compliance_dimensions: extractResult.value.compliance_dimensions || [],
+          facts: extractResult.value.facts,
+          disclaimer: extractResult.value.disclaimer,
+          llm_skipped: extractResult.value.llm_skipped ?? null,
+        },
+      }
+    }
+    return {
+      ...businessBase,
+      document_extract: {
+        filename: '（手动填写）',
+        mode: 'manual',
+        source: 'manual',
+        project_name: businessBase.project_name,
+        investment_structure: businessBase.investment_structure,
+        description: businessBase.description,
+        employee_count: businessBase.employee_count,
+        capacity_notes: businessBase.capacity_notes,
+        facility_notes: businessBase.facility_notes,
+        remarks: businessBase.remarks,
+        compliance_dimensions: [],
+        facts: [
+          { field: 'project_name', value: businessBase.project_name, source_snippet: null },
+          { field: 'description', value: businessBase.description, source_snippet: null },
+        ],
+        disclaimer: '业务侧手动填写提交，未上传方案文件；协查范围由法务确认。',
+      },
+    }
+  }
+  ensureAllDimensions()
+  if (extractResult.value) {
+    return {
+      ...base,
+      compliance_dimensions: form.value.compliance_dimensions,
+      document_extract: {
+        filename: extractResult.value.filename,
+        mode: extractResult.value.mode,
+        source: 'upload',
+        project_name: extractResult.value.project_name ?? base.project_name,
+        investment_structure: extractResult.value.investment_structure ?? base.investment_structure,
+        description: extractResult.value.description ?? base.description,
+        employee_count: extractResult.value.employee_count ?? base.employee_count,
+        capacity_notes: extractResult.value.capacity_notes ?? base.capacity_notes,
+        facility_notes: extractResult.value.facility_notes ?? base.facility_notes,
+        remarks: extractResult.value.remarks ?? base.remarks,
+        compliance_dimensions: extractResult.value.compliance_dimensions?.length
+          ? extractResult.value.compliance_dimensions
+          : base.compliance_dimensions,
+        facts: extractResult.value.facts,
+        disclaimer: extractResult.value.disclaimer,
+        llm_skipped: extractResult.value.llm_skipped ?? null,
+      },
+    }
+  }
+  return {
+    ...base,
+    compliance_dimensions: form.value.compliance_dimensions,
+    document_extract: {
+      filename: '（手动填写）',
+      mode: 'manual',
+      source: 'manual',
+      project_name: base.project_name,
+      investment_structure: base.investment_structure,
+      description: base.description,
+      employee_count: base.employee_count,
+      capacity_notes: base.capacity_notes,
+      facility_notes: base.facility_notes,
+      remarks: base.remarks,
+      compliance_dimensions: base.compliance_dimensions,
+      facts: [
+        { field: 'project_name', value: base.project_name, source_snippet: null },
+        { field: 'description', value: base.description, source_snippet: null },
+      ],
+      disclaimer: '业务侧手动填写提交，未上传方案文件；提交后可在此回看表单内容。',
+    },
+  }
+}
+
+function collectValidationIssues(): string[] {
+  const issues: string[] = []
+  if (!form.value.project_name.trim()) {
+    issues.push(FIELD_LABELS.project_name)
+  }
+  const desc = form.value.description.trim()
+  if (!desc) {
+    issues.push(FIELD_LABELS.description)
+  } else if (desc.length < 10) {
+    issues.push(`${FIELD_LABELS.description}（至少 10 个字，当前 ${desc.length} 字）`)
+  }
+  ensureAllDimensions()
+  if (!auth.isBusiness && form.value.compliance_dimensions.length === 0) {
+    issues.push('协查范围（至少选择一个合规维度）')
+  }
+  return issues
 }
 
 function validateForm(): boolean {
-  if (!form.value.project_name.trim()) {
-    error.value = '请填写项目名称'
+  const issues = collectValidationIssues()
+  if (issues.length) {
+    error.value = `请补充以下信息后再提交：${issues.join('、')}`
     return false
   }
-  if (!form.value.description.trim() || form.value.description.trim().length < 10) {
-    error.value = '业务描述至少需要 10 个字符，建议先点击「填入 BYD 演示模板」'
-    return false
-  }
-  ensureAllDimensions()
+  error.value = null
   return true
 }
 
@@ -139,12 +272,12 @@ async function submit() {
   try {
     const payload = await buildPayload()
     if (editMode.value && editScenarioId.value) {
-      const scenario = await reviseAndResubmitScenario(editScenarioId.value, payload, false)
+      const scenario = await reviseAndResubmitScenario(editScenarioId.value, payload)
       await router.push({ name: 'scenario-progress', params: { id: scenario.id } })
       return
     }
     if (auth.isBusiness) {
-      const scenario = await generateAndSubmitScenario(payload, false)
+      const scenario = await submitMaterialsScenario(payload)
       await router.push({ name: 'scenario-progress', params: { id: scenario.id } })
       return
     }
@@ -162,7 +295,7 @@ async function submitDemoQuick() {
   error.value = null
   try {
     if (auth.isBusiness) {
-      const scenario = await generateAndSubmitDemo(false)
+      const scenario = await submitMaterialsDemo()
       await router.push({ name: 'scenario-progress', params: { id: scenario.id } })
       return
     }
@@ -204,6 +337,10 @@ function extractApiError(e: unknown): string {
   return '操作失败，请稍后重试'
 }
 
+function factLabel(field: string): string {
+  return FIELD_LABELS[field] || field
+}
+
 function applyExtractResult(result: DocumentExtractResult) {
   if (result.project_name) form.value.project_name = result.project_name
   if (result.investment_structure) form.value.investment_structure = result.investment_structure
@@ -212,9 +349,16 @@ function applyExtractResult(result: DocumentExtractResult) {
   if (result.capacity_notes) form.value.capacity_notes = result.capacity_notes
   if (result.facility_notes) form.value.facility_notes = result.facility_notes
   if (result.remarks) form.value.remarks = result.remarks
-  if (result.compliance_dimensions?.length) {
+  if (!auth.isBusiness && result.compliance_dimensions?.length) {
     form.value.compliance_dimensions = result.compliance_dimensions
   }
+  if (!auth.isBusiness) ensureAllDimensions()
+  showFormDetails.value = collectValidationIssues().length > 0
+}
+
+async function scrollToExtractPreview() {
+  await nextTick()
+  extractPreviewEl.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 async function onDocumentSelected(event: Event) {
@@ -230,6 +374,7 @@ async function onDocumentSelected(event: Event) {
     const result = await extractDocumentFromFile(file)
     extractResult.value = result
     applyExtractResult(result)
+    await scrollToExtractPreview()
   } catch (e: unknown) {
     error.value = extractApiError(e)
   } finally {
@@ -245,10 +390,10 @@ async function onDocumentSelected(event: Event) {
         <p class="eyebrow dark">{{ editMode ? '业务协查 · 补充材料' : auth.isBusiness ? '业务协查' : 'Step 2 · 规则库' }}</p>
         <h1>{{ editMode ? '补充项目材料' : auth.isBusiness ? '提交投资项目' : '提交协查场景' }}</h1>
         <p class="muted" v-if="editMode">
-          法务已退回本项目。请根据下方批注意见修改描述或补充说明，保存后将<strong>重新生成清单并提交法务</strong>（仍是同一项目）。
+          法务已退回本项目。请根据下方批注意见修改描述或补充说明，保存后将<strong>重新提交材料</strong>（仍是同一项目，法务将再次确认协查范围）。
         </p>
         <p class="muted" v-else-if="auth.isBusiness">
-          填写项目信息后，系统将自动生成清单、检索法条、汇编简报，并<strong>直接提交法务复核</strong>。您只需跟踪进度。
+          请<strong>上传投资方案</strong>（推荐）或填写项目信息；核对后提交材料即可，<strong>协查范围由法务确认</strong>后再生成清单。
         </p>
         <p class="muted" v-else>输入业务场景描述，系统将映射法律审查维度并生成《专项核查清单》。</p>
         <p class="industry-pack-note" v-if="catalog?.pack?.name">
@@ -259,7 +404,7 @@ async function onDocumentSelected(event: Event) {
       <div class="header-actions" v-if="!editMode">
         <button type="button" class="btn-secondary" @click="loadDemo" :disabled="loading">填入 BYD 演示模板</button>
         <button v-if="auth.isBusiness" type="button" class="btn-secondary" @click="submitDemoQuick" :disabled="submitting">
-          {{ submitting ? '提交中…' : '演示项目一键提交法务' }}
+          {{ submitting ? '提交中…' : '演示项目一键提交材料' }}
         </button>
         <button v-else type="button" class="btn-secondary" @click="submitDemoQuick" :disabled="submitting">
           一键生成演示清单
@@ -270,17 +415,20 @@ async function onDocumentSelected(event: Event) {
     <form class="scenario-form panel" @submit.prevent="submit">
       <p class="error banner-error" v-if="error && !catalog">{{ error }}</p>
 
-      <div class="form-section doc-upload-section">
-        <h2>上传投资方案（可选）</h2>
-        <p class="muted">
-          支持 <strong>.txt / .md / .docx</strong>（≤2MB）。系统将抽取项目名称、用工、产能等事实预填表单；<strong>不会</strong>自动生成法律结论。
+      <div class="form-section doc-upload-section" :class="{ 'has-extract': !!extractResult }">
+        <h2>{{ auth.isBusiness && !editMode ? '上传投资方案（推荐）' : '上传投资方案（可选）' }}</h2>
+        <p class="muted" v-if="auth.isBusiness && !editMode">
+          支持 <strong>.txt / .md / .docx / .pdf</strong>（≤2MB）。上传后 AI 抽取事实并<strong>自动展开预填预览</strong>；确认无误即可提交材料。
+        </p>
+        <p class="muted" v-else>
+          支持 <strong>.txt / .md / .docx / .pdf</strong>（≤2MB）。系统将抽取项目名称、用工、产能等事实预填表单；<strong>不会</strong>自动生成法律结论。
         </p>
         <div class="doc-upload-row">
           <label class="btn-secondary file-upload-btn">
             {{ extracting ? '抽取中…' : '选择方案文件' }}
             <input
               type="file"
-              accept=".txt,.md,.docx,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              accept=".txt,.md,.docx,.pdf,text/plain,text/markdown,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/pdf"
               :disabled="extracting"
               hidden
               @change="onDocumentSelected"
@@ -290,22 +438,88 @@ async function onDocumentSelected(event: Event) {
             已解析 {{ extractResult.filename }} · {{ extractResult.mode === 'llm' ? 'AI 抽取' : '规则抽取' }}
           </span>
         </div>
-        <div class="extract-preview panel-inner" v-if="extractResult">
+        <div
+          ref="extractPreviewEl"
+          class="extract-preview extract-preview-expanded"
+          v-if="extractResult"
+        >
+          <div class="extract-preview-head">
+            <h3>AI 预填预览</h3>
+            <span class="badge ok">{{ extractResult.mode === 'llm' ? 'AI 抽取' : '规则抽取' }}</span>
+          </div>
           <p class="muted">{{ extractResult.disclaimer }}</p>
+
+          <dl class="extract-summary">
+            <div v-if="form.project_name">
+              <dt>项目名称</dt>
+              <dd>{{ form.project_name }}</dd>
+            </div>
+            <div v-if="form.investment_structure">
+              <dt>投资结构</dt>
+              <dd>{{ form.investment_structure }}</dd>
+            </div>
+            <div v-if="form.employee_count">
+              <dt>雇员规模</dt>
+              <dd>{{ form.employee_count }} 人</dd>
+            </div>
+            <div v-if="form.description">
+              <dt>业务描述</dt>
+              <dd>{{ form.description.length > 120 ? form.description.slice(0, 120) + '…' : form.description }}</dd>
+            </div>
+          </dl>
+
           <ul class="extract-facts" v-if="extractResult.facts.length">
             <li v-for="(fact, idx) in extractResult.facts.slice(0, 8)" :key="idx">
-              <strong>{{ fact.field }}</strong>：{{ fact.value }}
+              <strong>{{ factLabel(fact.field) }}</strong>：{{ fact.value }}
               <span class="muted" v-if="fact.source_snippet">（{{ fact.source_snippet }}）</span>
             </li>
           </ul>
-          <p class="muted warn-text">提交前请核对预填内容，尤其是数字与地点。</p>
+
+          <div v-if="validationIssues.length" class="validation-missing panel-inner">
+            <strong>尚无法提交，请补充：</strong>
+            <ul>
+              <li v-for="issue in validationIssues" :key="issue">{{ issue }}</li>
+            </ul>
+            <button type="button" class="btn-secondary sm" @click="showFormDetails = true">
+              展开表单补全
+            </button>
+          </div>
+
+          <div class="extract-confirm-actions" v-if="auth.isBusiness || editMode">
+            <button
+              type="button"
+              class="btn-primary"
+              :disabled="!canConfirmSubmit"
+              @click="submit"
+            >
+              {{
+                submitting
+                  ? '提交中…'
+                    : editMode
+                    ? '确认并重新提交材料'
+                    : '确认无误并提交材料'
+              }}
+            </button>
+            <button
+              v-if="!showFormDetails"
+              type="button"
+              class="btn-secondary"
+              @click="showFormDetails = true"
+            >
+              展开表单核对
+            </button>
+          </div>
+          <p class="muted warn-text" v-else>提交前请核对预填内容，尤其是数字与地点。</p>
         </div>
       </div>
 
-      <div class="form-section">
+      <div
+        class="form-section form-details-section"
+        v-show="!auth.isBusiness || editMode || showFormDetails || !extractResult"
+      >
         <h2>基本信息</h2>
         <div class="form-grid">
-          <label>
+          <label :class="{ 'field-missing': validationIssues.some((i) => i.startsWith('项目名称')) }">
             <span>项目名称</span>
             <input v-model="form.project_name" required placeholder="BYD 坎皮纳斯新能源工厂" />
           </label>
@@ -350,7 +564,7 @@ async function onDocumentSelected(event: Event) {
 
       <div class="form-section">
         <h2>业务描述（中文）</h2>
-        <label>
+        <label :class="{ 'field-missing': validationIssues.some((i) => i.startsWith('业务描述')) }">
           <textarea v-model="form.description" required rows="6" placeholder="请用 3～5 句话描述投资场景…" />
         </label>
         <div class="form-grid">
@@ -365,21 +579,30 @@ async function onDocumentSelected(event: Event) {
         </div>
       </div>
 
-      <div class="form-section" v-if="catalog">
+      <div class="form-section" v-if="catalog && !auth.isBusiness">
         <h2>协查范围</h2>
         <p class="muted">
-          本次提交将覆盖当前行业专包下的<strong>全部 {{ catalog.dimensions.length }} 个合规维度</strong>，无需业务侧勾选。
-          维度定义与核查项由<strong>法务在规则库</strong>中维护。
+          请选择本次协查需要覆盖的合规维度；系统将据此生成《专项核查清单》。
         </p>
-        <div class="dimension-grid dimension-grid-readonly">
-          <div v-for="dim in catalog.dimensions" :key="dim.id" class="dimension-card readonly">
-            <span class="dimension-check" aria-hidden="true">✓</span>
+        <div class="dimension-grid">
+          <label
+            v-for="dim in catalog.dimensions"
+            :key="dim.id"
+            class="dimension-card"
+            :class="{ active: form.compliance_dimensions.includes(dim.id) }"
+          >
+            <input
+              type="checkbox"
+              :value="dim.id"
+              :checked="form.compliance_dimensions.includes(dim.id)"
+              @change="toggleDimension(dim.id)"
+            />
             <div class="dimension-body">
               <strong>{{ dim.name }}</strong>
               <span class="dim-pt">{{ dim.name_pt }}</span>
               <p>{{ dim.description }}</p>
             </div>
-          </div>
+          </label>
         </div>
       </div>
 
@@ -409,14 +632,22 @@ async function onDocumentSelected(event: Event) {
 
       <div class="form-actions">
         <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
-        <button type="submit" class="btn-primary" :disabled="submitting">
+        <button
+          v-if="auth.isBusiness && extractResult && !showFormDetails"
+          type="button"
+          class="btn-secondary"
+          @click="showFormDetails = true"
+        >
+          展开完整表单
+        </button>
+        <button type="submit" class="btn-primary" :disabled="submitting || (auth.isBusiness && !!extractResult && validationIssues.length > 0)">
           {{
             submitting
               ? '处理中…'
               : editMode
-                ? '保存并重新提交法务'
+                ? '保存并重新提交材料'
                 : auth.isBusiness
-                  ? '生成并提交法务'
+                  ? '提交项目材料'
                   : '生成专项核查清单'
           }}
         </button>

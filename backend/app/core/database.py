@@ -30,8 +30,9 @@ def init_db() -> None:
 
     Base.metadata.create_all(bind=engine)
     try:
-        from app.core.migrate import migrate_sqlite_user_columns
+        from app.core.migrate import migrate_sqlite_scenario_columns, migrate_sqlite_user_columns
 
         migrate_sqlite_user_columns()
+        migrate_sqlite_scenario_columns()
     except Exception:
         pass

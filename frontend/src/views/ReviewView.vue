@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import {
   approveAllReview,
@@ -32,23 +32,89 @@ const exportDocxLabel = ref('法律研究意见书')
 const error = ref<string | null>(null)
 const comments = ref<Record<string, string>>({})
 const briefCache = ref<RiskBrief | null>(null)
-const loadingSnippetCode = ref<string | null>(null)
-const snippetPanel = ref<{
-  open: boolean
-  code: string | null
-  item: BriefItem | null
-  dimensionName: string | null
-  legalHits: LegalHit[]
-}>({
-  open: false,
-  code: null,
-  item: null,
-  dimensionName: null,
-  legalHits: [],
-})
+const inlineSnippets = ref<Record<string, { item: BriefItem; legalHits: LegalHit[] }>>({})
+const snippetLoading = ref<Record<string, boolean>>({})
+const snippetErrors = ref<Record<string, string>>({})
 
 const reviewFilter = ref<'all' | 'pending' | 'gate' | 'external'>('all')
 const GATE_THRESHOLD = 70
+
+type ReviewSectionGroup = {
+  dimension_id: string
+  dimension_name: string
+  dimension_name_pt: string
+  description: string
+  items: ReviewItem[]
+}
+
+const sectionOpen = ref<Record<string, boolean>>({})
+const itemOpen = ref<Record<string, boolean>>({})
+
+function initReviewCollapseState(sections: ReviewSectionGroup[]) {
+  if (!sections.length) return
+  const nextSection: Record<string, boolean> = { ...sectionOpen.value }
+  const nextItem: Record<string, boolean> = { ...itemOpen.value }
+  for (const section of sections) {
+    if (!(section.dimension_id in nextSection)) {
+      nextSection[section.dimension_id] = false
+    }
+    for (const item of section.items) {
+      if (!(item.code in nextItem)) {
+        nextItem[item.code] = false
+      }
+    }
+  }
+  sectionOpen.value = nextSection
+  itemOpen.value = nextItem
+}
+
+function isSectionOpen(id: string) {
+  return sectionOpen.value[id] ?? false
+}
+
+function isItemOpen(code: string) {
+  return itemOpen.value[code] ?? false
+}
+
+function toggleSection(id: string) {
+  sectionOpen.value = { ...sectionOpen.value, [id]: !isSectionOpen(id) }
+}
+
+function toggleItem(code: string) {
+  const willOpen = !isItemOpen(code)
+  itemOpen.value = { ...itemOpen.value, [code]: willOpen }
+  if (willOpen) void ensureInlineSnippet(code)
+}
+
+function setAllSections(open: boolean) {
+  const next: Record<string, boolean> = { ...sectionOpen.value }
+  for (const section of reviewSections.value) {
+    next[section.dimension_id] = open
+  }
+  sectionOpen.value = next
+}
+
+function setAllReviewItems(open: boolean) {
+  const next: Record<string, boolean> = { ...itemOpen.value }
+  for (const section of reviewSections.value) {
+    for (const item of section.items) {
+      next[item.code] = open
+      if (open) void ensureInlineSnippet(item.code)
+    }
+  }
+  itemOpen.value = next
+}
+
+const openSectionCount = computed(
+  () => reviewSections.value.filter((s) => isSectionOpen(s.dimension_id)).length,
+)
+
+const openReviewItemCount = computed(() =>
+  reviewSections.value.reduce(
+    (n, section) => n + section.items.filter((item) => isItemOpen(item.code)).length,
+    0,
+  ),
+)
 
 const priorityLabel: Record<string, string> = {
   high: '高',
@@ -82,6 +148,65 @@ const filteredItems = computed(() => {
   }
 })
 
+const reviewSections = computed((): ReviewSectionGroup[] => {
+  const items = filteredItems.value
+  if (!items.length) return []
+
+  const checklistSections = scenario.value?.checklist?.sections || []
+  if (!checklistSections.length) {
+    const byDim = new Map<string, ReviewItem[]>()
+    for (const item of items) {
+      const key = item.dimension_name || '其他'
+      if (!byDim.has(key)) byDim.set(key, [])
+      byDim.get(key)!.push(item)
+    }
+    return Array.from(byDim.entries()).map(([name, sectionItems], idx) => ({
+      dimension_id: `dim-${idx}`,
+      dimension_name: name,
+      dimension_name_pt: '',
+      description: '',
+      items: sectionItems,
+    }))
+  }
+
+  const groups: ReviewSectionGroup[] = []
+  const used = new Set<string>()
+  for (const section of checklistSections) {
+    const sectionItems = section.items
+      .map((ci) => items.find((i) => i.code === ci.code))
+      .filter((i): i is ReviewItem => !!i)
+    for (const item of sectionItems) used.add(item.code)
+    if (sectionItems.length) {
+      groups.push({
+        dimension_id: section.dimension_id,
+        dimension_name: section.dimension_name,
+        dimension_name_pt: section.dimension_name_pt,
+        description: section.description,
+        items: sectionItems,
+      })
+    }
+  }
+  const orphans = items.filter((i) => !used.has(i.code))
+  if (orphans.length) {
+    groups.push({
+      dimension_id: '_other',
+      dimension_name: '其他',
+      dimension_name_pt: '',
+      description: '',
+      items: orphans,
+    })
+  }
+  return groups
+})
+
+watch(
+  reviewSections,
+  (sections) => {
+    if (sections.length) initReviewCollapseState(sections)
+  },
+  { immediate: true },
+)
+
 onMounted(async () => {
   const id = Number(route.params.id)
   try {
@@ -105,12 +230,6 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
-  window.addEventListener('keydown', onSnippetKeydown)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('keydown', onSnippetKeydown)
-  unlockBodyScroll()
 })
 
 async function setDecision(code: string, decision: 'approved' | 'rejected') {
@@ -249,7 +368,7 @@ function extractError(e: unknown): string {
 }
 
 function goBrief() {
-  router.push({ name: 'brief', params: { id: route.params.id } })
+  router.push({ name: 'brief', params: { id: route.params.id }, query: { from: 'review' } })
 }
 
 function findBriefItem(brief: RiskBrief, code: string): { item: BriefItem; dimensionName: string } | null {
@@ -262,92 +381,48 @@ function findBriefItem(brief: RiskBrief, code: string): { item: BriefItem; dimen
   return null
 }
 
-async function openBriefSnippet(code: string) {
-  if (!scenario.value) return
-  const reviewItem = review.value?.items.find((i) => i.code === code)
-  loadingSnippetCode.value = code
-  error.value = null
+async function ensureInlineSnippet(code: string) {
+  if (inlineSnippets.value[code] || snippetLoading.value[code] || !scenario.value) return
+  snippetLoading.value = { ...snippetLoading.value, [code]: true }
+  snippetErrors.value = { ...snippetErrors.value, [code]: '' }
   try {
     if (!briefCache.value) {
       briefCache.value = await fetchBrief(scenario.value.id)
     }
     const match = findBriefItem(briefCache.value, code)
     if (!match) {
-      error.value = `简报中未找到条目 ${code}`
+      snippetErrors.value = {
+        ...snippetErrors.value,
+        [code]: `简报中未找到条目 ${code}`,
+      }
       return
     }
-    snippetPanel.value = {
-      open: true,
-      code,
-      item: match.item,
-      dimensionName: match.dimensionName,
-      legalHits: reviewItem?.legal_hits || [],
+    const reviewItem = review.value?.items.find((i) => i.code === code)
+    inlineSnippets.value = {
+      ...inlineSnippets.value,
+      [code]: { item: match.item, legalHits: reviewItem?.legal_hits || [] },
     }
   } catch {
-    error.value = '无法加载简报片段，请确认已生成双语简报'
+    snippetErrors.value = {
+      ...snippetErrors.value,
+      [code]: '无法加载简报片段，请确认已生成双语简报',
+    }
   } finally {
-    loadingSnippetCode.value = null
+    snippetLoading.value = { ...snippetLoading.value, [code]: false }
   }
 }
 
-function closeSnippet() {
-  snippetPanel.value = { open: false, code: null, item: null, dimensionName: null, legalHits: [] }
-}
-
-let bodyScrollLocked = false
-let savedScrollY = 0
-
-function lockBodyScroll() {
-  if (bodyScrollLocked) return
-  savedScrollY = window.scrollY
-  document.body.style.overflow = 'hidden'
-  document.body.style.position = 'fixed'
-  document.body.style.top = `-${savedScrollY}px`
-  document.body.style.left = '0'
-  document.body.style.right = '0'
-  document.body.style.width = '100%'
-  bodyScrollLocked = true
-}
-
-function unlockBodyScroll() {
-  if (!bodyScrollLocked) return
-  document.body.style.overflow = ''
-  document.body.style.position = ''
-  document.body.style.top = ''
-  document.body.style.left = ''
-  document.body.style.right = ''
-  document.body.style.width = ''
-  window.scrollTo(0, savedScrollY)
-  bodyScrollLocked = false
-}
-
-watch(
-  () => snippetPanel.value.open,
-  (open) => {
-    if (open) lockBodyScroll()
-    else unlockBodyScroll()
-  },
-)
-
-async function decideFromSnippet(decision: 'approved' | 'rejected') {
-  const code = snippetPanel.value.code
-  if (!code) return
-  await setDecision(code, decision)
-  closeSnippet()
+function inlineSnippet(code: string) {
+  return inlineSnippets.value[code]
 }
 
 function openFullBrief(code: string) {
-  closeSnippet()
   router.push({
     name: 'brief',
     params: { id: route.params.id },
     hash: `#brief-${code}`,
     query: { from: 'review' },
   })
-}
-
-function onSnippetKeydown(e: KeyboardEvent) {
-  if (e.key === 'Escape') closeSnippet()
 }
 </script>
 
@@ -374,7 +449,6 @@ function onSnippetKeydown(e: KeyboardEvent) {
         </div>
         <div class="header-actions" v-if="auth.isLegal">
           <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
-          <RouterLink :to="{ name: 'checklist', params: { id: scenario.id } }" class="btn-secondary link-btn">查看清单</RouterLink>
           <button type="button" class="btn-secondary" @click="goBrief">查看简报</button>
           <button
             v-if="!isLocked"
@@ -450,173 +524,196 @@ function onSnippetKeydown(e: KeyboardEvent) {
         </button>
       </div>
 
-      <section class="review-items panel">
-        <article v-for="item in filteredItems" :key="item.code" class="review-item" :class="item.decision">
-          <div class="item-head">
-            <span class="item-code">{{ item.code }}</span>
-            <span class="muted">{{ item.dimension_name }}</span>
-            <span class="badge" :class="item.gate_status === 'passed' ? 'ok' : 'pri-medium'">
-              门控 {{ item.gate_status === 'passed' ? '通过' : '需关注' }} · {{ item.match_score }}
-            </span>
-            <span class="badge decision-badge" :class="item.decision">
-              {{ item.decision === 'approved' ? '已确认' : item.decision === 'rejected' ? '已驳回' : '待复核' }}
-            </span>
-          </div>
-          <h3>{{ item.title }}</h3>
-          <div class="review-actions">
-            <button
-              type="button"
-              class="btn-secondary sm link-brief-snippet"
-              @click="openBriefSnippet(item.code)"
-              :disabled="loadingSnippetCode === item.code"
-            >
-              {{ loadingSnippetCode === item.code ? '加载中…' : '查看简报片段' }}
-            </button>
-            <template v-if="!isLocked">
-              <button
-                type="button"
-                class="btn-secondary sm"
-                :disabled="saving === item.code"
-                @click="setDecision(item.code, 'approved')"
-              >
-                确认
-              </button>
-              <button
-                type="button"
-                class="btn-secondary sm reject"
-                :disabled="saving === item.code"
-                @click="setDecision(item.code, 'rejected')"
-              >
-                驳回
-              </button>
-            </template>
-          </div>
-          <label class="comment-field">
-            <span>批注</span>
-            <input
-              v-model="comments[item.code]"
-              :disabled="isLocked"
-              placeholder="可选：补充复核意见"
-              @blur="saveComment(item.code)"
-            />
-          </label>
-          <label class="external-counsel-field" v-if="!isLocked">
-            <input
-              type="checkbox"
-              :checked="!!item.external_counsel_required"
-              @change="toggleExternalCounsel(item, ($event.target as HTMLInputElement).checked)"
-            />
-            <span>需外聘当地律所补充意见</span>
-          </label>
-          <p class="muted external-flag" v-else-if="item.external_counsel_required">已标记：需外聘律所</p>
-        </article>
-        <p class="muted" v-if="!filteredItems.length">当前筛选下暂无条目。</p>
-      </section>
+      <div class="collapse-toolbar panel" v-if="reviewSections.length">
+        <span class="muted">
+          共 {{ reviewSections.length }} 个合规维度 · 已展开 {{ openSectionCount }} 个 ·
+          {{ filteredItems.length }} 条核查项 · 已展开 {{ openReviewItemCount }} 条
+        </span>
+        <div class="collapse-toolbar-actions">
+          <button type="button" class="btn-text" @click="setAllSections(true)">展开全部维度</button>
+          <button type="button" class="btn-text" @click="setAllSections(false)">折叠全部维度</button>
+          <button type="button" class="btn-text" @click="setAllReviewItems(true)">展开全部条目</button>
+          <button type="button" class="btn-text" @click="setAllReviewItems(false)">折叠全部条目</button>
+        </div>
+      </div>
 
-      <!-- 简报片段侧栏：不离开复核页 -->
-      <Teleport to="body">
-        <div
-          v-if="snippetPanel.open && snippetPanel.item"
-          class="snippet-overlay"
-          @click.self="closeSnippet"
-          @wheel.self.prevent
-          @touchmove.self.prevent
+      <section
+        v-for="section in reviewSections"
+        :key="section.dimension_id"
+        class="checklist-section panel collapsible-section"
+        :class="{ 'is-open': isSectionOpen(section.dimension_id) }"
+      >
+        <button
+          type="button"
+          class="section-toggle"
+          :aria-expanded="isSectionOpen(section.dimension_id)"
+          @click="toggleSection(section.dimension_id)"
         >
-          <aside class="snippet-drawer" role="dialog" aria-label="简报片段" @click.stop>
-            <header class="snippet-drawer-head">
-              <div>
-                <span class="item-code">{{ snippetPanel.code }}</span>
-                <span class="muted">{{ snippetPanel.dimensionName }}</span>
-              </div>
-              <button type="button" class="btn-text" @click="closeSnippet">✕</button>
-            </header>
+          <span class="collapse-chevron" aria-hidden="true" />
+          <div class="section-toggle-main">
+            <h2>{{ section.dimension_name }}</h2>
+            <span class="dim-pt">{{ section.dimension_name_pt }}</span>
+          </div>
+          <span class="badge ok">{{ section.items.length }} 条</span>
+        </button>
 
-            <div class="snippet-drawer-body">
-              <div class="item-head">
-                <span class="badge" :class="snippetPanel.item.gate_status === 'passed' ? 'ok' : 'pri-medium'">
-                  {{ snippetPanel.item.gate_status === 'passed' ? '已通过门控' : '需法务复核' }}
-                </span>
-                <span class="badge" :class="'pri-' + snippetPanel.item.priority">
-                  {{ priorityLabel[snippetPanel.item.priority] || snippetPanel.item.priority }}优先级
-                </span>
-                <span class="score">匹配度 {{ snippetPanel.item.match_score }}</span>
-              </div>
-              <h3>{{ snippetPanel.item.title }}</h3>
-              <p v-if="snippetPanel.item.block_reason" class="block-reason">
-                门控原因：{{ snippetPanel.item.block_reason }}
-              </p>
-              <p class="gate-line muted">
-                门控阈值 {{ GATE_THRESHOLD }} 分 · 当前匹配度 {{ snippetPanel.item.match_score }}
-                <template v-if="snippetPanel.item.match_score < GATE_THRESHOLD">（未过线，须人工复核）</template>
-              </p>
-              <div class="snippet-section-title">简报风险说明</div>
-              <div class="bilingual-grid">
-                <article>
-                  <h4>中文</h4>
-                  <p>{{ snippetPanel.item.risk_zh }}</p>
-                </article>
-                <article>
-                  <h4>Português</h4>
-                  <p class="dim-pt">{{ snippetPanel.item.risk_pt }}</p>
-                </article>
-              </div>
-              <div v-if="snippetPanel.item.citations.length" class="brief-citations">
-                <h4>简报引用法条</h4>
-                <div v-for="cite in snippetPanel.item.citations" :key="cite.id" class="citation-row">
-                  <span class="source-badge">{{ cite.source_label }}</span>
-                  <span>{{ cite.title_zh || cite.title_pt }}</span>
-                  <a :href="cite.url" target="_blank" rel="noopener" class="hit-link">溯源 ↗</a>
-                </div>
-              </div>
+        <div v-show="isSectionOpen(section.dimension_id)" class="section-body">
+          <p v-if="section.description" class="section-desc">{{ section.description }}</p>
 
-              <div v-if="snippetPanel.legalHits.length" class="brief-citations legal-hits-panel">
-                <h4>法源检索原文片段</h4>
-                <div v-for="hit in snippetPanel.legalHits" :key="hit.id" class="legal-hit compact">
-                  <div class="hit-head">
-                    <span class="source-badge">{{ hit.source_label }}</span>
-                    <span class="badge" :class="hit.requires_review ? 'pri-medium' : 'ok'">
-                      匹配度 {{ hit.match_score }}
+          <div class="checklist-items">
+            <article
+              v-for="item in section.items"
+              :key="item.code"
+              class="checklist-item review-item collapsible-item"
+              :class="[item.decision, { 'is-open': isItemOpen(item.code) }]"
+            >
+              <button
+                type="button"
+                class="item-toggle"
+                :aria-expanded="isItemOpen(item.code)"
+                @click="toggleItem(item.code)"
+              >
+                <span class="collapse-chevron sm" aria-hidden="true" />
+                <div class="item-toggle-main">
+                  <div class="item-head">
+                    <span class="item-code">{{ item.code }}</span>
+                    <span class="badge" :class="item.gate_status === 'passed' ? 'ok' : 'pri-medium'">
+                      门控 {{ item.gate_status === 'passed' ? '通过' : '需关注' }} · {{ item.match_score }}
+                    </span>
+                    <span class="badge decision-badge" :class="item.decision">
+                      {{ item.decision === 'approved' ? '已确认' : item.decision === 'rejected' ? '已驳回' : '待复核' }}
                     </span>
                   </div>
-                  <strong>{{ hit.title_zh || hit.title_pt }}</strong>
-                  <p class="hit-excerpt">{{ hit.excerpt_pt }}</p>
-                  <p class="hit-excerpt zh" v-if="hit.excerpt_zh">{{ hit.excerpt_zh }}</p>
-                  <a :href="hit.url" target="_blank" rel="noopener" class="hit-link">LexML / 法院门户 ↗</a>
+                  <h3>{{ item.title }}</h3>
                 </div>
-              </div>
-            </div>
-
-            <footer class="snippet-drawer-foot">
-              <button type="button" class="btn-primary" @click="closeSnippet">关闭，继续复核</button>
-              <template v-if="!isLocked">
-                <button
-                  type="button"
-                  class="btn-secondary"
-                  :disabled="saving === snippetPanel.code"
-                  @click="decideFromSnippet('approved')"
-                >
-                  确认本条
-                </button>
-                <button
-                  type="button"
-                  class="btn-secondary reject"
-                  :disabled="saving === snippetPanel.code"
-                  @click="decideFromSnippet('rejected')"
-                >
-                  驳回本条
-                </button>
-              </template>
-              <button
-                type="button"
-                class="btn-text"
-                @click="openFullBrief(snippetPanel.code!)"
-              >
-                在完整简报中打开
               </button>
-            </footer>
-          </aside>
+
+              <div v-show="isItemOpen(item.code)" class="item-body review-item-body">
+                <p v-if="snippetLoading[item.code]" class="muted">加载简报片段…</p>
+                <p v-else-if="snippetErrors[item.code]" class="error">{{ snippetErrors[item.code] }}</p>
+                <template v-else-if="inlineSnippet(item.code)">
+                  <div class="review-item-inline-snippet">
+                    <div class="item-head">
+                      <span
+                        class="badge"
+                        :class="inlineSnippet(item.code)!.item.gate_status === 'passed' ? 'ok' : 'pri-medium'"
+                      >
+                        {{
+                          inlineSnippet(item.code)!.item.gate_status === 'passed' ? '已通过门控' : '需法务复核'
+                        }}
+                      </span>
+                      <span class="badge" :class="'pri-' + inlineSnippet(item.code)!.item.priority">
+                        {{
+                          priorityLabel[inlineSnippet(item.code)!.item.priority] ||
+                          inlineSnippet(item.code)!.item.priority
+                        }}优先级
+                      </span>
+                      <span class="score">匹配度 {{ inlineSnippet(item.code)!.item.match_score }}</span>
+                    </div>
+                    <p v-if="inlineSnippet(item.code)!.item.block_reason" class="block-reason">
+                      门控原因：{{ inlineSnippet(item.code)!.item.block_reason }}
+                    </p>
+                    <p class="gate-line muted">
+                      门控阈值 {{ GATE_THRESHOLD }} 分 · 当前匹配度 {{ inlineSnippet(item.code)!.item.match_score }}
+                      <template v-if="inlineSnippet(item.code)!.item.match_score < GATE_THRESHOLD">
+                        （未过线，须人工复核）
+                      </template>
+                    </p>
+                    <div class="snippet-section-title">简报风险说明</div>
+                    <div class="bilingual-grid">
+                      <article>
+                        <h4>中文</h4>
+                        <p>{{ inlineSnippet(item.code)!.item.risk_zh }}</p>
+                      </article>
+                      <article>
+                        <h4>Português</h4>
+                        <p class="dim-pt">{{ inlineSnippet(item.code)!.item.risk_pt }}</p>
+                      </article>
+                    </div>
+                    <div v-if="inlineSnippet(item.code)!.item.citations.length" class="brief-citations">
+                      <h4>简报引用法条</h4>
+                      <div
+                        v-for="cite in inlineSnippet(item.code)!.item.citations"
+                        :key="cite.id"
+                        class="citation-row"
+                      >
+                        <span class="source-badge">{{ cite.source_label }}</span>
+                        <span>{{ cite.title_zh || cite.title_pt }}</span>
+                        <a :href="cite.url" target="_blank" rel="noopener" class="hit-link">溯源 ↗</a>
+                      </div>
+                    </div>
+                    <div
+                      v-if="inlineSnippet(item.code)!.legalHits.length"
+                      class="brief-citations legal-hits-panel"
+                    >
+                      <h4>法源检索原文片段</h4>
+                      <div
+                        v-for="hit in inlineSnippet(item.code)!.legalHits"
+                        :key="hit.id"
+                        class="legal-hit compact"
+                      >
+                        <div class="hit-head">
+                          <span class="source-badge">{{ hit.source_label }}</span>
+                          <span class="badge" :class="hit.requires_review ? 'pri-medium' : 'ok'">
+                            匹配度 {{ hit.match_score }}
+                          </span>
+                        </div>
+                        <strong>{{ hit.title_zh || hit.title_pt }}</strong>
+                        <p class="hit-excerpt">{{ hit.excerpt_pt }}</p>
+                        <p class="hit-excerpt zh" v-if="hit.excerpt_zh">{{ hit.excerpt_zh }}</p>
+                        <a :href="hit.url" target="_blank" rel="noopener" class="hit-link">LexML / 法院门户 ↗</a>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="review-item-inline-actions">
+                    <template v-if="!isLocked">
+                      <button
+                        type="button"
+                        class="btn-secondary sm"
+                        :disabled="saving === item.code"
+                        @click="setDecision(item.code, 'approved')"
+                      >
+                        确认本条
+                      </button>
+                      <button
+                        type="button"
+                        class="btn-secondary sm reject"
+                        :disabled="saving === item.code"
+                        @click="setDecision(item.code, 'rejected')"
+                      >
+                        驳回本条
+                      </button>
+                    </template>
+                    <button type="button" class="btn-text" @click="openFullBrief(item.code)">
+                      在完整简报中打开
+                    </button>
+                  </div>
+                </template>
+                <label class="comment-field">
+                  <span>批注</span>
+                  <input
+                    v-model="comments[item.code]"
+                    :disabled="isLocked"
+                    placeholder="可选：补充复核意见"
+                    @blur="saveComment(item.code)"
+                  />
+                </label>
+                <label class="external-counsel-field" v-if="!isLocked">
+                  <input
+                    type="checkbox"
+                    :checked="!!item.external_counsel_required"
+                    @change="toggleExternalCounsel(item, ($event.target as HTMLInputElement).checked)"
+                  />
+                  <span>需外聘当地律所补充意见</span>
+                </label>
+                <p class="muted external-flag" v-else-if="item.external_counsel_required">已标记：需外聘律所</p>
+              </div>
+            </article>
+          </div>
         </div>
-      </Teleport>
+      </section>
+
+      <p class="muted panel" v-if="!reviewSections.length">当前筛选下暂无条目。</p>
     </template>
   </div>
 </template>

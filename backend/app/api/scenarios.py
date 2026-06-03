@@ -1,5 +1,6 @@
 from typing import List
 import copy
+from datetime import datetime, timezone
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
@@ -13,10 +14,12 @@ from app.core.roles import ROLE_BUSINESS, ROLE_LEGAL, ROLE_ADMIN, is_legal_role,
 from app.models.scenario import InvestigationScenario
 from app.models.user import User
 from app.schemas.scenario import (
+    BusinessSubmitRequest,
     RulesCatalogResponse,
     ScenarioCreateRequest,
     ScenarioResponse,
     ScenarioSummary,
+    ScopeConfirmRequest,
 )
 from app.schemas.brief import BriefGenerateResponse
 from app.schemas.document import DocumentExtractResponse
@@ -38,7 +41,13 @@ from app.services.review_service import (
     update_review_item,
 )
 from app.services.rule_engine import get_demo_scenario_template, get_mining_demo_scenario_template, get_rules_catalog
-from app.services.scenario_pipeline import run_generate_and_submit, run_revise_and_resubmit, scenario_summary_meta
+from app.services.scenario_pipeline import (
+    run_business_submit_materials,
+    run_confirm_scope_and_generate,
+    run_generate_and_submit,
+    run_revise_and_resubmit,
+    scenario_summary_meta,
+)
 from app.services.scenario_service import create_scenario_with_checklist, get_demo_request, scenario_to_response
 
 router = APIRouter(tags=["协查场景"])
@@ -70,7 +79,7 @@ def mining_demo_template(_: User = Depends(get_current_user)):
 
 @router.post("/scenarios/extract-document", response_model=DocumentExtractResponse)
 async def extract_scenario_document(
-    file: UploadFile = File(..., description="投资方案 .txt / .md / .docx（≤2MB）"),
+    file: UploadFile = File(..., description="投资方案 .txt / .md / .docx / .pdf（≤2MB）"),
     _: User = Depends(get_current_user),
 ):
     """从上传方案抽取客观事实，预填协查表单（规则引擎；配置 LLM 时优先 AI 抽取）。"""
@@ -89,12 +98,19 @@ def create_scenario(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if len(payload.compliance_dimensions) < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="请至少选择一个合规审查维度",
+        )
     scenario = create_scenario_with_checklist(db, current_user, payload)
     return scenario_to_response(scenario)
 
 
 @router.get("/scenarios", response_model=List[ScenarioSummary])
 def list_scenarios(
+    include_archived: bool = Query(default=False, description="业务端：是否包含已移入回收站的项目"),
+    include_deleted: bool = Query(default=False, description="法务端：是否包含已移入回收站的项目"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -105,6 +121,10 @@ def list_scenarios(
     )
     if not is_legal_role(current_user):
         query = query.filter(InvestigationScenario.user_id == current_user.id)
+        if not include_archived:
+            query = query.filter(InvestigationScenario.business_archived_at.is_(None))
+    elif not include_deleted:
+        query = query.filter(InvestigationScenario.legal_deleted_at.is_(None))
 
     rows = query.order_by(InvestigationScenario.created_at.desc()).all()
     summaries: list[ScenarioSummary] = []
@@ -130,18 +150,143 @@ def list_scenarios(
                 legal_rejected_count=bf.get("rejected_count") if bf else None,
                 feedback_action_required=bf.get("action_required") if bf else None,
                 needs_revision=meta.get("needs_revision"),
+                business_archived=bool(s.business_archived_at),
+                legal_deleted=bool(s.legal_deleted_at),
+                legal_deleted_at=s.legal_deleted_at,
+                has_document_extract=bool(payload.get("document_extract")),
             )
         )
 
     if is_legal_role(current_user):
         summaries.sort(
             key=lambda item: (
-                0 if item.status == "pending_legal_review" else 1,
+                0 if item.status == "pending_scope" else 1 if item.status == "pending_legal_review" else 2,
                 {"high": 0, "medium": 1, "low": 2}.get(item.review_priority or "low", 9),
                 -item.created_at.timestamp(),
             )
         )
     return summaries
+
+
+@router.post("/scenarios/{scenario_id}/archive")
+def archive_scenario_for_business(
+    scenario_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_role(current_user, ROLE_BUSINESS)
+    scenario = _load_owned_scenario(db, scenario_id, current_user.id)
+    if scenario.status == "returned_for_revision":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="该项目待补充材料，请先处理法务反馈后再移入回收站",
+        )
+    scenario.business_archived_at = datetime.now(timezone.utc)
+    db.commit()
+    write_audit_log(
+        db,
+        user=current_user,
+        action="scenario.archive",
+        resource_type="scenario",
+        resource_id=str(scenario.id),
+        detail=f"业务移入回收站：{scenario.project_name}",
+    )
+    return {"ok": True, "id": scenario.id}
+
+
+@router.post("/scenarios/{scenario_id}/unarchive")
+def unarchive_scenario_for_business(
+    scenario_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    require_role(current_user, ROLE_BUSINESS)
+    scenario = _load_owned_scenario(db, scenario_id, current_user.id)
+    scenario.business_archived_at = None
+    db.commit()
+    write_audit_log(
+        db,
+        user=current_user,
+        action="scenario.unarchive",
+        resource_type="scenario",
+        resource_id=str(scenario.id),
+        detail=f"业务从回收站恢复：{scenario.project_name}",
+    )
+    return {"ok": True, "id": scenario.id}
+
+
+@router.delete("/scenarios/{scenario_id}")
+def delete_scenario(
+    scenario_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_legal_user),
+):
+    """法务将已定稿协查案例移入回收站（可恢复）。"""
+    scenario = _load_accessible_scenario(db, scenario_id, current_user)
+    payload = scenario.checklist.payload if scenario.checklist else {}
+    meta = scenario_summary_meta(scenario.status, payload)
+    progress = meta["progress_status"]
+
+    if progress in ("submitted", "in_review"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="待法务复核或复核中的项目不可移入回收站",
+        )
+    if progress == "needs_revision":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="待业务补充的项目不可移入回收站，请等待业务重提或继续跟进",
+        )
+    if progress != "finalized":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="仅已定稿项目可移入回收站；历史半成品请确认无进行中的复核后再联系管理员清理",
+        )
+    if scenario.legal_deleted_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="该项目已在回收站中",
+        )
+
+    scenario.legal_deleted_at = datetime.now(timezone.utc)
+    db.commit()
+    write_audit_log(
+        db,
+        user=current_user,
+        action="scenario.delete",
+        resource_type="scenario",
+        resource_id=str(scenario_id),
+        detail=f"法务移入回收站：{scenario.project_name}",
+    )
+    return {"ok": True, "id": scenario_id}
+
+
+@router.post("/scenarios/{scenario_id}/restore")
+def restore_scenario_for_legal(
+    scenario_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_legal_user),
+):
+    """法务从回收站恢复协查案例。"""
+    scenario = _load_scenario_row(db, scenario_id)
+    if scenario.legal_deleted_at is None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="该项目不在回收站中",
+        )
+
+    project_name = scenario.project_name
+    scenario.legal_deleted_at = None
+    db.commit()
+    write_audit_log(
+        db,
+        user=current_user,
+        action="scenario.restore",
+        resource_type="scenario",
+        resource_id=str(scenario.id),
+        detail=f"法务从回收站恢复：{project_name}",
+    )
+    return {"ok": True, "id": scenario.id}
 
 
 @router.get("/scenarios/{scenario_id}", response_model=ScenarioResponse)
@@ -164,6 +309,33 @@ def create_demo_scenario(
     return scenario_to_response(scenario)
 
 
+@router.post("/scenarios/submit-materials", response_model=ScenarioResponse, status_code=201)
+def submit_scenario_materials(
+    payload: BusinessSubmitRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """业务：提交项目材料，协查范围由法务确认后再生成清单。"""
+    require_role(current_user, (ROLE_BUSINESS,))
+    scenario = run_business_submit_materials(db, current_user, payload)
+    return scenario_to_response(scenario)
+
+
+@router.post("/scenarios/demo/submit-materials", response_model=ScenarioResponse, status_code=201)
+def submit_demo_materials(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """业务：BYD 演示模板材料提交（待法务确认协查范围）。"""
+    require_role(current_user, (ROLE_BUSINESS,))
+    from app.services.scenario_service import get_demo_request
+
+    demo = get_demo_request()
+    payload = BusinessSubmitRequest(**demo.model_dump(exclude={"compliance_dimensions"}))
+    scenario = run_business_submit_materials(db, current_user, payload)
+    return scenario_to_response(scenario)
+
+
 @router.post("/scenarios/generate-and-submit", response_model=ScenarioResponse, status_code=201)
 def generate_and_submit_scenario(
     payload: ScenarioCreateRequest,
@@ -171,8 +343,13 @@ def generate_and_submit_scenario(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """业务一键：生成清单 + 法源 + 简报并提交法务复核。"""
-    require_role(current_user, (ROLE_BUSINESS,))
+    """法务一键：生成清单 + 法源 + 简报并进入待复核（兼容旧接口）。"""
+    require_role(current_user, (ROLE_LEGAL, ROLE_ADMIN))
+    if len(payload.compliance_dimensions) < 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="请至少选择一个合规审查维度",
+        )
     scenario = run_generate_and_submit(db, current_user, payload, polish=polish)
     return scenario_to_response(scenario)
 
@@ -183,25 +360,46 @@ def generate_and_submit_demo(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """业务一键：BYD 演示模板并提交法务复核。"""
-    require_role(current_user, (ROLE_BUSINESS,))
+    """法务：BYD 演示模板一键生成并进入待复核。"""
+    require_role(current_user, (ROLE_LEGAL, ROLE_ADMIN))
     scenario = run_generate_and_submit(db, current_user, get_demo_request(), polish=polish)
+    return scenario_to_response(scenario)
+
+
+@router.post("/scenarios/{scenario_id}/confirm-scope", response_model=ScenarioResponse)
+def confirm_scenario_scope(
+    scenario_id: int,
+    body: ScopeConfirmRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_legal_user),
+):
+    """法务：确认协查范围并生成清单、法源与简报。"""
+    scenario = _load_accessible_scenario(db, scenario_id, current_user)
+    try:
+        scenario = run_confirm_scope_and_generate(
+            db,
+            current_user,
+            scenario,
+            body.compliance_dimensions,
+            polish=body.polish,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return scenario_to_response(scenario)
 
 
 @router.post("/scenarios/{scenario_id}/revise-and-resubmit", response_model=ScenarioResponse)
 def revise_and_resubmit_scenario(
     scenario_id: int,
-    payload: ScenarioCreateRequest,
-    polish: bool = Query(default=False),
+    payload: BusinessSubmitRequest,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    """业务：法务退回后在同一项目补充材料并重新提交。"""
+    """业务：法务退回后在同一项目补充材料并重新提交（待法务再次确认范围）。"""
     require_role(current_user, (ROLE_BUSINESS,))
     scenario = _load_owned_scenario(db, scenario_id, current_user.id)
     try:
-        scenario = run_revise_and_resubmit(db, current_user, scenario, payload, polish=polish)
+        scenario = run_revise_and_resubmit(db, current_user, scenario, payload)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return scenario_to_response(scenario)
@@ -268,9 +466,15 @@ def _assert_owner(scenario: InvestigationScenario, user: User) -> None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅场景提交人可执行此操作")
 
 
+def _assert_not_legally_deleted(scenario: InvestigationScenario, user: User) -> None:
+    if scenario.legal_deleted_at is not None and is_legal_role(user):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="场景不存在或已移入回收站")
+
+
 def _load_accessible_scenario(db: Session, scenario_id: int, user: User) -> InvestigationScenario:
     scenario = _load_scenario_row(db, scenario_id)
     _assert_can_access(scenario, user)
+    _assert_not_legally_deleted(scenario, user)
     return scenario
 
 

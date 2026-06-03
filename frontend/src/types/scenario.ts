@@ -123,6 +123,25 @@ export interface Scenario {
   business_feedback?: BusinessFeedback | null
   can_revise?: boolean
   revision_round?: number
+  document_extract?: DocumentExtractSnapshot | null
+}
+
+export interface DocumentExtractSnapshot {
+  filename: string
+  mode: string
+  source?: string
+  extracted_at?: string | null
+  project_name?: string | null
+  investment_structure?: string | null
+  description?: string | null
+  employee_count?: number | null
+  capacity_notes?: string | null
+  facility_notes?: string | null
+  remarks?: string | null
+  compliance_dimensions?: string[]
+  facts: Array<{ field: string; value: string; source_snippet?: string | null }>
+  disclaimer?: string
+  llm_skipped?: string | null
 }
 
 export interface BusinessFeedbackItem {
@@ -174,6 +193,10 @@ export interface ScenarioSummary {
   legal_rejected_count?: number | null
   feedback_action_required?: boolean | null
   needs_revision?: boolean | null
+  business_archived?: boolean
+  legal_deleted?: boolean
+  legal_deleted_at?: string | null
+  has_document_extract?: boolean
 }
 
 export interface BriefCitation {

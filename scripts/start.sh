@@ -11,7 +11,12 @@ free_port() {
   if [ -n "$pids" ]; then
     echo "==> 释放端口 ${port} (停止旧进程)..."
     kill $pids 2>/dev/null || true
-    sleep 1
+    sleep 2
+    pids=$(lsof -ti :"$port" 2>/dev/null || true)
+    if [ -n "$pids" ]; then
+      kill -9 $pids 2>/dev/null || true
+      sleep 1
+    fi
   fi
 }
 

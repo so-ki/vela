@@ -18,13 +18,39 @@ const steps = computed(() => {
   const finalized = ['review_approved', 'review_partial', 'review_rejected'].includes(status)
   const returned = status === 'returned_for_revision'
   const inReview = status === 'review_in_progress' || finalized
-  const submitted = status === 'pending_legal_review' || inReview || returned
+  const scopeConfirmed = status !== 'pending_scope'
 
   return [
-    { key: 'submit', title: '已提交法务', done: submitted, current: status === 'pending_legal_review' },
-    { key: 'review', title: '法务复核中', done: inReview || returned, current: status === 'review_in_progress' },
-    { key: 'revise', title: '待业务补充', done: returned || finalized, current: returned },
-    { key: 'done', title: '复核定稿完成', done: finalized, current: finalized && !returned },
+    {
+      key: 'materials',
+      title: '已提交材料',
+      done: true,
+      current: status === 'pending_scope',
+    },
+    {
+      key: 'scope',
+      title: '法务确认协查范围',
+      done: scopeConfirmed,
+      current: status === 'pending_scope',
+    },
+    {
+      key: 'review',
+      title: '法务复核中',
+      done: inReview || returned,
+      current: status === 'review_in_progress',
+    },
+    {
+      key: 'revise',
+      title: '待业务补充',
+      done: returned || finalized,
+      current: returned,
+    },
+    {
+      key: 'done',
+      title: '复核定稿完成',
+      done: finalized,
+      current: finalized && !returned,
+    },
   ]
 })
 
@@ -51,6 +77,9 @@ onMounted(async () => {
           <p class="muted" v-if="canRevise">
             法务已退回本项目，请根据下方批注<strong>补充材料</strong>后重新提交（无需新建项目）。
           </p>
+          <p class="muted" v-else-if="scenario.status === 'pending_scope'">
+            材料已提交。协查范围由<strong>法务筛选确认</strong>后将自动生成核查清单，您无需选择合规维度。
+          </p>
           <p class="muted" v-else>
             您无需在此做法律判断；法务反馈会显示在下方。
           </p>
@@ -59,6 +88,7 @@ onMounted(async () => {
           </p>
         </div>
         <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
+        <RouterLink :to="`/scenarios/${scenario.id}/extract`" class="btn-primary link-btn">查看AI抽取表</RouterLink>
       </header>
 
       <section class="panel progress-timeline">
@@ -114,10 +144,19 @@ onMounted(async () => {
       </section>
 
       <section class="panel" v-else>
-        <h2>说明</h2>
+        <h2>AI 抽取信息表</h2>
+        <p class="muted">提交时可回看从方案抽取或手动填写的项目字段及原文依据。</p>
+        <div class="action-row stack-actions">
+          <RouterLink :to="`/scenarios/${scenario.id}/extract`" class="btn-primary link-btn full">
+            查看AI抽取表
+          </RouterLink>
+        </div>
         <ul class="progress-notes">
-          <li>清单、法条检索与双语简报已由系统自动生成并提交法务。</li>
-          <li>法务开始复核后，驳回意见与「需外聘」标记会显示在本页。</li>
+          <li v-if="scenario.status === 'pending_scope'">
+            法务确认协查范围后，系统将自动生成清单、法条检索与双语简报。
+          </li>
+          <li v-else>清单、法条检索与双语简报已由法务确认范围后自动生成。</li>
+          <li>法务开始复核后，驳回意见与「需外聘」标记会显示在本页上方。</li>
           <li>若被退回补充，您可在<strong>同一项目</strong>修改后重新提交。</li>
         </ul>
       </section>

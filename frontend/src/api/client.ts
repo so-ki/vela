@@ -88,6 +88,16 @@ export async function createDemoScenario() {
   return data
 }
 
+export async function submitMaterialsScenario(payload: Record<string, unknown>) {
+  const { data } = await api.post('/scenarios/submit-materials', payload)
+  return data
+}
+
+export async function submitMaterialsDemo() {
+  const { data } = await api.post('/scenarios/demo/submit-materials')
+  return data
+}
+
 export async function generateAndSubmitScenario(payload: Record<string, unknown>, polish = false) {
   const { data } = await api.post(`/scenarios/generate-and-submit?polish=${polish}`, payload)
   return data
@@ -95,6 +105,18 @@ export async function generateAndSubmitScenario(payload: Record<string, unknown>
 
 export async function generateAndSubmitDemo(polish = false) {
   const { data } = await api.post(`/scenarios/demo/generate-and-submit?polish=${polish}`)
+  return data
+}
+
+export async function confirmScenarioScope(
+  scenarioId: number,
+  complianceDimensions: string[],
+  polish = false,
+) {
+  const { data } = await api.post(`/scenarios/${scenarioId}/confirm-scope`, {
+    compliance_dimensions: complianceDimensions,
+    polish,
+  })
   return data
 }
 
@@ -123,12 +145,8 @@ export async function extractDocumentFromFile(file: File): Promise<DocumentExtra
   return data
 }
 
-export async function reviseAndResubmitScenario(
-  scenarioId: number,
-  payload: Record<string, unknown>,
-  polish = false,
-) {
-  const { data } = await api.post(`/scenarios/${scenarioId}/revise-and-resubmit?polish=${polish}`, payload)
+export async function reviseAndResubmitScenario(scenarioId: number, payload: Record<string, unknown>) {
+  const { data } = await api.post(`/scenarios/${scenarioId}/revise-and-resubmit`, payload)
   return data
 }
 
@@ -137,8 +155,30 @@ export async function returnScenarioToBusiness(scenarioId: number, note?: string
   return data
 }
 
-export async function fetchScenarios() {
-  const { data } = await api.get('/scenarios')
+export async function fetchScenarios(includeArchived = false, includeDeleted = false) {
+  const { data } = await api.get('/scenarios', {
+    params: { include_archived: includeArchived, include_deleted: includeDeleted },
+  })
+  return data
+}
+
+export async function archiveScenario(scenarioId: number) {
+  const { data } = await api.post(`/scenarios/${scenarioId}/archive`)
+  return data
+}
+
+export async function unarchiveScenario(scenarioId: number) {
+  const { data } = await api.post(`/scenarios/${scenarioId}/unarchive`)
+  return data
+}
+
+export async function deleteScenario(scenarioId: number) {
+  const { data } = await api.delete(`/scenarios/${scenarioId}`)
+  return data
+}
+
+export async function restoreDeletedScenario(scenarioId: number) {
+  const { data } = await api.post(`/scenarios/${scenarioId}/restore`)
   return data
 }
 

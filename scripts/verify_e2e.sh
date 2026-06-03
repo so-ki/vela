@@ -53,11 +53,27 @@ SOLAR=$(curl -sf -X POST "$API/scenarios" -H "$(auth_header "$TOKEN")" -H 'Conte
 SOLAR_TOTAL=$(echo "$SOLAR" | python3 -c "import sys,json; print(json.load(sys.stdin)['checklist']['total_items'])")
 if [ "$SOLAR_TOTAL" -lt "$TOTAL" ]; then ok "solar-only=$SOLAR_TOTAL < byd=$TOTAL"; else bad "solar-only=$SOLAR_TOTAL not shorter than byd=$TOTAL"; fi
 
-log "5. Business submit + legal reject feedback visible"
+log "5. Business submit materials + legal confirm scope + reject feedback"
 BIZ=$(login biz@demo.vela)
-SUB=$(curl -sf -X POST "$API/scenarios/demo/generate-and-submit?polish=false" -H "$(auth_header "$BIZ")")
+SUB=$(curl -sf -X POST "$API/scenarios/demo/submit-materials" -H "$(auth_header "$BIZ")")
 SUB_ID=$(echo "$SUB" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+echo "$SUB" | python3 -c "
+import sys, json
+d=json.load(sys.stdin)
+assert d.get('status')=='pending_scope', d
+print('status:', d['status'])
+" && ok "business submit materials" || bad "business submit materials"
 LEGAL=$(login legal@demo.vela)
+SCOPE=$(curl -sf -X POST "$API/scenarios/$SUB_ID/confirm-scope" \
+  -H "$(auth_header "$LEGAL")" -H 'Content-Type: application/json' \
+  -d '{"compliance_dimensions":["labor","foreign_investment","tax","industry_access"],"polish":false}')
+echo "$SCOPE" | python3 -c "
+import sys, json
+d=json.load(sys.stdin)
+assert d.get('status')=='pending_legal_review', d
+assert d.get('checklist',{}).get('total_items',0)>=20, d
+print('items:', d['checklist']['total_items'])
+" && ok "legal confirm scope" || bad "legal confirm scope"
 curl -sf -X POST "$API/scenarios/$SUB_ID/review/init" -H "$(auth_header "$LEGAL")" >/dev/null
 curl -sf -X PATCH "$API/scenarios/$SUB_ID/review/items/LAB-001" \
   -H "$(auth_header "$LEGAL")" -H 'Content-Type: application/json' \
@@ -89,6 +105,24 @@ assert '储能' in (d.get('description') or ''), d
 assert d.get('mode') in ('rules','llm'), d
 print('mode:', d['mode'], 'employees:', d['employee_count'])
 " && ok "document extract" || bad "document extract"
+
+log "7b. Document extract PDF"
+PDF_FIXTURE="BYD坎皮纳斯_投资方案_演示.pdf"
+if [ -f "$PDF_FIXTURE" ]; then
+  EXTRACT_PDF=$(curl -sf -X POST "$API/scenarios/extract-document" \
+    -H "$(auth_header "$TOKEN")" \
+    -F "file=@$PDF_FIXTURE")
+  echo "$EXTRACT_PDF" | python3 -c "
+import sys, json
+d=json.load(sys.stdin)
+assert d.get('employee_count')==450, d
+assert '坎皮纳斯' in (d.get('project_name') or d.get('description') or ''), d
+assert d.get('mode') in ('rules','llm'), d
+print('mode:', d['mode'], 'employees:', d['employee_count'])
+" && ok "document extract pdf" || bad "document extract pdf"
+else
+  echo "skip: $PDF_FIXTURE not found"
+fi
 
 log "8. Storage-only checklist shorter than BYD"
 STOR=$(curl -sf -X POST "$API/scenarios" -H "$(auth_header "$TOKEN")" -H 'Content-Type: application/json' -d '{
@@ -129,18 +163,16 @@ print(json.dumps({
   'investment_structure': s.get('investment_structure'),
   'description': s['description'],
   'employee_count': s.get('employee_count'),
-  'compliance_dimensions': s['compliance_dimensions'],
 }, ensure_ascii=False))
 ")
-REV=$(curl -sf -X POST "$API/scenarios/$SUB_ID/revise-and-resubmit?polish=false" \
+REV=$(curl -sf -X POST "$API/scenarios/$SUB_ID/revise-and-resubmit" \
   -H "$(auth_header "$BIZ")" -H 'Content-Type: application/json' \
   -d "$REV_PAYLOAD")
 echo "$REV" | python3 -c "
 import sys, json
 d=json.load(sys.stdin)
-assert d.get('status')=='pending_legal_review', d
+assert d.get('status')=='pending_scope', d
 assert (d.get('revision_round') or 0)>=1, d
-assert d.get('checklist'), d
 print('revision_round:', d.get('revision_round'))
 " && ok "revise resubmit" || bad "revise resubmit"
 

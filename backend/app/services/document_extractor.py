@@ -6,13 +6,14 @@ from typing import Any, Optional
 
 import httpx
 from docx import Document
+from pypdf import PdfReader
 
 from app.core.config import get_settings
 from app.services.intent_parser import _extract_json
 from app.services.llm_client import get_llm_config
 
 MAX_BYTES = 2 * 1024 * 1024
-ALLOWED_SUFFIXES = {".txt", ".md", ".docx"}
+ALLOWED_SUFFIXES = {".txt", ".md", ".docx", ".pdf"}
 
 VALID_DIMENSIONS = ["labor", "foreign_investment", "tax", "industry_access"]
 
@@ -64,11 +65,32 @@ def read_upload_text(filename: str, content: bytes) -> str:
                 continue
         raise ValueError("无法识别文本编码，请使用 UTF-8 保存")
 
+    if suffix == ".pdf":
+        return _read_pdf_text(content)
+
     doc = Document(io.BytesIO(content))
     parts = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
     text = "\n".join(parts).strip()
     if not text:
         raise ValueError("Word 文档未读取到有效文本，请确认非扫描件图片")
+    return text
+
+
+def _read_pdf_text(content: bytes) -> str:
+    try:
+        reader = PdfReader(io.BytesIO(content))
+    except Exception as exc:
+        raise ValueError("无法解析 PDF 文件，请确认文件未损坏") from exc
+
+    parts: list[str] = []
+    for page in reader.pages:
+        page_text = page.extract_text()
+        if page_text:
+            parts.append(page_text.strip())
+
+    text = "\n".join(parts).strip()
+    if not text:
+        raise ValueError("PDF 未读取到有效文本，请确认非扫描件图片或使用 Word/文本格式")
     return text
 
 

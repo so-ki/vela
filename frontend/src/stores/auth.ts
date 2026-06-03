@@ -4,7 +4,7 @@ import { acceptDisclaimer, fetchMe, login as apiLogin } from '@/api/client'
 import type { User } from '@/types'
 
 export const useAuthStore = defineStore('auth', () => {
-  const token = ref<string | null>(localStorage.getItem('vela_token'))
+  const token = ref<string | null>(readStoredToken())
   const user = ref<User | null>(null)
   const loading = ref(false)
   const error = ref<string | null>(null)
@@ -25,13 +25,21 @@ export const useAuthStore = defineStore('auth', () => {
   function setSession(accessToken: string, userData: User) {
     token.value = accessToken
     user.value = userData
-    localStorage.setItem('vela_token', accessToken)
+    try {
+      localStorage.setItem('vela_token', accessToken)
+    } catch {
+      /* Safari 隐私模式等场景可能禁用 storage */
+    }
   }
 
   function clearSession() {
     token.value = null
     user.value = null
-    localStorage.removeItem('vela_token')
+    try {
+      localStorage.removeItem('vela_token')
+    } catch {
+      /* ignore */
+    }
   }
 
   async function login(email: string, password: string) {
@@ -91,6 +99,14 @@ export const useAuthStore = defineStore('auth', () => {
     setSession,
   }
 })
+
+function readStoredToken(): string | null {
+  try {
+    return localStorage.getItem('vela_token')
+  } catch {
+    return null
+  }
+}
 
 function extractError(e: unknown): string {
   if (typeof e === 'object' && e !== null && 'response' in e) {

@@ -2,10 +2,12 @@
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { fetchScenario, retrieveLegalSources } from '@/api/client'
+import { useAuthStore } from '@/stores/auth'
 import type { ChecklistSection, Scenario } from '@/types/scenario'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 const scenario = ref<Scenario | null>(null)
 const legalSections = ref<ChecklistSection[] | null>(null)
 const loading = ref(true)
@@ -129,6 +131,28 @@ const openSectionCount = computed(
   () => displaySections.value.filter((s) => isSectionOpen(s.dimension_id)).length,
 )
 
+function scenarioHasBrief(status: string | undefined) {
+  if (!status || status === 'checklist_generated') return false
+  return (
+    status === 'brief_generated' ||
+    status === 'brief_blocked' ||
+    status === 'pending_legal_review' ||
+    status === 'returned_for_revision' ||
+    status === 'review_in_progress' ||
+    status.startsWith('review_')
+  )
+}
+
+const hasBrief = computed(() => scenarioHasBrief(scenario.value?.status))
+
+const showViewBrief = computed(
+  () => auth.isLegal && (route.query.from === 'review' || hasBrief.value),
+)
+
+const briefLinkQuery = computed(() =>
+  route.query.from === 'review' ? { from: 'review' } : undefined,
+)
+
 async function goToBrief() {
   if (!scenario.value) return
   generatingBrief.value = true
@@ -144,13 +168,15 @@ async function goToBrief() {
 </script>
 
 <template>
-  <div class="checklist-page">
+  <div class="checklist-page" :class="{ 'with-review-return': auth.isLegal && route.query.from === 'review' }">
     <div v-if="loading" class="muted">加载中…</div>
     <div v-else-if="error && !displaySections.length" class="error banner-error">{{ error }}</div>
     <template v-else-if="scenario && checklist">
       <header class="page-header">
         <div>
-          <p class="eyebrow dark">专项核查清单 · Step 3 法源绑定</p>
+          <p class="eyebrow dark">
+            {{ auth.isBusiness ? '业务协查 · 核查清单（只读）' : '专项核查清单 · Step 3 法源绑定' }}
+          </p>
           <h1>{{ checklist.title }}</h1>
           <p class="meta">
             行业专包：<strong>{{ checklist.industry_pack_name || checklist.detected_industry_name }}</strong> ·
@@ -169,8 +195,36 @@ async function goToBrief() {
           <p class="meta warn" v-if="retrieving">正在检索 LexML / STF / STJ 法源…</p>
         </div>
         <div class="header-actions">
-          <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
+          <RouterLink
+            v-if="auth.isLegal && route.query.from === 'review' && scenario"
+            :to="{ name: 'review', params: { id: scenario.id } }"
+            class="btn-primary link-btn"
+          >
+            返回继续复核
+          </RouterLink>
+          <RouterLink
+            v-if="auth.isBusiness"
+            :to="{ name: 'scenario-progress', params: { id: scenario.id } }"
+            class="btn-secondary link-btn"
+          >
+            查看进度
+          </RouterLink>
+          <RouterLink
+            v-if="auth.isBusiness"
+            :to="{ name: 'brief', params: { id: scenario.id } }"
+            class="btn-primary link-btn"
+          >
+            查看双语简报
+          </RouterLink>
+          <RouterLink
+            v-if="showViewBrief && scenario"
+            :to="{ name: 'brief', params: { id: scenario.id }, query: briefLinkQuery }"
+            class="btn-secondary link-btn"
+          >
+            查看简报
+          </RouterLink>
           <button
+            v-else-if="auth.isLegal"
             type="button"
             class="btn-primary"
             :disabled="generatingBrief || retrieving || !legalSections"
@@ -178,10 +232,14 @@ async function goToBrief() {
           >
             {{ generatingBrief ? '跳转中…' : '生成双语简报' }}
           </button>
+          <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
         </div>
       </header>
 
-      <div class="disclaimer-banner" v-if="legalSections">
+      <div class="disclaimer-banner" v-if="auth.isBusiness">
+        清单与法条检索结果仅供业务侧<strong>查阅</strong>，不构成正式法律意见；法律判断与定稿由法务完成。
+      </div>
+      <div class="disclaimer-banner" v-else-if="legalSections">
         以下法条片段来自 LexML / STF / STJ 开放法源索引，仅供协查参考，不构成正式法律意见。匹配度低于 70 分须标注「需法务复核」。
       </div>
       <div class="disclaimer-banner" v-else>
@@ -287,6 +345,15 @@ async function goToBrief() {
           </div>
         </div>
       </section>
+
+      <div v-if="auth.isLegal && route.query.from === 'review' && scenario" class="review-return-bar">
+        <RouterLink
+          :to="{ name: 'review', params: { id: scenario.id } }"
+          class="btn-primary link-btn review-return-btn"
+        >
+          ← 返回继续复核
+        </RouterLink>
+      </div>
     </template>
   </div>
 </template>
