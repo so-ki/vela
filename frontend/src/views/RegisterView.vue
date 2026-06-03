@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter, RouterLink } from 'vue-router'
-import { fetchDisclaimer, register } from '@/api/client'
+import { fetchDisclaimer, fetchSsoConfig, register } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import type { Disclaimer } from '@/types'
 
@@ -17,9 +17,14 @@ const form = ref({
 })
 const loading = ref(false)
 const error = ref<string | null>(null)
+const registrationClosed = ref(false)
 
 onMounted(async () => {
-  disclaimer.value = await fetchDisclaimer()
+  const [disc, sso] = await Promise.all([fetchDisclaimer(), fetchSsoConfig()])
+  disclaimer.value = disc
+  if (!sso.allow_open_registration) {
+    registrationClosed.value = true
+  }
 })
 
 async function handleSubmit() {
@@ -55,7 +60,14 @@ async function handleSubmit() {
         <p>注册即表示您已阅读并同意平台免责声明</p>
       </div>
 
-      <form @submit.prevent="handleSubmit" class="auth-form">
+      <div v-if="registrationClosed" class="disclaimer-preview">
+        <p>当前环境已关闭开放注册。请使用企业 SSO 登录，或联系管理员开通账户。</p>
+        <p class="auth-footer">
+          <RouterLink to="/login">返回登录</RouterLink>
+        </p>
+      </div>
+
+      <form v-else @submit.prevent="handleSubmit" class="auth-form">
         <div class="form-row">
           <label>
             <span>姓名</span>
@@ -97,7 +109,7 @@ async function handleSubmit() {
         </button>
       </form>
 
-      <p class="auth-footer">
+      <p class="auth-footer" v-if="!registrationClosed">
         已有账户？<RouterLink to="/login">返回登录</RouterLink>
       </p>
     </div>

@@ -41,3 +41,10 @@ class TokenResponse(BaseModel):
 
 class AcceptDisclaimerRequest(BaseModel):
     accept: bool = Field(description="必须为 true 方可继续使用平台")
+
+
+class SsoConfigResponse(BaseModel):
+    enabled: bool
+    provider_name: str
+    allow_password_login: bool
+    allow_open_registration: bool

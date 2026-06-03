@@ -241,8 +241,8 @@ vela-platform/
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/api/v1/scenarios/{id}/export/docx` | 导出 Word 协查底稿（需复核定稿） |
-| GET | `/api/v1/scenarios/{id}/export/pdf` | 导出 PDF 协查底稿（需复核定稿） |
+| GET | `/api/v1/scenarios/{id}/export/docx` | 导出 Word 法律研究意见书（法学院模板，需复核定稿） |
+| GET | `/api/v1/scenarios/{id}/export/pdf` | 导出 PDF 协查底稿（legacy 格式，需复核定稿） |
 
 ### 法源监测
 
@@ -299,7 +299,7 @@ vela-platform/
 | 法源库 | 32 条精选语料 + Jusbrasil + Chroma | LexML 增量同步、语料扩容 |
 | 意图解析 | 规则引擎 + 子赛道关键词 + 可选 LLM | 全 LLM 解析模式 |
 | 法规监测 | 手动扫描 + 提醒列表 | 自动爬虫 + 订阅推送 |
-| 导出 | Word + PDF | 律所定制模板 |
+| 导出 | Word 法学院意见书 + PDF legacy 底稿 | 律所 `.docx` 样张加载、PDF 与 Word 统一 |
 | 角色 | 业务提交 / 法务复核分权 | ✅ 已实现 |
 
 ---
@@ -312,4 +312,4 @@ vela-platform/
 
 ## 上传 GitHub / 邀请测试者
 
-见 **[客户操作手册.md](./客户操作手册.md)** / **[客户操作手册.docx](./客户操作手册.docx)**（面向法务/业务用户）、**[操作手册.md](./操作手册.md)** / **[操作手册.docx](./操作手册.docx)**（含部署与演示脚本）、**[GITHUB_SETUP.md](./GITHUB_SETUP.md)**、**[TESTING.md](./TESTING.md)** 与 **[API.md](./API.md)**（REST 集成说明）。
+见 **[DEPLOYMENT.md](./DEPLOYMENT.md)**（生产 Docker / SSO / 导出配置）、**[客户操作手册.md](./客户操作手册.md)** / **[客户操作手册.docx](./客户操作手册.docx)**（面向法务/业务用户）、**[操作手册.md](./操作手册.md)** / **[操作手册.docx](./操作手册.docx)**（含部署与演示脚本）、**[GITHUB_SETUP.md](./GITHUB_SETUP.md)**、**[TESTING.md](./TESTING.md)** 与 **[API.md](./API.md)**（REST 集成说明）。

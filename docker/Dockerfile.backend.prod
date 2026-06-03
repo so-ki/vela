@@ -1,0 +1,20 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt requirements-rag.txt ./
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r requirements-rag.txt || true
+
+COPY . .
+
+RUN mkdir -p data/chroma
+
+ENV APP_ENV=production
+ENV PYTHONUNBUFFERED=1
+
+EXPOSE 8000
+
+CMD ["sh", "-c", "python scripts/seed_demo_user.py && exec gunicorn app.main:app -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 --workers 2 --timeout 180"]

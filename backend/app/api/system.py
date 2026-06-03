@@ -48,3 +48,20 @@ def system_status(db: Session = Depends(get_db), _: User = Depends(get_current_u
 @router.get("/llm/status", response_model=LlmStatusResponse)
 def llm_service_status(_: User = Depends(get_current_user)):
     return LlmStatusResponse(**llm_status())
+
+
+class ExportConfigResponse(BaseModel):
+    template: str
+    docx_label: str
+    org_name: str
+
+
+@router.get("/export/config", response_model=ExportConfigResponse)
+def export_config():
+    settings = get_settings()
+    label = "法律研究意见书" if settings.export_template == "law_school" else "协查底稿"
+    return ExportConfigResponse(
+        template=settings.export_template,
+        docx_label=label,
+        org_name=settings.export_org_name,
+    )

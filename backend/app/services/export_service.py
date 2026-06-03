@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import io
-import re
 from datetime import datetime
 from typing import Any
 
 from docx import Document
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.shared import Pt, RGBColor
+from docx.shared import Pt
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
@@ -15,8 +14,11 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
+from app.core.config import get_settings
 from app.models.scenario import InvestigationScenario
 from app.services.disclaimer import DISCLAIMER_FULL_TEXT
+from app.services.export_context import export_context, format_export_datetime, safe_export_filename
+from app.services.export_template_law_school import build_law_school_docx
 
 pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
 
@@ -36,24 +38,20 @@ def _pdf_escape(text: str) -> str:
     )
 
 
-def _export_context(scenario: InvestigationScenario) -> dict[str, Any]:
-    payload = scenario.checklist.payload
-    return {
-        "scenario": scenario,
-        "payload": payload,
-        "brief": payload.get("brief") or {},
-        "review": payload.get("review") or {},
-        "sections_legal": payload.get("sections_with_legal") or payload.get("sections", []),
-    }
-
-
-def _safe_filename(name: str) -> str:
-    cleaned = re.sub(r'[\\/:*?"<>|]', "_", name)
-    return cleaned[:80] or "vela_sample"
+def build_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
+    settings = get_settings()
+    if settings.export_template == "law_school":
+        return build_law_school_docx(scenario)
+    return build_legacy_docx(scenario)
 
 
 def build_sample_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
-    ctx = _export_context(scenario)
+    """Backward-compatible alias."""
+    return build_docx(scenario)
+
+
+def build_legacy_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
+    ctx = export_context(scenario)
     payload = ctx["payload"]
     brief = ctx["brief"]
     review = ctx["review"]
@@ -98,7 +96,6 @@ def build_sample_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
             p.add_run(f"（{item.get('priority', '')} 优先级）")
             doc.add_paragraph(item.get("description", ""))
 
-    sections_legal = ctx["sections_legal"]
     doc.add_heading("三、法源绑定摘要", level=1)
     for section in sections_legal:
         for item in section.get("items", []):
@@ -143,7 +140,7 @@ def build_sample_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
             f"复核人：{review.get('reviewer_name', '')} · 状态：{review.get('status', '')}"
         )
         if review.get("finalized_at"):
-            doc.add_paragraph(f"定稿时间：{review.get('finalized_at')}")
+            doc.add_paragraph(f"定稿时间：{format_export_datetime(review.get('finalized_at'))}")
         for item in review.get("items", []):
             decision = {"approved": "确认", "rejected": "驳回", "pending": "待复核"}.get(
                 item.get("decision", "pending"), item.get("decision")
@@ -159,12 +156,12 @@ def build_sample_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
 
     buf = io.BytesIO()
     doc.save(buf)
-    filename = f"{_safe_filename(scenario_obj.project_name)}_协查底稿.docx"
+    filename = safe_export_filename(scenario_obj.project_name, "协查底稿.docx")
     return buf.getvalue(), filename
 
 
 def build_sample_pdf(scenario: InvestigationScenario) -> tuple[bytes, str]:
-    ctx = _export_context(scenario)
+    ctx = export_context(scenario)
     payload = ctx["payload"]
     brief = ctx["brief"]
     review = ctx["review"]
@@ -226,5 +223,5 @@ def build_sample_pdf(scenario: InvestigationScenario) -> tuple[bytes, str]:
         story.append(Paragraph(_pdf_escape(para), body))
 
     doc.build(story)
-    filename = f"{_safe_filename(scenario_obj.project_name)}_协查底稿.pdf"
+    filename = safe_export_filename(scenario_obj.project_name, "协查底稿.pdf")
     return buf.getvalue(), filename

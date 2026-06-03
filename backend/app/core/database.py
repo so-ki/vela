@@ -29,3 +29,9 @@ def init_db() -> None:
     from app.models import audit_log, scenario, user  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+    try:
+        from app.core.migrate import migrate_sqlite_user_columns
+
+        migrate_sqlite_user_columns()
+    except Exception:
+        pass

@@ -1,6 +1,8 @@
 # Secrets & local config
 .env
 .env.local
+.env.prod
+.env.prod.smoke
 *.pem
 
 # Runtime data (SQLite, Chroma) — not app source corpus

@@ -6,6 +6,7 @@ import {
   downloadDocxExport,
   downloadPdfExport,
   fetchBrief,
+  fetchExportConfig,
   fetchReview,
   fetchScenario,
   finalizeReview,
@@ -27,6 +28,7 @@ const finalizing = ref(false)
 const returning = ref(false)
 const exporting = ref(false)
 const exportingPdf = ref(false)
+const exportDocxLabel = ref('法律研究意见书')
 const error = ref<string | null>(null)
 const comments = ref<Record<string, string>>({})
 const briefCache = ref<RiskBrief | null>(null)
@@ -83,6 +85,8 @@ const filteredItems = computed(() => {
 onMounted(async () => {
   const id = Number(route.params.id)
   try {
+    const exportCfg = await fetchExportConfig()
+    exportDocxLabel.value = exportCfg.docx_label
     scenario.value = await fetchScenario(id)
     try {
       review.value = await fetchReview(id)
@@ -203,11 +207,11 @@ async function runExportPdf() {
   exportingPdf.value = true
   error.value = null
   try {
-    const blob = await downloadPdfExport(scenario.value.id)
+    const { blob, filename } = await downloadPdfExport(scenario.value.id)
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${scenario.value.project_name}_协查底稿.pdf`
+    a.download = filename
     a.click()
     URL.revokeObjectURL(url)
   } catch (e: unknown) {
@@ -222,11 +226,11 @@ async function runExport() {
   exporting.value = true
   error.value = null
   try {
-    const blob = await downloadDocxExport(scenario.value.id)
+    const { blob, filename } = await downloadDocxExport(scenario.value.id)
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${scenario.value.project_name}_协查底稿.docx`
+    a.download = filename
     a.click()
     URL.revokeObjectURL(url)
   } catch (e: unknown) {
@@ -404,7 +408,7 @@ function onSnippetKeydown(e: KeyboardEvent) {
             :disabled="!review.can_export || exporting"
             @click="runExport"
           >
-            {{ exporting ? '导出中…' : '导出 Word' }}
+            {{ exporting ? '导出中…' : `导出 Word · ${exportDocxLabel}` }}
           </button>
           <button
             type="button"
@@ -419,7 +423,7 @@ function onSnippetKeydown(e: KeyboardEvent) {
 
       <div class="disclaimer-banner">
         <template v-if="auth.isLegal">
-          请对每条核查项作出确认或驳回，并可在批注栏补充意见。全部处理完成后方可定稿并导出协查底稿。
+          请对每条核查项作出确认或驳回，并可在批注栏补充意见。全部处理完成后方可定稿并导出{{ exportDocxLabel }}。
         </template>
         <template v-else>
           本页仅供查看复核进度。确认、定稿与导出须由法务角色操作。
@@ -508,23 +512,6 @@ function onSnippetKeydown(e: KeyboardEvent) {
         </article>
         <p class="muted" v-if="!filteredItems.length">当前筛选下暂无条目。</p>
       </section>
-
-      <div class="next-step panel">
-        <h2>导航</h2>
-        <p class="muted" v-if="review.can_export">
-          协查底稿已定稿，可继续导出或返回工作台处理其他待办。
-        </p>
-        <p class="muted" v-else>
-          复核进行中：可随时返回清单或简报对照，处理完所有条目后再定稿。
-        </p>
-        <div class="action-row">
-          <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
-          <RouterLink :to="{ name: 'checklist', params: { id: scenario.id } }" class="btn-secondary link-btn">
-            查看清单
-          </RouterLink>
-          <button type="button" class="btn-secondary" @click="goBrief">查看简报</button>
-        </div>
-      </div>
 
       <!-- 简报片段侧栏：不离开复核页 -->
       <Teleport to="body">

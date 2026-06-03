@@ -1,10 +1,18 @@
 import axios from 'axios'
-import type { Disclaimer, LoginResponse, SystemStatus, User } from '@/types'
+import type { Disclaimer, ExportConfig, LoginResponse, SsoConfig, SystemStatus, User } from '@/types'
 
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
   headers: { 'Content-Type': 'application/json' },
 })
+
+function parseContentDisposition(header?: string): string | null {
+  if (!header) return null
+  const utfMatch = header.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utfMatch) return decodeURIComponent(utfMatch[1])
+  const match = header.match(/filename="([^"]+)"/i)
+  return match ? match[1] : null
+}
 
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('vela_token')
@@ -21,6 +29,16 @@ export async function fetchDisclaimer(): Promise<Disclaimer> {
 
 export async function login(email: string, password: string): Promise<LoginResponse> {
   const { data } = await api.post<LoginResponse>('/auth/login', { email, password })
+  return data
+}
+
+export async function fetchSsoConfig(): Promise<SsoConfig> {
+  const { data } = await api.get<SsoConfig>('/auth/sso/config')
+  return data
+}
+
+export async function fetchExportConfig(): Promise<ExportConfig> {
+  const { data } = await api.get<ExportConfig>('/export/config')
   return data
 }
 
@@ -186,17 +204,21 @@ export async function submitScenarioForReview(scenarioId: number) {
 }
 
 export async function downloadDocxExport(scenarioId: number) {
-  const { data } = await api.get(`/scenarios/${scenarioId}/export/docx`, {
+  const resp = await api.get(`/scenarios/${scenarioId}/export/docx`, {
     responseType: 'blob',
   })
-  return data as Blob
+  const filename =
+    parseContentDisposition(resp.headers['content-disposition']) || 'vela_export.docx'
+  return { blob: resp.data as Blob, filename }
 }
 
 export async function downloadPdfExport(scenarioId: number) {
-  const { data } = await api.get(`/scenarios/${scenarioId}/export/pdf`, {
+  const resp = await api.get(`/scenarios/${scenarioId}/export/pdf`, {
     responseType: 'blob',
   })
-  return data as Blob
+  const filename =
+    parseContentDisposition(resp.headers['content-disposition']) || 'vela_export.pdf'
+  return { blob: resp.data as Blob, filename }
 }
 
 export async function fetchLegalMonitor() {

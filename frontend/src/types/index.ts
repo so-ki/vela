@@ -33,3 +33,15 @@ export interface SystemStatus {
   chroma: { status: string; collection?: string; document_count?: number; message?: string }
   disclaimer_required: boolean
 }
+
+export interface SsoConfig {
+  enabled: boolean
+  provider_name: string
+  allow_password_login: boolean
+  allow_open_registration: boolean
+}
+
+export interface ExportConfig {
+  template: string
+  docx_label: string
+}

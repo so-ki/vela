@@ -7,7 +7,7 @@ Base URL（本地）：`http://127.0.0.1:8000/api/v1`
 - Swagger UI：http://127.0.0.1:8000/docs
 - ReDoc：http://127.0.0.1:8000/redoc
 
-认证：除 `/health`、`/auth/login`、`/auth/register` 外，请求头需携带：
+认证：除 `/health`、`/auth/login`、`/auth/register`、`/auth/sso/config`、`/export/config` 外，请求头需携带：
 
 ```http
 Authorization: Bearer <JWT>
@@ -27,8 +27,8 @@ Authorization: Bearer <JWT>
 | 5b | POST | `/scenarios/{id}/review/return-to-business` | **法务**：退回业务在同一项目补充 |
 | 6 | POST | `/scenarios/{id}/review/finalize` | **法务角色**：定稿 |
 | 6b | POST | `/scenarios/{id}/revise-and-resubmit` | **业务**：补充材料后重新提交（同一项目） |
-| 7 | GET | `/scenarios/{id}/export/docx` | **法务角色**：导出 Word |
-| 7b | GET | `/scenarios/{id}/export/pdf` | **法务角色**：导出 PDF |
+| 7 | GET | `/scenarios/{id}/export/docx` | **法务角色**：导出 Word（默认法学院《法律研究意见书》） |
+| 7b | GET | `/scenarios/{id}/export/pdf` | **法务角色**：导出 PDF（legacy 协查底稿格式） |
 
 ## 角色
 
@@ -38,6 +38,29 @@ Authorization: Bearer <JWT>
 | `legal` | 查看全部场景、复核、定稿、导出；可一键样本 |
 
 演示账号：`biz@demo.vela` / `legal@demo.vela`，密码 `Demo1234!`
+
+## SSO（OpenID Connect）
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/auth/sso/config` | 是否启用 SSO、是否允许密码登录/开放注册 |
+| GET | `/auth/sso/login` | 302 跳转 IdP 授权页 |
+| GET | `/auth/sso/callback` | IdP 回调；交换 token 后 302 至前端 `/login/sso/callback` |
+
+生产环境变量见 `.env.production.example` 与 **[DEPLOYMENT.md](./DEPLOYMENT.md)**。
+
+## Word 导出模板
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/export/config` | 当前模板（`law_school` / `legacy`）与文档标签 |
+
+环境变量：
+
+- `EXPORT_TEMPLATE=law_school` — 法学院标准《涉外投资合规法律研究意见书》
+- `EXPORT_ORG_NAME` / `EXPORT_ORG_DEPARTMENT` / `EXPORT_RECIPIENT_LABEL` — 抬头与致/自/关于表
+
+定稿后 `export/docx` 响应头 `Content-Disposition` 含 UTF-8 文件名，如 `{项目}_法律研究意见书.docx`。
 
 ## 一键样本
 
@@ -75,8 +98,8 @@ POST /scenarios/demo/sample
 
 ## 嵌入 OA / 合规系统
 
-1. 服务端调用 `POST /auth/login` 获取 JWT（或使用 SSO 网关签发）
+1. 服务端调用 `POST /auth/login` 获取 JWT，或浏览器走 `/auth/sso/login` 企业 SSO
 2. 按上表顺序调用 REST API
-3. 导出底稿使用 `export/docx` 或 `export/pdf` 二进制响应
+3. 定稿后导出：`export/docx`（法学院意见书）或 `export/pdf`（legacy 底稿）
 
 CORS 默认允许 `http://localhost:5173`；生产环境在 `backend/.env` 配置 `CORS_ORIGINS`。
