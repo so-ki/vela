@@ -8,8 +8,7 @@ from typing import Any, Optional
 from fastapi import HTTPException, status
 
 from app.services.legal_ingest import CORPUS_PATH, ingest_corpus, load_corpus
-
-RULES_PATH = Path(__file__).resolve().parents[1] / "rules" / "brazil_new_energy.json"
+from app.services.rules_registry import load_rules
 
 VALID_SOURCES = {"lexml", "stf", "stj", "jusbrasil"}
 VALID_LEVELS = {"federal", "state", "municipal", "case_law"}
@@ -95,10 +94,7 @@ def _validate_document(doc: dict[str, Any], *, existing_ids: set[str], doc_id: O
 
 def get_corpus_meta() -> dict[str, Any]:
     corpus = load_corpus()
-    rules: dict[str, Any] = {}
-    if RULES_PATH.exists():
-        with open(RULES_PATH, encoding="utf-8") as f:
-            rules = json.load(f)
+    rules = load_rules()
 
     dimensions = [
         {"id": d["id"], "name": d["name"]}

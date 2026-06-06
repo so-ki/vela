@@ -40,6 +40,12 @@ const router = createRouter({
           meta: { requiresDisclaimer: true, businessOnly: true },
         },
         {
+          path: 'scenarios/material-review',
+          name: 'material-review',
+          component: () => import('@/views/MaterialReviewView.vue'),
+          meta: { requiresDisclaimer: true, businessOnly: true },
+        },
+        {
           path: 'scenarios/:id/edit',
           name: 'scenario-edit',
           component: () => import('@/views/ScenarioCreateView.vue'),
@@ -68,12 +74,6 @@ const router = createRouter({
           name: 'brief',
           component: () => import('@/views/BriefView.vue'),
           meta: { requiresDisclaimer: true, businessReadOnly: true },
-        },
-        {
-          path: 'scenarios/:id/scope',
-          name: 'legal-scope',
-          component: () => import('@/views/LegalScopeView.vue'),
-          meta: { requiresDisclaimer: true, legalOnly: true },
         },
         {
           path: 'scenarios/:id/review',

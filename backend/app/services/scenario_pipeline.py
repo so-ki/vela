@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -15,7 +16,12 @@ from app.services.audit import write_audit_log
 from app.services.brief_generator import generate_brief
 from app.services.legal_ingest import ingest_corpus
 from app.services.legal_rag import retrieve_for_checklist
-from app.services.rule_engine import generate_checklist
+from app.services.material_review_service import (
+    assess_material_completeness,
+    build_material_return_record,
+)
+from app.services.material_file_storage import save_scenario_material_files
+from app.services.rule_engine import generate_checklist, get_material_field_labels
 from app.services.scenario_service import (
     _materials_only_payload,
     attach_document_extract_to_payload,
@@ -58,9 +64,11 @@ def run_business_submit_materials(
     db: Session,
     user: User,
     payload: BusinessSubmitRequest,
+    *,
+    uploads: list[tuple[str, bytes, str | None]] | None = None,
 ) -> InvestigationScenario:
     """业务：上传/填写项目材料，提交法务确认协查范围（不生成清单）。"""
-    return create_scenario_materials_only(db, user, payload)
+    return create_scenario_materials_only(db, user, payload, uploads=uploads)
 
 
 def run_confirm_scope_and_generate(
@@ -74,6 +82,14 @@ def run_confirm_scope_and_generate(
     """法务：确认协查范围并生成清单、法源绑定与双语简报，进入待复核。"""
     if scenario.status != "pending_scope":
         raise ValueError("当前状态不可确认协查范围")
+
+    assessment = assess_material_completeness(scenario, compliance_dimensions)
+    if assessment["auto_missing_fields"]:
+        labels = get_material_field_labels()
+        missing_labels = [labels.get(key, key) for key in assessment["auto_missing_fields"]]
+        raise ValueError(
+            f"提交表仍有缺项（{', '.join(missing_labels)}），请先驳回业务补充后再确认范围。"
+        )
 
     old_payload = copy.deepcopy(scenario.checklist.payload if scenario.checklist else {})
     document_extract = old_payload.get("document_extract")
@@ -92,6 +108,19 @@ def run_confirm_scope_and_generate(
     if revision_history:
         checklist_payload["revision_history"] = revision_history
         checklist_payload["revision_round"] = revision_round
+
+    material_review = dict(old_payload.get("material_review") or {})
+    material_review.update(
+        {
+            "selected_dimensions": compliance_dimensions,
+            "status": "approved",
+            "approved_at": datetime.now(timezone.utc).isoformat(),
+            "approved_by": user.full_name,
+            "approved_by_id": user.id,
+            "field_labels": get_material_field_labels(),
+        }
+    )
+    checklist_payload["material_review"] = material_review
 
     scenario.checklist.payload = checklist_payload
     checklist_payload = _attach_legal_and_brief(scenario, checklist_payload, polish=polish)
@@ -153,29 +182,91 @@ def run_generate_and_submit(
     return scenario
 
 
+def run_return_materials(
+    db: Session,
+    user: User,
+    scenario: InvestigationScenario,
+    compliance_dimensions: list[str],
+    missing_fields: list[str],
+    *,
+    note: str | None = None,
+) -> InvestigationScenario:
+    """法务在确认范围前驳回业务提交表（字段级），业务补充后回到 pending_scope。"""
+    if scenario.status != "pending_scope":
+        raise ValueError("当前状态不可驳回材料，请确认项目处于待确认协查范围阶段")
+
+    if not scenario.checklist:
+        raise ValueError("场景缺少核查清单")
+
+    old_payload = copy.deepcopy(scenario.checklist.payload or {})
+    material_review = build_material_return_record(
+        scenario,
+        user,
+        compliance_dimensions=compliance_dimensions,
+        missing_fields=missing_fields,
+        note=note,
+    )
+    old_payload["material_review"] = material_review
+    scenario.status = "returned_for_revision"
+    scenario.checklist.payload = old_payload
+    flag_modified(scenario.checklist, "payload")
+    db.commit()
+    db.refresh(scenario)
+
+    write_audit_log(
+        db,
+        user=user,
+        action="scenario.return_materials",
+        resource_type="scenario",
+        resource_id=str(scenario.id),
+        detail=(
+            f"法务驳回提交表：{scenario.project_name}；"
+            f"维度 {', '.join(compliance_dimensions)}；"
+            f"缺项 {', '.join(missing_fields)}"
+        ),
+    )
+    return scenario
+
+
 def run_revise_and_resubmit(
     db: Session,
     user: User,
     scenario: InvestigationScenario,
     payload: BusinessSubmitRequest,
+    *,
+    uploads: list[tuple[str, bytes, str | None]] | None = None,
 ) -> InvestigationScenario:
     """业务在同一项目补充材料后重新提交，待法务再次确认协查范围。"""
     if scenario.status != "returned_for_revision":
         raise ValueError("当前状态不可补充提交，请确认法务已退回该项目")
 
     old_payload = copy.deepcopy(scenario.checklist.payload if scenario.checklist else {})
+    old_material = old_payload.get("material_review") or {}
     revision_history = list(old_payload.get("revision_history") or [])
-    revision_round = len(revision_history) + 1
-    revision_history.append(
-        {
-            "round": revision_round,
-            "returned_at": old_payload.get("review", {}).get("returned_at"),
-            "return_note": old_payload.get("review", {}).get("return_note"),
-            "review": old_payload.get("review"),
-            "description_snapshot": scenario.description,
-            "compliance_dimensions": list(scenario.compliance_dimensions or []),
-        }
-    )
+    material_history = list(old_material.get("history") or [])
+
+    if old_material.get("status") == "returned" and old_material.get("return_kind") == "materials":
+        material_history.append(
+            {
+                "round": len(material_history) + 1,
+                "returned_at": old_material.get("returned_at"),
+                "return_note": old_material.get("return_note"),
+                "missing_fields": list(old_material.get("missing_fields") or []),
+                "submitted_snapshot": old_material.get("submitted_snapshot"),
+            }
+        )
+    else:
+        revision_round = len(revision_history) + 1
+        revision_history.append(
+            {
+                "round": revision_round,
+                "returned_at": old_payload.get("review", {}).get("returned_at"),
+                "return_note": old_payload.get("review", {}).get("return_note"),
+                "review": old_payload.get("review"),
+                "description_snapshot": scenario.description,
+                "compliance_dimensions": list(scenario.compliance_dimensions or []),
+            }
+        )
 
     create_req = business_submit_to_create_request(payload)
     scenario.project_name = create_req.project_name
@@ -185,7 +276,11 @@ def run_revise_and_resubmit(
     scenario.industry = create_req.industry
     scenario.action_type = create_req.action_type
     scenario.investment_structure = create_req.investment_structure
+    scenario.investment_destination = create_req.investment_destination
+    scenario.project_content_scale = create_req.project_content_scale
+    scenario.funding_source = create_req.funding_source
     scenario.description = create_req.description
+    scenario.known_risks = create_req.known_risks
     scenario.employee_count = create_req.employee_count
     scenario.capacity_notes = create_req.capacity_notes
     scenario.facility_notes = create_req.facility_notes
@@ -198,8 +293,28 @@ def run_revise_and_resubmit(
 
     materials_payload = _materials_only_payload(create_req)
     materials_payload = attach_document_extract_to_payload(materials_payload, create_req)
+
+    old_doc = old_payload.get("document_extract") or {}
+    archived_files = list(old_doc.get("archived_files") or [])
+    if uploads:
+        archived_files.extend(save_scenario_material_files(scenario.id, uploads))
+    if archived_files:
+        doc = dict(materials_payload.get("document_extract") or {})
+        doc["archived_files"] = archived_files
+        materials_payload["document_extract"] = doc
+
     materials_payload["revision_history"] = revision_history
     materials_payload["revision_round"] = len(revision_history)
+
+    selected_dimensions = list(old_material.get("selected_dimensions") or [])
+    if selected_dimensions or material_history:
+        materials_payload["material_review"] = {
+            "selected_dimensions": selected_dimensions,
+            "status": "resubmitted",
+            "revision_round": len(material_history),
+            "history": material_history,
+            "field_labels": get_material_field_labels(),
+        }
 
     if not scenario.checklist:
         raise ValueError("场景缺少核查清单")

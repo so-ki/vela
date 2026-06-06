@@ -69,7 +69,7 @@ def build_legacy_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
 
     doc.add_paragraph(f"项目名称：{scenario_obj.project_name}")
     doc.add_paragraph(f"地点：{scenario_obj.city} · {scenario_obj.state} · {scenario_obj.country}")
-    doc.add_paragraph(f"行业专包：{checklist.get('industry_pack_name') or checklist.get('detected_industry_name', scenario_obj.industry)}")
+    doc.add_paragraph(f"协查法域：{checklist.get('industry_pack_name') or checklist.get('detected_industry_name', scenario_obj.industry)}")
     sub_sectors = checklist.get("detected_sub_sectors") or []
     if sub_sectors:
         names = "、".join(s.get("name", "") for s in sub_sectors if s.get("name"))
@@ -83,6 +83,14 @@ def build_legacy_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
     doc.add_paragraph(scenario_obj.description)
     if scenario_obj.investment_structure:
         doc.add_paragraph(f"投资结构：{scenario_obj.investment_structure}")
+    if scenario_obj.investment_destination:
+        doc.add_paragraph(f"投资目的地：{scenario_obj.investment_destination}")
+    if scenario_obj.funding_source:
+        doc.add_paragraph(f"资金来源：{scenario_obj.funding_source}")
+    if scenario_obj.project_content_scale:
+        doc.add_paragraph(f"主要内容：{scenario_obj.project_content_scale}")
+    if scenario_obj.known_risks:
+        doc.add_paragraph(f"已知风险与关注事项：{scenario_obj.known_risks}")
     if scenario_obj.employee_count:
         doc.add_paragraph(f"雇员规模：约 {scenario_obj.employee_count} 人")
 

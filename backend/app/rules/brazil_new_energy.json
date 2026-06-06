@@ -1,9 +1,23 @@
 {
   "pack": {
     "id": "brazil_new_energy",
-    "name": "巴西 · 新能源制造（设厂专包）",
-    "version": "2.0",
-    "focus": "境外绿地设厂 · 电动客车 / 动力电池 / 光伏储能 / 研发中心"
+    "name": "巴西 · 投资协查",
+    "version": "2.4",
+    "region": "latin_america",
+    "primary_country": "brazil",
+    "industry_focus": "新能源及相关投资",
+    "focus": "拉美首发法域 · 覆盖 FDI、绿地投资、研发中心及制造扩建"
+  },
+  "material_intake_policy": {
+    "philosophy": "upload_first",
+    "business_action": "upload_proposal_files_only",
+    "legal_defines": ["compliance_dimensions", "dimension_field_requirements"],
+    "archive_source_files": true,
+    "submit_always_required": ["project_name", "investment_structure", "description"],
+    "user_confirm_fields": ["description", "investment_structure", "funding_source", "known_risks"],
+    "business_responsibility_hint": "确认方案中的项目事实真实、完整；法务负责合规维度与法律判断",
+    "gate_a_by": "dimension_field_requirements",
+    "accepted_upload_types": [".txt", ".md", ".docx", ".pdf"]
   },
   "jurisdiction": {
     "id": "brazil",
@@ -48,8 +62,12 @@
   "action_types": {
     "greenfield_plant": {
       "id": "greenfield_plant",
-      "name": "境外设厂",
-      "keywords": ["设厂", "工厂", "制造", "组装", "投产", "建设", "厂房", "研发中心", "factory", "manufacturing", "plant"],
+      "name": "直接投资与新建项目",
+      "keywords": [
+        "投资", "FDI", "外资", "子公司", "合资", "并购", "市场准入",
+        "设厂", "工厂", "制造", "组装", "投产", "建设", "厂房",
+        "研发中心", "设立", "factory", "manufacturing", "plant", "greenfield"
+      ],
       "includes_rd": {
         "keywords": ["研发", "research", "development", "R&D", "研发中心"],
         "extra_dimensions": []
@@ -86,14 +104,37 @@
       "description": "工业许可、制造业登记、产品认证及安全生产要求"
     }
   },
+  "ui_groups": [
+    { "id": "project", "label": "项目信息", "order": 1 },
+    { "id": "narrative", "label": "业务描述与风险", "order": 2 },
+    { "id": "timeline", "label": "关键时间线", "order": 3 }
+  ],
+  "material_fields": [
+    { "key": "project_name", "label": "项目名称", "type": "text", "section": "core", "ui_group": "project", "always_required": true, "min_length": 1, "policies": { "extract": "try", "gate_a": "never", "checklist_role": "context" } },
+    { "key": "investment_destination", "label": "投资目的地", "type": "text", "section": "core", "ui_group": "project", "min_length": 2, "policies": { "extract": "try", "gate_a": "dimension", "checklist_role": "context" } },
+    { "key": "investment_structure", "label": "投资结构", "type": "text", "section": "core", "ui_group": "project", "always_required": true, "min_length": 2, "policies": { "extract": "try", "user_confirm": true, "gate_a": "dimension", "checklist_role": "trigger" } },
+    { "key": "funding_source", "label": "资金来源", "type": "textarea", "section": "core", "ui_group": "project", "rows": 2, "min_length": 2, "policies": { "extract": "try", "user_confirm": true, "gate_a": "dimension", "checklist_role": "context" } },
+    { "key": "project_content_scale", "label": "主要内容", "type": "textarea", "section": "core", "ui_group": "project", "rows": 2, "min_length": 5, "policies": { "extract": "try", "gate_a": "dimension", "checklist_role": "trigger" } },
+    { "key": "description", "label": "业务描述", "type": "textarea", "section": "core", "ui_group": "narrative", "always_required": true, "min_length": 10, "rows": 6, "policies": { "extract": "try", "user_confirm": true, "gate_a": "dimension", "checklist_role": "trigger" } },
+    { "key": "known_risks", "label": "已知风险与关注事项", "type": "textarea", "section": "core", "ui_group": "narrative", "rows": 3, "policies": { "extract": "try", "user_confirm": true, "gate_a": "never", "checklist_role": "context" } },
+    { "key": "board_date", "label": "董事会日期", "type": "date", "section": "timeline", "ui_group": "timeline", "policies": { "extract": "try", "gate_a": "never", "checklist_role": "context" } },
+    { "key": "start_date", "label": "预计开工", "type": "date", "section": "timeline", "ui_group": "timeline", "policies": { "extract": "try", "gate_a": "never", "checklist_role": "context" } },
+    { "key": "production_date", "label": "预计投产", "type": "date", "section": "timeline", "ui_group": "timeline", "policies": { "extract": "try", "gate_a": "never", "checklist_role": "context" } }
+  ],
+  "dimension_field_requirements": {
+    "labor": ["description"],
+    "foreign_investment": ["investment_structure", "investment_destination", "funding_source", "description"],
+    "tax": ["description", "funding_source", "project_content_scale"],
+    "industry_access": ["investment_destination", "project_content_scale", "description"]
+  },
   "checklist_items": [
     {
       "id": "LAB-001",
       "dimension": "labor",
       "title": "核查本地雇佣规模与 CLT 适用",
-      "description": "确认约 450 名本地雇员计划是否全部适用 CLT 劳动合同制度，岗位分类（生产/研发/管理）及雇佣合同模板。",
+      "description": "若方案涉及在巴西雇佣本地员工，确认适用 CLT 劳动合同、岗位分类及雇佣合同模板。",
       "priority": "high",
-      "always_include": true,
+      "always_include": false,
       "triggers": ["雇员", "就业", "岗位", "450", "工人", "员工", "hiring", "jobs"]
     },
     {
@@ -102,17 +143,17 @@
       "title": "FGTS 及法定福利缴付安排",
       "description": "核实 FGTS（工龄保障基金）8% 缴付、13薪、年假及法定福利预算与外包/派遣边界。",
       "priority": "high",
-      "always_include": true,
-      "triggers": ["FGTS", "福利", "薪酬", "派遣"]
+      "always_include": false,
+      "triggers": ["FGTS", "福利", "薪酬", "派遣", "雇员", "员工", "就业", "CLT"]
     },
     {
       "id": "LAB-003",
       "dimension": "labor",
       "title": "工会与集体谈判风险",
-      "description": "评估坎皮纳斯制造业工会覆盖情况、集体谈判（CCT/ACT）义务及停工风险预案。",
+      "description": "评估投资所在地工会覆盖、集体谈判（CCT/ACT）义务及劳资风险预案。",
       "priority": "medium",
-      "always_include": true,
-      "triggers": ["工会", "坎皮纳斯", "制造"]
+      "always_include": false,
+      "triggers": ["工会", "坎皮纳斯", "制造", "雇员", "员工"]
     },
     {
       "id": "LAB-004",
@@ -126,20 +167,20 @@
     {
       "id": "FOR-001",
       "dimension": "foreign_investment",
-      "title": "100% 外资子公司设立路径",
-      "description": "确认通过巴西全资子公司投资的设立流程（CNPJ 注册、公司章程、外资申报）。",
+      "title": "外资在巴西投资设立路径",
+      "description": "确认通过子公司、合资公司或其他实体在巴西投资的设立流程（CNPJ 注册、公司章程、外资申报）。",
       "priority": "high",
       "always_include": true,
-      "triggers": ["外资", "子公司", "100%", "全资", "比亚迪"]
+      "triggers": ["外资", "子公司", "100%", "全资", "合资", "FDI", "投资", "设立"]
     },
     {
       "id": "FOR-002",
       "dimension": "foreign_investment",
       "title": "行业外资准入限制筛查",
-      "description": "核查电动客车、动力电池、光伏及储能领域是否存在外资股比、本地成分或特许要求。",
+      "description": "核查拟投资行业是否存在外资股比、本地成分、特许或备案要求（含新能源、制造、研发等）。",
       "priority": "high",
       "always_include": true,
-      "triggers": ["电池", "客车", "光伏", "储能", "制造"]
+      "triggers": ["外资", "准入", "限制", "行业", "电池", "客车", "光伏", "储能", "研发", "制造", "FDI"]
     },
     {
       "id": "FOR-003",
@@ -154,28 +195,28 @@
       "id": "TAX-001",
       "dimension": "tax",
       "title": "联邦层企业所得税（IRPJ/CSLL）",
-      "description": "确认制造+研发混合业务的联邦所得税、社会贡献税适用及预估税负模型。",
+      "description": "确认项目在巴西开展经营活动时的联邦所得税、社会贡献税适用及预估税负框架。",
       "priority": "high",
       "always_include": true,
-      "triggers": ["制造", "研发", "所得税"]
+      "triggers": ["所得税", "税", "经营", "研发", "制造", "投资"]
     },
     {
       "id": "TAX-002",
       "dimension": "tax",
       "title": "圣保罗州 ICMS 及州激励",
-      "description": "核查州级 ICMS、坎皮纳斯/圣保罗州投资激励（如 PADIS、PRODEIC 等）适用资格。",
+      "description": "核查州级 ICMS 及投资激励（如 PADIS、PRODEIC 等）的适用资格与合规义务。",
       "priority": "high",
       "always_include": true,
-      "triggers": ["圣保罗", "坎皮纳斯", "州"]
+      "triggers": ["圣保罗", "坎皮纳斯", "州", "ICMS", "巴西", "投资"]
     },
     {
       "id": "TAX-003",
       "dimension": "tax",
       "title": "市级 ISS/IPTU 及地方税",
-      "description": "确认坎皮纳斯市服务税 ISS（研发/服务环节）、物业税 IPTU 及市政收费。",
+      "description": "确认投资所在城市的 ISS（服务环节）、IPTU 及市政收费义务。",
       "priority": "medium",
-      "always_include": true,
-      "triggers": ["坎皮纳斯", "市", "研发"]
+      "always_include": false,
+      "triggers": ["坎皮纳斯", "市", "研发", "服务", "圣保罗"]
     },
     {
       "id": "TAX-004",
@@ -190,18 +231,18 @@
       "id": "IND-001",
       "dimension": "industry_access",
       "title": "工业用地与建设许可（Alvará）",
-      "description": "核查 32,000m² + 20,000m² 厂房用地性质、建筑许可、消防及 ocupação 合规。",
+      "description": "若涉及新建厂房或改扩建，核查用地性质、建筑许可、消防及 ocupação 合规。",
       "priority": "high",
-      "always_include": true,
+      "always_include": false,
       "triggers": ["厂房", "平方米", "m²", "建设", "开工", "32,000", "20,000"]
     },
     {
       "id": "IND-002",
       "dimension": "industry_access",
       "title": "制造业登记与运营许可",
-      "description": "确认客车组装、电池包生产所需工业登记、ANATEL/INMETRO 等产品合规路径。",
+      "description": "若涉及制造或组装业务，确认工业登记、产品认证（如 INMETRO/ANATEL）及运营许可路径。",
       "priority": "high",
-      "always_include": true,
+      "always_include": false,
       "triggers": ["制造", "组装", "电池", "客车", "生产"]
     },
     {

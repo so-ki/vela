@@ -8,19 +8,22 @@ import {
   fetchBrief,
   fetchExportConfig,
   fetchReview,
+  fetchRulesCatalog,
   fetchScenario,
   finalizeReview,
   initReview,
   returnScenarioToBusiness,
   updateReviewItem,
 } from '@/api/client'
+import LegalMaterialGatePanel from '@/components/LegalMaterialGatePanel.vue'
 import { useAuthStore } from '@/stores/auth'
-import type { BriefItem, LegalHit, ReviewItem, ReviewState, RiskBrief, Scenario } from '@/types/scenario'
+import type { BriefItem, LegalHit, ReviewItem, ReviewState, RiskBrief, RulesCatalog, Scenario } from '@/types/scenario'
 
 const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const scenario = ref<Scenario | null>(null)
+const catalog = ref<RulesCatalog | null>(null)
 const review = ref<ReviewState | null>(null)
 const loading = ref(true)
 const saving = ref<string | null>(null)
@@ -134,6 +137,12 @@ const isLocked = computed(() =>
   review.value ? !['in_progress'].includes(review.value.status) || !auth.isLegal : true,
 )
 
+const showMaterialGate = computed(
+  () => auth.isLegal && scenario.value?.status === 'pending_scope',
+)
+
+const showChecklistReview = computed(() => !showMaterialGate.value && !!review.value)
+
 const filteredItems = computed(() => {
   const items = review.value?.items || []
   switch (reviewFilter.value) {
@@ -207,30 +216,65 @@ watch(
   { immediate: true },
 )
 
-onMounted(async () => {
-  const id = Number(route.params.id)
+async function loadReviewData(id: number) {
+  if (scenario.value?.status === 'pending_scope') {
+    review.value = null
+    return
+  }
   try {
-    const exportCfg = await fetchExportConfig()
-    exportDocxLabel.value = exportCfg.docx_label
-    scenario.value = await fetchScenario(id)
-    try {
-      review.value = await fetchReview(id)
-    } catch {
-      if (auth.isLegal) {
-        review.value = await initReview(id)
-      } else {
-        error.value = '法务尚未开始复核，请在工作台等待处理结果'
-      }
-    }
-    for (const item of review.value?.items || []) {
-      if (item.comment) comments.value[item.code] = item.comment
-    }
+    review.value = await fetchReview(id)
   } catch {
-    error.value = '无法加载复核工作台，请先生成双语简报'
+    if (auth.isLegal) {
+      review.value = await initReview(id)
+    } else {
+      throw new Error('法务尚未开始复核，请在工作台等待处理结果')
+    }
+  }
+  comments.value = {}
+  for (const item of review.value?.items || []) {
+    if (item.comment) comments.value[item.code] = item.comment
+  }
+}
+
+async function loadPage() {
+  const id = Number(route.params.id)
+  error.value = null
+  const exportCfg = await fetchExportConfig()
+  exportDocxLabel.value = exportCfg.docx_label
+  if (auth.isLegal) {
+    catalog.value = await fetchRulesCatalog()
+  }
+  scenario.value = await fetchScenario(id)
+  await loadReviewData(id)
+}
+
+onMounted(async () => {
+  loading.value = true
+  try {
+    await loadPage()
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : '无法加载复核工作台，请稍后重试'
   } finally {
     loading.value = false
   }
 })
+
+async function onScopeConfirmed(updated: Scenario) {
+  scenario.value = updated
+  loading.value = true
+  error.value = null
+  try {
+    await loadReviewData(updated.id)
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : '清单已生成，但复核工作台加载失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function onMaterialsReturned() {
+  await router.push({ name: 'dashboard' })
+}
 
 async function setDecision(code: string, decision: 'approved' | 'rejected') {
   if (!scenario.value || isLocked.value) return
@@ -429,80 +473,107 @@ function openFullBrief(code: string) {
 <template>
   <div class="review-page">
     <div v-if="loading" class="muted">加载中…</div>
-    <div v-else-if="error && !review" class="error banner-error">{{ error }}</div>
-    <template v-else-if="review && scenario">
+    <div v-else-if="error && !scenario" class="error banner-error">{{ error }}</div>
+    <template v-else-if="scenario">
       <header class="page-header">
         <div>
-          <p class="eyebrow dark">Step 6 · 法务复核工作台</p>
+          <p class="eyebrow dark">法务复核工作台</p>
           <h1>{{ scenario.project_name }}</h1>
-          <p class="meta">
-            复核人 <strong>{{ review.reviewer_name }}</strong> ·
-            已确认 <strong>{{ review.approved_count }}</strong> ·
-            已驳回 <strong>{{ review.rejected_count }}</strong> ·
-            待处理 <strong>{{ review.pending_count }}</strong>
+          <p class="meta" v-if="showMaterialGate">
+            请先完成<strong>协查范围与材料完整性</strong>，确认后将同页进入清单复核。
           </p>
-          <p class="meta">
-            <span class="badge" :class="review.status === 'approved' ? 'ok' : review.status === 'in_progress' ? 'pri-medium' : 'err'">
-              {{ statusLabel[review.status] || review.status }}
-            </span>
-          </p>
+          <template v-else-if="review">
+            <p class="meta">
+              复核人 <strong>{{ review.reviewer_name }}</strong> ·
+              已确认 <strong>{{ review.approved_count }}</strong> ·
+              已驳回 <strong>{{ review.rejected_count }}</strong> ·
+              待处理 <strong>{{ review.pending_count }}</strong>
+            </p>
+            <p class="meta">
+              <span class="badge" :class="review.status === 'approved' ? 'ok' : review.status === 'in_progress' ? 'pri-medium' : 'err'">
+                {{ statusLabel[review.status] || review.status }}
+              </span>
+            </p>
+          </template>
         </div>
         <div class="header-actions" v-if="auth.isLegal">
           <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
-          <button type="button" class="btn-secondary" @click="goBrief">查看简报</button>
-          <button
-            v-if="!isLocked"
-            type="button"
-            class="btn-secondary"
-            :disabled="saving === 'all'"
-            @click="runApproveAll"
-          >
-            全部确认
-          </button>
-          <button
-            v-if="!isLocked && review.can_return_to_business"
-            type="button"
-            class="btn-secondary reject"
-            :disabled="returning"
-            @click="runReturnToBusiness"
-          >
-            {{ returning ? '退回中…' : '退回业务补充' }}
-          </button>
-          <button
-            type="button"
-            class="btn-primary"
-            :disabled="!review.can_finalize || finalizing || isLocked"
-            @click="runFinalize"
-          >
-            {{ finalizing ? '定稿中…' : '提交复核定稿' }}
-          </button>
-          <button
-            type="button"
-            class="btn-secondary"
-            :disabled="!review.can_export || exporting"
-            @click="runExport"
-          >
-            {{ exporting ? '导出中…' : `导出 Word · ${exportDocxLabel}` }}
-          </button>
-          <button
-            type="button"
-            class="btn-secondary"
-            :disabled="!review.can_export || exportingPdf"
-            @click="runExportPdf"
-          >
-            {{ exportingPdf ? '导出中…' : '导出 PDF' }}
-          </button>
+          <template v-if="showChecklistReview && review">
+            <button type="button" class="btn-secondary" @click="goBrief">查看简报</button>
+            <button
+              v-if="!isLocked"
+              type="button"
+              class="btn-secondary"
+              :disabled="saving === 'all'"
+              @click="runApproveAll"
+            >
+              全部确认
+            </button>
+            <button
+              v-if="!isLocked && review.can_return_to_business"
+              type="button"
+              class="btn-secondary reject"
+              :disabled="returning"
+              @click="runReturnToBusiness"
+            >
+              {{ returning ? '退回中…' : '退回业务补充' }}
+            </button>
+            <button
+              type="button"
+              class="btn-primary"
+              :disabled="!review.can_finalize || finalizing || isLocked"
+              @click="runFinalize"
+            >
+              {{ finalizing ? '定稿中…' : '提交复核定稿' }}
+            </button>
+            <button
+              type="button"
+              class="btn-secondary"
+              :disabled="!review.can_export || exporting"
+              @click="runExport"
+            >
+              {{ exporting ? '导出中…' : `导出 Word · ${exportDocxLabel}` }}
+            </button>
+            <button
+              type="button"
+              class="btn-secondary"
+              :disabled="!review.can_export || exportingPdf"
+              @click="runExportPdf"
+            >
+              {{ exportingPdf ? '导出中…' : '导出 PDF' }}
+            </button>
+          </template>
         </div>
       </header>
 
-      <div class="disclaimer-banner">
-        <template v-if="auth.isLegal">
-          请对每条核查项作出确认或驳回，并可在批注栏补充意见。全部处理完成后方可定稿并导出{{ exportDocxLabel }}。
-        </template>
-        <template v-else>
-          本页仅供查看复核进度。确认、定稿与导出须由法务角色操作。
-        </template>
-      </div>
+      <LegalMaterialGatePanel
+        v-if="showMaterialGate && catalog"
+        :scenario="scenario"
+        :catalog="catalog"
+        @scope-confirmed="onScopeConfirmed"
+        @materials-returned="onMaterialsReturned"
+      />
+
+      <section v-if="showMaterialGate" class="panel review-section-pending">
+        <h2>② 清单复核</h2>
+        <p class="muted">完成上方范围确认并生成清单后，将在此处展开核查条目复核。</p>
+      </section>
+
+      <template v-else-if="review">
+        <section class="review-checklist-section">
+          <div class="review-section-head panel">
+            <h2>② 清单复核</h2>
+            <p class="muted">对核查清单条目逐条确认或驳回；全部处理完成后方可定稿并导出。</p>
+          </div>
+
+          <div class="disclaimer-banner">
+            <template v-if="auth.isLegal">
+              请对每条核查项作出确认或驳回，并可在批注栏补充意见。全部处理完成后方可定稿并导出{{ exportDocxLabel }}。
+            </template>
+            <template v-else>
+              本页仅供查看复核进度。确认、定稿与导出须由法务角色操作。
+            </template>
+          </div>
 
       <p class="error banner-error" v-if="error">{{ error }}</p>
 
@@ -714,6 +785,10 @@ function openFullBrief(code: string) {
       </section>
 
       <p class="muted panel" v-if="!reviewSections.length">当前筛选下暂无条目。</p>
+        </section>
+      </template>
+
+      <p class="error banner-error" v-if="error && scenario">{{ error }}</p>
     </template>
   </div>
 </template>

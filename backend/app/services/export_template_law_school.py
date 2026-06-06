@@ -122,7 +122,7 @@ def build_law_school_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
             ("自", f"{settings.export_org_name} · {settings.export_org_department}"),
             ("关于", f"{scenario_obj.project_name} — 巴西投资合规协查"),
             ("项目地点", f"{scenario_obj.city} · {scenario_obj.state} · {scenario_obj.country}"),
-            ("行业专包", payload.get("industry_pack_name") or payload.get("detected_industry_name", scenario_obj.industry)),
+            ("协查法域", payload.get("industry_pack_name") or payload.get("detected_industry_name", scenario_obj.industry)),
             ("动作类型", payload.get("detected_action_type_name", scenario_obj.action_type)),
             ("识别子赛道", sub_names or "—"),
             ("协查状态", scenario_obj.status),
@@ -141,6 +141,14 @@ def build_law_school_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
     _add_paragraph(doc, scenario_obj.description or "（无业务描述）")
     if scenario_obj.investment_structure:
         _add_paragraph(doc, f"投资结构：{scenario_obj.investment_structure}")
+    if scenario_obj.investment_destination:
+        _add_paragraph(doc, f"投资目的地：{scenario_obj.investment_destination}")
+    if scenario_obj.funding_source:
+        _add_paragraph(doc, f"资金来源：{scenario_obj.funding_source}")
+    if scenario_obj.project_content_scale:
+        _add_paragraph(doc, f"主要内容：{scenario_obj.project_content_scale}")
+    if scenario_obj.known_risks:
+        _add_paragraph(doc, f"已知风险与关注事项：{scenario_obj.known_risks}")
     if scenario_obj.employee_count:
         _add_paragraph(doc, f"雇员规模：约 {scenario_obj.employee_count} 人")
 

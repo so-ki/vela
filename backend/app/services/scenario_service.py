@@ -8,13 +8,41 @@ from app.schemas.scenario import (
     BusinessSubmitRequest,
     ChecklistResponse,
     DocumentExtractSnapshot,
+    MaterialFeedback,
     ScenarioCreateRequest,
     ScenarioResponse,
     BusinessFeedback,
 )
 from app.services.audit import write_audit_log
 from app.services.review_service import business_feedback_from_review
-from app.services.rule_engine import ScenarioInput, generate_checklist, get_demo_scenario_template
+from app.services.material_review_service import (
+    assess_material_completeness,
+    build_material_return_record,
+    business_feedback_from_material_review,
+)
+from app.services.rule_engine import (
+    ScenarioInput,
+    generate_checklist,
+    get_demo_scenario_template,
+    get_material_field_labels,
+    load_rules,
+)
+from app.services.rules_registry import resolve_pack_id, resolve_scenario_pack_id
+from app.services.material_file_storage import save_scenario_material_files
+
+
+def _pack_labels(action_type: str, pack_id: str | None = None) -> tuple[str, str]:
+    rules = load_rules(pack_id)
+    pack = rules.get("pack", {})
+    action = rules.get("action_types", {}).get(action_type, {})
+    return (
+        pack.get("name") or "巴西 · 投资协查",
+        action.get("name") or action_type,
+    )
+
+
+def _resolve_payload_pack_id(payload: BusinessSubmitRequest | ScenarioCreateRequest) -> str:
+    return resolve_pack_id(getattr(payload, "rules_pack_id", None), payload.country)
 
 
 def _materials_only_payload(
@@ -23,16 +51,21 @@ def _materials_only_payload(
     document_extract: dict | None = None,
 ) -> dict:
     """业务材料占位清单：不含核查项，待法务确认协查范围。"""
+    pack_id = _resolve_payload_pack_id(payload)
+    pack_name, action_name = _pack_labels(payload.action_type, pack_id)
+    rules = load_rules(pack_id)
+    industry_name = rules.get("industries", {}).get(payload.industry, {}).get("name", payload.industry)
     data: dict = {
         "title": "待法务确认协查范围",
         "total_items": 0,
-        "jurisdiction": "Brazil",
-        "industry_pack_name": "巴西 · 新能源（专包 v2）",
+        "jurisdiction": rules["jurisdiction"]["name"],
+        "industry_pack_id": pack_id,
+        "industry_pack_name": pack_name,
         "detected_industry": payload.industry,
-        "detected_industry_name": "新能源",
+        "detected_industry_name": industry_name,
         "detected_sub_sectors": [],
         "detected_action_type": payload.action_type,
-        "detected_action_type_name": "境外设厂",
+        "detected_action_type_name": action_name,
         "selected_dimensions": [],
         "sections": [],
         "materials_only": True,
@@ -50,8 +83,11 @@ def create_scenario_materials_only(
     db: Session,
     user: User,
     payload: BusinessSubmitRequest,
+    *,
+    uploads: list[tuple[str, bytes, str | None]] | None = None,
 ) -> InvestigationScenario:
     """业务提交材料：保存场景与抽取记录，不生成核查清单。"""
+    pack_id = _resolve_payload_pack_id(payload)
     checklist_payload = _materials_only_payload(payload)
     if payload.document_extract:
         checklist_payload = attach_document_extract_to_payload(checklist_payload, payload)
@@ -59,13 +95,18 @@ def create_scenario_materials_only(
     scenario = InvestigationScenario(
         user_id=user.id,
         project_name=payload.project_name,
+        rules_pack_id=pack_id,
         country=payload.country,
         state=payload.state,
         city=payload.city,
         industry=payload.industry,
         action_type=payload.action_type,
         investment_structure=payload.investment_structure,
+        investment_destination=payload.investment_destination,
+        project_content_scale=payload.project_content_scale,
+        funding_source=payload.funding_source,
         description=payload.description,
+        known_risks=payload.known_risks,
         employee_count=payload.employee_count,
         capacity_notes=payload.capacity_notes,
         facility_notes=payload.facility_notes,
@@ -78,6 +119,12 @@ def create_scenario_materials_only(
     )
     db.add(scenario)
     db.flush()
+
+    if uploads:
+        archived_files = save_scenario_material_files(scenario.id, uploads)
+        doc = dict(checklist_payload.get("document_extract") or {})
+        doc["archived_files"] = archived_files
+        checklist_payload["document_extract"] = doc
 
     checklist = ComplianceChecklist(
         scenario_id=scenario.id,
@@ -113,15 +160,25 @@ def business_submit_to_create_request(payload: BusinessSubmitRequest) -> Scenari
 
 
 def scenario_to_create_request(scenario: InvestigationScenario) -> ScenarioCreateRequest:
+    pack_id = resolve_scenario_pack_id(
+        rules_pack_id=scenario.rules_pack_id,
+        country=scenario.country,
+        checklist_payload=scenario.checklist.payload if scenario.checklist else None,
+    )
     return ScenarioCreateRequest(
         project_name=scenario.project_name,
+        rules_pack_id=pack_id,
         country=scenario.country,
         state=scenario.state,
         city=scenario.city,
         industry=scenario.industry,
         action_type=scenario.action_type,
         investment_structure=scenario.investment_structure,
+        investment_destination=scenario.investment_destination,
+        project_content_scale=scenario.project_content_scale,
+        funding_source=scenario.funding_source,
         description=scenario.description,
+        known_risks=scenario.known_risks,
         employee_count=scenario.employee_count,
         capacity_notes=scenario.capacity_notes,
         facility_notes=scenario.facility_notes,
@@ -138,6 +195,7 @@ def create_scenario_with_checklist(
     user: User,
     payload: ScenarioCreateRequest,
 ) -> InvestigationScenario:
+    pack_id = _resolve_payload_pack_id(payload)
     scenario_input = ScenarioInput(
         project_name=payload.project_name,
         country=payload.country,
@@ -146,7 +204,11 @@ def create_scenario_with_checklist(
         industry=payload.industry,
         action_type=payload.action_type,
         investment_structure=payload.investment_structure or "",
+        investment_destination=payload.investment_destination or "",
+        project_content_scale=payload.project_content_scale or "",
+        funding_source=payload.funding_source or "",
         description=payload.description,
+        known_risks=payload.known_risks or "",
         compliance_dimensions=payload.compliance_dimensions,
         employee_count=payload.employee_count,
         capacity_notes=payload.capacity_notes,
@@ -155,20 +217,26 @@ def create_scenario_with_checklist(
         start_date=str(payload.start_date) if payload.start_date else None,
         production_date=str(payload.production_date) if payload.production_date else None,
         remarks=payload.remarks,
+        rules_pack_id=pack_id,
     )
 
-    checklist_data = generate_checklist(scenario_input)
+    checklist_data = generate_checklist(scenario_input, pack_id)
 
     scenario = InvestigationScenario(
         user_id=user.id,
         project_name=payload.project_name,
+        rules_pack_id=pack_id,
         country=payload.country,
         state=payload.state,
         city=payload.city,
         industry=payload.industry,
         action_type=payload.action_type,
         investment_structure=payload.investment_structure,
+        investment_destination=payload.investment_destination,
+        project_content_scale=payload.project_content_scale,
+        funding_source=payload.funding_source,
         description=payload.description,
+        known_risks=payload.known_risks,
         employee_count=payload.employee_count,
         capacity_notes=payload.capacity_notes,
         facility_notes=payload.facility_notes,
@@ -212,6 +280,7 @@ def create_scenario_with_checklist(
 
 
 def _payload_from_request(payload: ScenarioCreateRequest) -> ScenarioInput:
+    pack_id = _resolve_payload_pack_id(payload)
     return ScenarioInput(
         project_name=payload.project_name,
         country=payload.country,
@@ -220,7 +289,11 @@ def _payload_from_request(payload: ScenarioCreateRequest) -> ScenarioInput:
         industry=payload.industry,
         action_type=payload.action_type,
         investment_structure=payload.investment_structure or "",
+        investment_destination=payload.investment_destination or "",
+        project_content_scale=payload.project_content_scale or "",
+        funding_source=payload.funding_source or "",
         description=payload.description,
+        known_risks=payload.known_risks or "",
         compliance_dimensions=payload.compliance_dimensions,
         employee_count=payload.employee_count,
         capacity_notes=payload.capacity_notes,
@@ -229,18 +302,24 @@ def _payload_from_request(payload: ScenarioCreateRequest) -> ScenarioInput:
         start_date=str(payload.start_date) if payload.start_date else None,
         production_date=str(payload.production_date) if payload.production_date else None,
         remarks=payload.remarks,
+        rules_pack_id=pack_id,
     )
 
 
 def _apply_payload_to_scenario(scenario: InvestigationScenario, payload: ScenarioCreateRequest) -> None:
     scenario.project_name = payload.project_name
+    scenario.rules_pack_id = _resolve_payload_pack_id(payload)
     scenario.country = payload.country
     scenario.state = payload.state
     scenario.city = payload.city
     scenario.industry = payload.industry
     scenario.action_type = payload.action_type
     scenario.investment_structure = payload.investment_structure
+    scenario.investment_destination = payload.investment_destination
+    scenario.project_content_scale = payload.project_content_scale
+    scenario.funding_source = payload.funding_source
     scenario.description = payload.description
+    scenario.known_risks = payload.known_risks
     scenario.employee_count = payload.employee_count
     scenario.capacity_notes = payload.capacity_notes
     scenario.facility_notes = payload.facility_notes
@@ -258,7 +337,8 @@ def regenerate_scenario_checklist(
 ) -> dict:
     """在同一 scenario 上重新生成清单（保留 revision_history 由调用方处理）。"""
     _apply_payload_to_scenario(scenario, payload)
-    checklist_data = generate_checklist(_payload_from_request(payload))
+    pack_id = _resolve_payload_pack_id(payload)
+    checklist_data = generate_checklist(_payload_from_request(payload), pack_id)
 
     if not scenario.checklist:
         raise ValueError("场景缺少核查清单")
@@ -271,16 +351,34 @@ def regenerate_scenario_checklist(
     return checklist_data
 
 
+def _material_feedback_resp(scenario: InvestigationScenario) -> MaterialFeedback | None:
+    if not scenario.checklist:
+        return None
+    raw = business_feedback_from_material_review(
+        (scenario.checklist.payload or {}).get("material_review")
+    )
+    if raw is None:
+        return None
+    return MaterialFeedback(**raw)
+
+
 def scenario_to_response(scenario: InvestigationScenario) -> ScenarioResponse:
     checklist_resp = None
+    checklist_payload = scenario.checklist.payload if scenario.checklist else {}
+    resolved_pack_id = resolve_scenario_pack_id(
+        rules_pack_id=scenario.rules_pack_id,
+        country=scenario.country,
+        checklist_payload=checklist_payload or None,
+    )
     if scenario.checklist:
-        payload = scenario.checklist.payload
+        payload = checklist_payload
         checklist_resp = ChecklistResponse(
             id=scenario.checklist.id,
             title=payload["title"],
             version=scenario.checklist.version,
             total_items=payload["total_items"],
             jurisdiction=payload["jurisdiction"],
+            industry_pack_id=payload.get("industry_pack_id") or resolved_pack_id,
             industry_pack_name=payload.get("industry_pack_name"),
             detected_industry=payload["detected_industry"],
             detected_industry_name=payload["detected_industry_name"],
@@ -293,19 +391,25 @@ def scenario_to_response(scenario: InvestigationScenario) -> ScenarioResponse:
             created_at=scenario.checklist.created_at,
         )
 
-    payload = scenario.checklist.payload if scenario.checklist else {}
+    payload = checklist_payload
     revision_round = int(payload.get("revision_round") or 0)
+    material_review = payload.get("material_review") or {}
 
     return ScenarioResponse(
         id=scenario.id,
         project_name=scenario.project_name,
+        rules_pack_id=resolved_pack_id,
         country=scenario.country,
         state=scenario.state,
         city=scenario.city,
         industry=scenario.industry,
         action_type=scenario.action_type,
         investment_structure=scenario.investment_structure,
+        investment_destination=scenario.investment_destination,
+        project_content_scale=scenario.project_content_scale,
+        funding_source=scenario.funding_source,
         description=scenario.description,
+        known_risks=scenario.known_risks,
         employee_count=scenario.employee_count,
         capacity_notes=scenario.capacity_notes,
         facility_notes=scenario.facility_notes,
@@ -318,6 +422,8 @@ def scenario_to_response(scenario: InvestigationScenario) -> ScenarioResponse:
         created_at=scenario.created_at,
         checklist=checklist_resp,
         business_feedback=_business_feedback_resp(scenario),
+        material_feedback=_material_feedback_resp(scenario),
+        material_scope_dimensions=list(material_review.get("selected_dimensions") or []),
         can_revise=scenario.status == "returned_for_revision",
         revision_round=revision_round,
         document_extract=document_extract_for_scenario(scenario),
@@ -397,7 +503,11 @@ def document_extract_for_scenario(
         extracted_at=scenario.created_at,
         project_name=scenario.project_name,
         investment_structure=scenario.investment_structure,
+        investment_destination=scenario.investment_destination,
+        project_content_scale=scenario.project_content_scale,
+        funding_source=scenario.funding_source,
         description=scenario.description,
+        known_risks=scenario.known_risks,
         employee_count=scenario.employee_count,
         capacity_notes=scenario.capacity_notes,
         facility_notes=scenario.facility_notes,

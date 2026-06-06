@@ -68,8 +68,20 @@ export async function fetchSystemStatus(): Promise<SystemStatus> {
   return data
 }
 
-export async function fetchRulesCatalog() {
-  const { data } = await api.get('/rules/catalog')
+export async function fetchRulesClassification() {
+  const { data } = await api.get('/rules/classification')
+  return data
+}
+
+export async function fetchRulesPacks(includePlanned = false) {
+  const { data } = await api.get('/rules/packs', { params: { include_planned: includePlanned } })
+  return data
+}
+
+export async function fetchRulesCatalog(packId?: string) {
+  const { data } = await api.get('/rules/catalog', {
+    params: packId ? { pack_id: packId } : undefined,
+  })
   return data
 }
 
@@ -88,7 +100,18 @@ export async function createDemoScenario() {
   return data
 }
 
-export async function submitMaterialsScenario(payload: Record<string, unknown>) {
+export async function submitMaterialsScenario(payload: Record<string, unknown>, files?: File[]) {
+  if (files?.length) {
+    const formData = new FormData()
+    formData.append('payload', JSON.stringify(payload))
+    for (const file of files) {
+      formData.append('files', file)
+    }
+    const { data } = await api.post('/scenarios/submit-materials', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data
+  }
   const { data } = await api.post('/scenarios/submit-materials', payload)
   return data
 }
@@ -120,20 +143,56 @@ export async function confirmScenarioScope(
   return data
 }
 
+export async function previewMaterialReview(scenarioId: number, complianceDimensions: string[]) {
+  const { data } = await api.post(`/scenarios/${scenarioId}/material-review/preview`, {
+    compliance_dimensions: complianceDimensions,
+  })
+  return data
+}
+
+export async function returnScenarioMaterials(
+  scenarioId: number,
+  payload: { compliance_dimensions: string[]; missing_fields: string[]; note?: string | null },
+) {
+  const { data } = await api.post(`/scenarios/${scenarioId}/return-materials`, payload)
+  return data
+}
+
 export interface DocumentExtractResult {
   filename: string
   mode: string
   project_name?: string | null
+  investment_destination?: string | null
   investment_structure?: string | null
+  funding_source?: string | null
+  project_content_scale?: string | null
   description?: string | null
+  known_risks?: string | null
   employee_count?: number | null
   capacity_notes?: string | null
   facility_notes?: string | null
+  board_date?: string | null
+  start_date?: string | null
+  production_date?: string | null
   remarks?: string | null
   compliance_dimensions: string[]
-  facts: Array<{ field: string; value: string; source_snippet?: string | null }>
+  facts: Array<{ field: string; value: string; source_snippet?: string | null; source_filename?: string | null }>
   disclaimer: string
   llm_skipped?: string | null
+}
+
+export interface ExtractFieldConflict {
+  field: string
+  label: string
+  sources: Array<{ filename: string; value: string }>
+  merge_note: string
+}
+
+export interface DocumentExtractBatchResult {
+  files: DocumentExtractResult[]
+  merged: DocumentExtractResult
+  failed: string[]
+  conflicts?: ExtractFieldConflict[]
 }
 
 export async function extractDocumentFromFile(file: File): Promise<DocumentExtractResult> {
@@ -145,9 +204,51 @@ export async function extractDocumentFromFile(file: File): Promise<DocumentExtra
   return data
 }
 
-export async function reviseAndResubmitScenario(scenarioId: number, payload: Record<string, unknown>) {
+export async function extractDocumentsFromFiles(files: File[]): Promise<DocumentExtractBatchResult> {
+  const form = new FormData()
+  for (const file of files) {
+    form.append('files', file)
+  }
+  const { data } = await api.post<DocumentExtractBatchResult>('/scenarios/extract-documents', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return data
+}
+
+export async function reviseAndResubmitScenario(
+  scenarioId: number,
+  payload: Record<string, unknown>,
+  files?: File[],
+) {
+  if (files?.length) {
+    const formData = new FormData()
+    formData.append('payload', JSON.stringify(payload))
+    for (const file of files) {
+      formData.append('files', file)
+    }
+    const { data } = await api.post(`/scenarios/${scenarioId}/revise-and-resubmit`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data
+  }
   const { data } = await api.post(`/scenarios/${scenarioId}/revise-and-resubmit`, payload)
   return data
+}
+
+export async function downloadScenarioMaterialFile(
+  scenarioId: number,
+  storedName: string,
+  filename: string,
+): Promise<void> {
+  const { data } = await api.get(`/scenarios/${scenarioId}/material-files/${encodeURIComponent(storedName)}`, {
+    responseType: 'blob',
+  })
+  const url = URL.createObjectURL(data)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = filename
+  anchor.click()
+  URL.revokeObjectURL(url)
 }
 
 export async function returnScenarioToBusiness(scenarioId: number, note?: string) {

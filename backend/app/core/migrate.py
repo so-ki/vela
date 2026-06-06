@@ -36,6 +36,20 @@ def migrate_sqlite_scenario_columns() -> None:
         statements.append(
             "ALTER TABLE investigation_scenarios ADD COLUMN legal_deleted_at DATETIME"
         )
+    if "investment_destination" not in cols:
+        statements.append(
+            "ALTER TABLE investigation_scenarios ADD COLUMN investment_destination VARCHAR(512)"
+        )
+    if "project_content_scale" not in cols:
+        statements.append(
+            "ALTER TABLE investigation_scenarios ADD COLUMN project_content_scale VARCHAR(512)"
+        )
+    if "funding_source" not in cols:
+        statements.append("ALTER TABLE investigation_scenarios ADD COLUMN funding_source TEXT")
+    if "known_risks" not in cols:
+        statements.append("ALTER TABLE investigation_scenarios ADD COLUMN known_risks TEXT")
+    if "rules_pack_id" not in cols:
+        statements.append("ALTER TABLE investigation_scenarios ADD COLUMN rules_pack_id VARCHAR(64)")
     if not statements:
         return
     with engine.begin() as conn:

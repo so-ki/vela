@@ -12,7 +12,6 @@ import {
   fetchSystemStatus,
   restoreDeletedScenario,
   scanLegalMonitor,
-  submitMaterialsDemo,
   unarchiveScenario,
 } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
@@ -29,17 +28,16 @@ const scenarios = ref<ScenarioSummary[]>([])
 const rulesCatalog = ref<RulesCatalog | null>(null)
 const loading = ref(true)
 const creatingSample = ref(false)
-const submittingDemo = ref(false)
 const sampleError = ref<string | null>(null)
 const archivingId = ref<number | null>(null)
 const deletingId = ref<number | null>(null)
 const restoringId = ref<number | null>(null)
-const submitPanelOpen = ref(false)
+const submitPanelOpen = ref(true)
 const corpusPanelOpen = ref(false)
 const demoPanelOpen = ref(false)
 const dimensionsPanelOpen = ref(false)
 const systemPanelOpen = ref(false)
-const allScenariosPanelOpen = ref(false)
+const allScenariosPanelOpen = ref(true)
 const recycleBinPanelOpen = ref(false)
 const scenarioGroupOpen = ref<Record<string, boolean>>({
   submitted: false,
@@ -98,24 +96,23 @@ function sortByLegalPriority(items: ScenarioSummary[]) {
   })
 }
 
-const legalPendingScopeScenarios = computed(() =>
-  sortByCreatedDesc(displayedScenarios.value.filter((s) => s.progress_status === 'pending_scope')),
-)
-
-const legalPendingReviewScenarios = computed(() =>
-  sortByLegalPriority(displayedScenarios.value.filter((s) => s.progress_status === 'submitted')),
-)
+const legalPendingReviewScenarios = computed(() => {
+  const items = displayedScenarios.value.filter(
+    (s) => s.progress_status === 'submitted' || s.progress_status === 'pending_scope',
+  )
+  return [...items].sort((a, b) => {
+    const aScope = a.progress_status === 'pending_scope' ? 0 : 1
+    const bScope = b.progress_status === 'pending_scope' ? 0 : 1
+    if (aScope !== bScope) return aScope - bScope
+    const pa = priorityOrder[a.review_priority || 'low'] ?? 9
+    const pb = priorityOrder[b.review_priority || 'low'] ?? 9
+    if (pa !== pb) return pa - pb
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  })
+})
 
 const legalInReviewScenarios = computed(() =>
   sortByLegalPriority(displayedScenarios.value.filter((s) => s.progress_status === 'in_review')),
-)
-
-const legalActionableScenarios = computed(() =>
-  sortByLegalPriority(
-    displayedScenarios.value.filter(
-      (s) => s.progress_status === 'submitted' || s.progress_status === 'in_review',
-    ),
-  ),
 )
 
 function sortByCreatedDesc(items: ScenarioSummary[]) {
@@ -200,28 +197,11 @@ const legalCatalogScenarios = computed(() =>
   displayedScenarios.value.filter((s) => isLegalActiveScenario(s) || isLegalScenarioCompleted(s)),
 )
 
-const legalNextAction = computed(() => {
-  if (legalPendingScopeScenarios.value.length) {
-    return { scenario: legalPendingScopeScenarios.value[0], kind: 'scope' as const }
-  }
-  if (legalActionableScenarios.value.length) {
-    return { scenario: legalActionableScenarios.value[0], kind: 'review' as const }
-  }
-  return null
-})
-
 const legalScenarioGroups = computed(() => [
-  {
-    id: 'pending_scope',
-    label: '待确认协查范围',
-    hint: '业务已提交材料，请筛选必要的合规维度并生成核查清单。',
-    items: legalPendingScopeScenarios.value,
-    badgeClass: 'pri-medium',
-  },
   {
     id: 'submitted',
     label: '待复核',
-    hint: '业务已提交法务，等待接手复核；按优先级排序，门控未过线条目会排在前面。',
+    hint: '含待确认协查范围与待开始清单复核；展开后点击「复核」进入，范围/材料确认与清单复核在同一页完成。',
     items: legalPendingReviewScenarios.value,
     badgeClass: 'pri-medium',
   },
@@ -340,19 +320,6 @@ async function runCreateSample() {
   }
 }
 
-async function runBusinessDemoSubmit() {
-  submittingDemo.value = true
-  sampleError.value = null
-  try {
-    const scenario = await submitMaterialsDemo()
-    await router.push({ name: 'scenario-progress', params: { id: scenario.id } })
-  } catch {
-    sampleError.value = '提交失败，请确认后端已启动'
-  } finally {
-    submittingDemo.value = false
-  }
-}
-
 async function runLegalScan() {
   scanningLegal.value = true
   try {
@@ -393,7 +360,6 @@ function scenarioLinks(s: ScenarioSummary) {
     progress: `/scenarios/${s.id}/progress`,
     extract: `/scenarios/${s.id}/extract`,
     edit: `/scenarios/${s.id}/edit`,
-    scope: `/scenarios/${s.id}/scope`,
     checklist: `/scenarios/${s.id}/checklist`,
     brief: `/scenarios/${s.id}/brief`,
     review: `/scenarios/${s.id}/review`,
@@ -457,7 +423,7 @@ async function removeCompletedScenario(s: ScenarioSummary) {
 </script>
 
 <template>
-  <div class="dashboard" :class="{ 'legal-workbench-order': auth.isLegal }">
+  <div class="dashboard" :class="{ 'legal-workbench-order': auth.isLegal, 'business-workbench': auth.isBusiness }">
     <section class="hero-card">
       <div>
         <p class="eyebrow">工作台</p>
@@ -481,44 +447,40 @@ async function removeCompletedScenario(s: ScenarioSummary) {
       </div>
     </section>
 
-    <div class="grid-2 legal-workbench-grid">
-      <!-- 业务：提交入口（与提交页、客户手册步骤 2 对齐） -->
-      <section
-        class="panel workbench-panel collapsible-workbench"
-        :class="{ 'is-open': submitPanelOpen }"
-        v-if="auth.isBusiness"
+    <!-- 业务：提交入口（全宽，与下方进度/回收站对齐） -->
+    <section
+      class="panel workbench-panel collapsible-workbench business-submit-panel"
+      :class="{ 'is-open': submitPanelOpen }"
+      v-if="auth.isBusiness"
+    >
+      <button
+        type="button"
+        class="workbench-panel-toggle"
+        :aria-expanded="submitPanelOpen"
+        @click="submitPanelOpen = !submitPanelOpen"
       >
-        <button
-          type="button"
-          class="workbench-panel-toggle"
-          :aria-expanded="submitPanelOpen"
-          @click="submitPanelOpen = !submitPanelOpen"
-        >
-          <span class="collapse-chevron sm" aria-hidden="true" />
-          <div class="workbench-panel-toggle-main">
-            <h2>提交新协查</h2>
-            <span class="muted workbench-panel-summary">上传方案 · 生成清单与简报 · 提交法务</span>
-          </div>
-        </button>
-        <div v-show="submitPanelOpen" class="workbench-panel-body">
+        <span class="collapse-chevron sm" aria-hidden="true" />
+        <div class="workbench-panel-toggle-main">
+          <h2>提交新协查</h2>
+          <span class="muted workbench-panel-summary">上传方案 · 核对抽取结果 · 提交法务</span>
+        </div>
+      </button>
+      <div v-show="submitPanelOpen" class="workbench-panel-body">
         <p class="muted">
-          填写项目信息后，系统将自动生成<strong>专项核查清单</strong>、检索法条、汇编<strong>双语简报</strong>，并<strong>直接提交法务复核</strong>。
+          <strong>只需上传</strong>巴西投资方案（Word、PDF 等）；系统自动抽取并打开核对表，无需事先准备字段清单。提交后由<strong>法务确认协查范围</strong>。
         </p>
         <ul class="panel-hints">
-          <li>提交页可上传 <strong>.txt / .md / .docx / .pdf</strong> 方案预填表单</li>
+          <li>支持 <strong>.txt / .md / .docx / .pdf</strong>，可多个文件；原文件将归档供法务回看</li>
           <li>提交后在下方「我的协查进度」跟踪状态；法务驳回可在<strong>同一项目</strong>补充后重提</li>
         </ul>
         <p class="error" v-if="sampleError">{{ sampleError }}</p>
         <div class="action-row stack-actions">
-          <RouterLink to="/scenarios/new" class="btn-primary link-btn full">填写项目并提交法务</RouterLink>
-          <button type="button" class="btn-secondary full" :disabled="submittingDemo" @click="runBusinessDemoSubmit">
-            {{ submittingDemo ? '提交中…' : '演示项目一键提交材料' }}
-          </button>
+          <RouterLink to="/scenarios/new" class="btn-primary link-btn full">上传方案并提交协查</RouterLink>
         </div>
-        <p class="muted panel-footnote">演示按钮使用 BYD 坎皮纳斯预设场景，仅供学习流程；正式项目请填写真实信息。</p>
-        </div>
-      </section>
+      </div>
+    </section>
 
+    <div class="grid-2 legal-workbench-grid" v-if="auth.isLegal">
       <!-- 法务：法源语料维护 -->
       <section
         class="panel workbench-panel collapsible-workbench"
@@ -584,7 +546,7 @@ async function removeCompletedScenario(s: ScenarioSummary) {
         >
           <span class="collapse-chevron sm" aria-hidden="true" />
           <div class="workbench-panel-toggle-main">
-            <h2>法务演示（可选）</h2>
+            <h2>法务演示</h2>
             <span class="muted workbench-panel-summary">BYD 预设 · 约 24 条</span>
           </div>
         </button>
@@ -623,8 +585,8 @@ async function removeCompletedScenario(s: ScenarioSummary) {
         </button>
         <div v-show="dimensionsPanelOpen" class="workbench-panel-body">
         <p class="muted">
-          当前行业专包 <strong>{{ rulesCatalog.pack?.name }}</strong> 下的
-          <strong>{{ rulesCatalog.dimensions.length }} 个协查维度</strong>；业务提交材料后，由法务在「待确认协查范围」中筛选必要维度并生成清单。
+          协查法域 <strong>{{ rulesCatalog.pack?.name }}</strong>（巴西 · 拉美首发）下的
+          <strong>{{ rulesCatalog.dimensions.length }} 个协查维度</strong>；业务提交材料后，由法务在<strong>复核页</strong>筛选必要维度、确认材料并生成清单。
         </p>
         <div class="dimension-grid dimension-grid-readonly">
           <div
@@ -675,7 +637,7 @@ async function removeCompletedScenario(s: ScenarioSummary) {
         <div v-if="loading" class="muted">检测中…</div>
         <ul v-else-if="status" class="status-list panel-status">
           <li><span>数据库</span><span :class="status.database === 'ok' ? 'badge ok' : 'badge err'">{{ status.database }}</span></li>
-          <li><span>规则库</span><span class="badge ok">新能源专包 v2 · 4 维度</span></li>
+          <li><span>规则库</span><span class="badge ok">{{ rulesCatalog?.pack?.name ?? '巴西 · 投资协查' }} · {{ rulesCatalog?.dimensions?.length ?? 4 }} 维度</span></li>
           <li>
             <span>法源索引</span>
             <span class="badge ok">{{ legalStatus?.document_count ?? '—' }} 条 · {{ legalStatus?.mode ?? 'keyword' }}</span>
@@ -707,7 +669,7 @@ async function removeCompletedScenario(s: ScenarioSummary) {
             {{ auth.isLegal ? legalCatalogScenarios.length : displayedScenarios.length }} 项
           </span>
           <span v-if="auth.isLegal" class="muted scenario-catalog-meta">
-            待确认范围 {{ legalPendingScopeScenarios.length }} · 待复核 {{ legalPendingReviewScenarios.length }} · 复核中 {{ legalInReviewScenarios.length }} ·
+            待复核 {{ legalPendingReviewScenarios.length }} · 复核中 {{ legalInReviewScenarios.length }} ·
             待业务补充 {{ legalNeedsRevisionScenarios.length }} · 已完成 {{ legalCompletedScenarios.length }}
           </span>
           <span v-else-if="displayedScenarios.length" class="muted scenario-catalog-meta">
@@ -723,24 +685,8 @@ async function removeCompletedScenario(s: ScenarioSummary) {
       >
         <div v-if="auth.isLegal" class="scenario-group-list">
           <p class="muted scenario-catalog-intro">
-            「待确认协查范围」优先处理；「待复核」「复核中」按优先级排序。全部条目处理完毕后可提交定稿并导出底稿。
+            展开对应分组，点击项目旁的「复核」即可处理；Gate A（范围与材料）与清单复核在同一复核页上下分区完成。
           </p>
-          <div v-if="legalNextAction" class="action-row stack-actions scenario-catalog-quick">
-            <RouterLink
-              v-if="legalNextAction.kind === 'scope'"
-              :to="scenarioLinks(legalNextAction.scenario).scope"
-              class="btn-primary link-btn full"
-            >
-              确认协查范围：{{ legalNextAction.scenario.project_name }}
-            </RouterLink>
-            <RouterLink
-              v-else
-              :to="scenarioLinks(legalNextAction.scenario).review"
-              class="btn-primary link-btn full"
-            >
-              处理优先级最高任务
-            </RouterLink>
-          </div>
           <section
             v-for="group in legalScenarioGroups"
             :key="group.id"
@@ -783,26 +729,28 @@ async function removeCompletedScenario(s: ScenarioSummary) {
                     </span>
                   </div>
                   <div class="scenario-actions">
-                    <template v-if="group.id === 'pending_scope'">
-                      <RouterLink
-                        :to="scenarioLinks(s).scope"
-                        :class="legalNextAction?.scenario.id === s.id ? 'btn-primary link-btn sm' : 'btn-secondary link-btn sm'"
-                      >
-                        {{ legalNextAction?.scenario.id === s.id ? '确认范围' : '协查范围' }}
-                      </RouterLink>
-                      <RouterLink :to="scenarioLinks(s).extract" class="btn-secondary link-btn sm">材料</RouterLink>
-                    </template>
-                    <template v-else>
-                      <RouterLink :to="scenarioLinks(s).checklist" class="btn-secondary link-btn sm">清单</RouterLink>
-                      <RouterLink :to="scenarioLinks(s).brief" class="btn-secondary link-btn sm">简报</RouterLink>
-                      <RouterLink
-                        v-if="group.id === 'submitted' || group.id === 'in_review'"
-                        :to="scenarioLinks(s).review"
-                        :class="legalNextAction?.kind === 'review' && legalNextAction?.scenario.id === s.id ? 'btn-primary link-btn sm' : 'btn-secondary link-btn sm'"
-                      >
-                        {{ legalNextAction?.kind === 'review' && legalNextAction?.scenario.id === s.id ? '进入复核' : '复核' }}
-                      </RouterLink>
-                    </template>
+                    <RouterLink
+                      v-if="s.progress_status !== 'pending_scope'"
+                      :to="scenarioLinks(s).checklist"
+                      class="btn-secondary link-btn sm"
+                    >
+                      清单
+                    </RouterLink>
+                    <RouterLink
+                      v-if="s.progress_status !== 'pending_scope'"
+                      :to="scenarioLinks(s).brief"
+                      class="btn-secondary link-btn sm"
+                    >
+                      简报
+                    </RouterLink>
+                    <RouterLink :to="scenarioLinks(s).extract" class="btn-secondary link-btn sm">材料</RouterLink>
+                    <RouterLink
+                      v-if="group.id === 'submitted' || group.id === 'in_review'"
+                      :to="scenarioLinks(s).review"
+                      class="btn-primary link-btn sm"
+                    >
+                      复核
+                    </RouterLink>
                     <button
                       v-if="group.id === 'completed'"
                       type="button"

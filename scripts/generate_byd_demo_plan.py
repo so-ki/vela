@@ -29,7 +29,7 @@ SECTIONS: list[tuple[str, str]] = [
         "一、项目概况",
         "项目名称：BYD 坎皮纳斯新能源工厂（演示案例）\n"
         "项目地点：巴西 · 圣保罗州 · 坎皮纳斯市（Campinas）\n"
-        "行业方向：新能源制造 · 绿地建厂（Greenfield）\n"
+        "行业方向：新能源及相关投资 · 直接投资与新建项目（Greenfield / FDI）\n"
         "投资主体：中资母公司通过巴西全资子公司投资，100% 外资",
     ),
     (
@@ -98,7 +98,7 @@ def build_pdf(path: Path) -> None:
     story.append(Paragraph(_escape(TITLE), _pdf_style("Title", fontSize=16, leading=22, spaceAfter=12)))
     story.append(
         Paragraph(
-            _escape("文档类型：对外投资设厂方案摘要 · 密级：内部演示"),
+            _escape("文档类型：巴西投资方案摘要 · 密级：内部演示"),
             _pdf_style("Sub", fontSize=10, textColor="#555555", spaceAfter=16),
         )
     )
@@ -118,7 +118,7 @@ def build_docx(path: Path) -> None:
 
     title = doc.add_heading(TITLE, level=0)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    doc.add_paragraph("文档类型：对外投资设厂方案摘要 · 密级：内部演示").alignment = WD_ALIGN_PARAGRAPH.CENTER
+    doc.add_paragraph("文档类型：巴西投资方案摘要 · 密级：内部演示").alignment = WD_ALIGN_PARAGRAPH.CENTER
     doc.add_paragraph("")
 
     for heading, body in SECTIONS:

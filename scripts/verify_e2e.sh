@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Vela 端到端验收：行业专包 + 业务/法务分角色 + 法务反馈
+# Vela 端到端验收：巴西投资协查规则包 + 业务/法务分角色 + 法务反馈
 set -euo pipefail
 
 API="${VELA_API:-http://127.0.0.1:8000/api/v1}"
@@ -24,14 +24,27 @@ auth_header() {
 log "1. Health"
 curl -sf "$API/health" >/dev/null && ok "health" || bad "health"
 
-log "2. Rules catalog (industry pack v2)"
+log "2. Rules catalog (Brazil investment pack v2.4)"
 PACK=$(curl -sf "$API/rules/catalog" -H "$(auth_header "$(login legal@demo.vela)")")
 echo "$PACK" | python3 -c "
 import sys, json
 d=json.load(sys.stdin)
 assert d.get('pack',{}).get('id')=='brazil_new_energy', d
+assert d.get('rules_pack_id')=='brazil_new_energy', d
+assert d.get('scene_defaults',{}).get('country')=='brazil', d
 print('pack:', d['pack'].get('name'))
 " && ok "catalog pack" || bad "catalog pack"
+
+log "2b. Rules classification tree"
+CLASS=$(curl -sf "$API/rules/classification" -H "$(auth_header "$(login legal@demo.vela)")")
+echo "$CLASS" | python3 -c "
+import sys, json
+d=json.load(sys.stdin)
+assert d.get('default_pack_id')=='brazil_new_energy', d
+assert d.get('regions')[0]['id']=='latin_america', d
+assert d['regions'][0]['countries'][0]['default_pack_id']=='brazil_new_energy', d
+print('regions:', len(d['regions']), 'packs:', len(d['packs']))
+" && ok "classification" || bad "classification"
 
 log "3. BYD checklist item count"
 TOKEN=$(login legal@demo.vela)
@@ -123,6 +136,20 @@ print('mode:', d['mode'], 'employees:', d['employee_count'])
 else
   echo "skip: $PDF_FIXTURE not found"
 fi
+
+log "7c. Batch document extract (multi-file merge)"
+BATCH=$(curl -sf -X POST "$API/scenarios/extract-documents" \
+  -H "$(auth_header "$TOKEN")" \
+  -F "files=@scripts/fixtures/sample_storage_project.txt" \
+  -F "files=@scripts/fixtures/sample_storage_project.txt")
+echo "$BATCH" | python3 -c "
+import sys, json
+d=json.load(sys.stdin)
+assert len(d.get('files', [])) == 2, d
+assert d.get('merged', {}).get('employee_count') == 120, d
+assert d['merged'].get('filename'), d
+print('batch files:', len(d['files']), 'merged:', d['merged']['filename'][:40])
+" && ok "batch document extract" || bad "batch document extract"
 
 log "8. Storage-only checklist shorter than BYD"
 STOR=$(curl -sf -X POST "$API/scenarios" -H "$(auth_header "$TOKEN")" -H 'Content-Type: application/json' -d '{

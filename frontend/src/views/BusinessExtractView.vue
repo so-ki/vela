@@ -1,64 +1,106 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, RouterLink } from 'vue-router'
+import BusinessMaterialReviewTable from '@/components/BusinessMaterialReviewTable.vue'
+import PerFileExtractSection from '@/components/PerFileExtractSection.vue'
 import { fetchScenario } from '@/api/client'
-import type { DocumentExtractSnapshot, Scenario } from '@/types/scenario'
+import type { DocumentExtractResult } from '@/api/client'
+import type { Scenario, ScenarioFormData } from '@/types/scenario'
 
 const route = useRoute()
 const scenario = ref<Scenario | null>(null)
+const form = ref<ScenarioFormData>({
+  project_name: '',
+  country: '',
+  state: '',
+  city: '',
+  industry: '',
+  action_type: '',
+  investment_destination: '',
+  investment_structure: '',
+  funding_source: '',
+  project_content_scale: '',
+  description: '',
+  known_risks: '',
+  employee_count: undefined,
+  capacity_notes: '',
+  facility_notes: '',
+  compliance_dimensions: [],
+  board_date: '',
+  start_date: '',
+  production_date: '',
+  remarks: '',
+})
 const loading = ref(true)
 const error = ref<string | null>(null)
 
-const FIELD_LABELS: Record<string, string> = {
-  project_name: '项目名称',
-  description: '业务描述',
-  investment_structure: '投资结构',
-  employee_count: '雇员规模',
-  capacity_notes: '产能说明',
-  facility_notes: '厂房说明',
-  remarks: '备注',
-  compliance_dimensions: '协查维度',
-}
-
 const extract = computed(() => scenario.value?.document_extract)
 
-const formRows = computed(() => {
-  const e = extract.value
-  if (!e) return []
-  const rows: Array<{ label: string; value: string }> = []
-  const push = (key: keyof DocumentExtractSnapshot, label: string, formatter?: (v: unknown) => string) => {
-    const raw = e[key]
-    if (raw === null || raw === undefined || raw === '') return
-    if (Array.isArray(raw)) {
-      if (raw.length) rows.push({ label, value: raw.join('、') })
-      return
-    }
-    rows.push({ label, value: formatter ? formatter(raw) : String(raw) })
-  }
-  push('project_name', '项目名称')
-  push('investment_structure', '投资结构')
-  push('employee_count', '雇员规模', (v) => `${v} 人`)
-  push('capacity_notes', '产能说明')
-  push('facility_notes', '厂房说明')
-  push('description', '业务描述')
-  push('remarks', '备注')
-  return rows
+const perFileResults = computed<DocumentExtractResult[]>(() => {
+  const snapshot = extract.value
+  if (!snapshot?.files?.length) return []
+  return snapshot.files.map((file) => ({
+    filename: file.filename,
+    mode: file.mode,
+    project_name: file.project_name,
+    investment_destination: file.investment_destination,
+    investment_structure: file.investment_structure,
+    funding_source: file.funding_source,
+    project_content_scale: file.project_content_scale,
+    description: file.description,
+    known_risks: file.known_risks,
+    employee_count: file.employee_count,
+    capacity_notes: file.capacity_notes,
+    facility_notes: file.facility_notes,
+    board_date: file.board_date,
+    start_date: file.start_date,
+    production_date: file.production_date,
+    remarks: file.remarks,
+    compliance_dimensions: file.compliance_dimensions || [],
+    facts: file.facts,
+    disclaimer: file.disclaimer || '',
+    llm_skipped: file.llm_skipped,
+  }))
 })
+
+const hasMultiFileExtract = computed(() => perFileResults.value.length > 1)
 
 const modeLabel = computed(() => {
   const mode = extract.value?.mode
+  if (hasMultiFileExtract.value) return '多文件合并'
   if (mode === 'llm') return 'AI 抽取'
   if (mode === 'rules') return '规则抽取'
   return '手动填写'
 })
 
-function factLabel(field: string) {
-  return FIELD_LABELS[field] || field
-}
+const reviewFacts = computed(() => extract.value?.facts ?? [])
 
 onMounted(async () => {
   try {
-    scenario.value = await fetchScenario(Number(route.params.id))
+    const data = await fetchScenario(Number(route.params.id))
+    scenario.value = data
+    form.value = {
+      project_name: data.project_name,
+      country: data.country,
+      state: data.state,
+      city: data.city,
+      industry: data.industry,
+      action_type: data.action_type,
+      investment_destination: data.investment_destination || '',
+      investment_structure: data.investment_structure || '',
+      funding_source: data.funding_source || '',
+      project_content_scale: data.project_content_scale || '',
+      description: data.description,
+      known_risks: data.known_risks || '',
+      employee_count: data.employee_count ?? undefined,
+      capacity_notes: data.capacity_notes || '',
+      facility_notes: data.facility_notes || '',
+      compliance_dimensions: data.compliance_dimensions || [],
+      board_date: data.board_date || '',
+      start_date: data.start_date || '',
+      production_date: data.production_date || '',
+      remarks: data.remarks || '',
+    }
   } catch {
     error.value = '无法加载抽取信息'
   } finally {
@@ -71,17 +113,13 @@ onMounted(async () => {
   <div class="extract-review-page">
     <div v-if="loading" class="muted">加载中…</div>
     <div v-else-if="error" class="error banner-error">{{ error }}</div>
-    <template v-else-if="scenario && extract">
+    <template v-else-if="scenario">
       <header class="page-header">
         <div>
           <p class="eyebrow dark">业务协查 · AI 抽取信息表</p>
           <h1>{{ scenario.project_name }}</h1>
-          <p class="meta">
-            <span class="badge ok">{{ modeLabel }}</span>
-            <span class="muted" v-if="extract.filename">来源文件：{{ extract.filename }}</span>
-            <span class="muted" v-if="extract.extracted_at">
-              · 抽取于 {{ new Date(extract.extracted_at).toLocaleString('zh-CN') }}
-            </span>
+          <p v-if="hasMultiFileExtract" class="muted">
+            共 {{ perFileResults.length }} 个方案文件 · 以下为各文件抽取结果与合并核对表
           </p>
         </div>
         <div class="header-actions">
@@ -90,48 +128,31 @@ onMounted(async () => {
         </div>
       </header>
 
-      <div class="disclaimer-banner">
-        {{ extract.disclaimer || '以下信息来自上传方案抽取或提交表单，仅供业务核对，不构成法律意见。' }}
-      </div>
-
-      <section class="panel extract-table-panel">
-        <h2>预填字段一览</h2>
-        <table class="extract-fields-table" v-if="formRows.length">
-          <thead>
-            <tr>
-              <th>字段</th>
-              <th>抽取 / 填入值</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="row in formRows" :key="row.label">
-              <th scope="row">{{ row.label }}</th>
-              <td>{{ row.value }}</td>
-            </tr>
-          </tbody>
-        </table>
-        <p class="muted" v-else>暂无结构化字段。</p>
+      <section v-if="hasMultiFileExtract" class="form-section per-file-review-block">
+        <h2>各文件抽取结果</h2>
+        <PerFileExtractSection
+          v-for="(fileResult, idx) in perFileResults"
+          :key="`${fileResult.filename}-${idx}`"
+          :index="idx"
+          :result="fileResult"
+        />
       </section>
 
-      <section class="panel extract-table-panel" v-if="extract.facts?.length">
-        <h2>抽取依据明细</h2>
-        <p class="muted">每条对应方案原文片段，便于核对 AI / 规则抽取是否准确。</p>
-        <table class="extract-fields-table extract-facts-table">
-          <thead>
-            <tr>
-              <th>字段</th>
-              <th>值</th>
-              <th>原文依据</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(fact, idx) in extract.facts" :key="idx">
-              <th scope="row">{{ factLabel(fact.field) }}</th>
-              <td>{{ fact.value }}</td>
-              <td class="muted">{{ fact.source_snippet || '—' }}</td>
-            </tr>
-          </tbody>
-        </table>
+      <section :class="{ 'merged-review-block': hasMultiFileExtract }">
+        <div v-if="hasMultiFileExtract" class="extract-table-head">
+          <h2>合并核对表</h2>
+          <p class="muted">提交时使用的合并去重结果（只读回看）。</p>
+        </div>
+        <BusinessMaterialReviewTable
+          v-model="form"
+          :editable="false"
+          :dynamic-visibility="true"
+          :mode-label="modeLabel"
+          :filename="extract?.filename ?? null"
+          :extracted-at="extract?.extracted_at ?? null"
+          :disclaimer="extract?.disclaimer || '以下信息来自上传方案抽取或提交表单，仅供业务核对，不构成法律意见。'"
+          :facts="reviewFacts"
+        />
       </section>
     </template>
   </div>

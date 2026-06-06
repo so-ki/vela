@@ -118,7 +118,7 @@ def _executive_summary_zh(scenario: InvestigationScenario, checklist: dict[str, 
         names = "、".join(s.get("name", "") for s in sub_sectors if s.get("name"))
         if names:
             sub_label = f"识别子赛道：{names}。"
-    pack = checklist.get("industry_pack_name") or "巴西 · 新能源制造"
+    pack = checklist.get("industry_pack_name") or "巴西 · 投资协查"
     return (
         f"本简报针对项目「{scenario.project_name}」（{pack} · "
         f"{checklist.get('detected_action_type_name', scenario.action_type)}），"

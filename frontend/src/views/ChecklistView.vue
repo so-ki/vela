@@ -179,7 +179,7 @@ async function goToBrief() {
           </p>
           <h1>{{ checklist.title }}</h1>
           <p class="meta">
-            行业专包：<strong>{{ checklist.industry_pack_name || checklist.detected_industry_name }}</strong> ·
+            协查法域：<strong>{{ checklist.industry_pack_name || checklist.detected_industry_name }}</strong> ·
             动作类型：<strong>{{ checklist.detected_action_type_name }}</strong> ·
             共 <strong>{{ checklist.total_items }}</strong> 条
           </p>

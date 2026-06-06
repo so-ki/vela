@@ -93,8 +93,11 @@ POST /scenarios/demo/sample
 
 | 方法 | 路径 |
 |------|------|
-| GET | `/rules/demo-template` | BYD 新能源设厂 |
-| GET | `/rules/demo-template/mining` | **501** — 矿产专包尚未建设 |
+| GET | `/rules/classification` | 区域 → 国家 → 默认规则包分类树 |
+| GET | `/rules/packs` | 已注册规则包列表 |
+| GET | `/rules/catalog` | 当前规则包表单/清单配置（可选 `?pack_id=`） |
+| GET | `/rules/demo-template` | BYD 坎皮纳斯投资协查演示 |
+| GET | `/rules/demo-template/mining` | **501** — 矿产协查规则包尚未建设 |
 
 ## 嵌入 OA / 合规系统
 

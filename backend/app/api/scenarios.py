@@ -1,10 +1,12 @@
-from typing import List
+from __future__ import annotations
+
+from typing import List, Optional
 import copy
 from datetime import datetime, timezone
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from fastapi.responses import Response
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from fastapi.responses import FileResponse, Response
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -15,19 +17,23 @@ from app.models.scenario import InvestigationScenario
 from app.models.user import User
 from app.schemas.scenario import (
     BusinessSubmitRequest,
+    MaterialReturnRequest,
+    MaterialReviewPreviewRequest,
     RulesCatalogResponse,
+    RulesClassificationResponse,
+    RulesPackSummary,
     ScenarioCreateRequest,
     ScenarioResponse,
     ScenarioSummary,
     ScopeConfirmRequest,
 )
 from app.schemas.brief import BriefGenerateResponse
-from app.schemas.document import DocumentExtractResponse
+from app.schemas.document import DocumentExtractBatchResponse, DocumentExtractResponse, FieldConflict
 from app.schemas.legal import LegalRetrievalResponse
 from app.schemas.review import ReviewItemUpdateRequest, ReviewResponse, ReviewReturnRequest
 from app.services.audit import write_audit_log
 from app.services.brief_generator import generate_brief
-from app.services.document_extractor import extract_facts_from_document
+from app.services.document_extractor import extract_documents_batch, extract_facts_from_document
 from app.services.export_service import build_sample_docx, build_sample_pdf
 from app.services.legal_ingest import get_index_status, ingest_corpus
 from app.services.legal_rag import retrieve_for_checklist
@@ -40,11 +46,15 @@ from app.services.review_service import (
     review_to_response,
     update_review_item,
 )
-from app.services.rule_engine import get_demo_scenario_template, get_mining_demo_scenario_template, get_rules_catalog
+from app.services.material_review_service import assess_material_completeness
+from app.services.material_file_storage import resolve_archived_file_path
+from app.services.rule_engine import get_demo_scenario_template, get_mining_demo_scenario_template, get_rules_catalog, load_rules
+from app.services.rules_registry import RulesPackNotFoundError, get_classification, list_packs, resolve_pack_id
 from app.services.scenario_pipeline import (
     run_business_submit_materials,
     run_confirm_scope_and_generate,
     run_generate_and_submit,
+    run_return_materials,
     run_revise_and_resubmit,
     scenario_summary_meta,
 )
@@ -59,9 +69,58 @@ def _save_payload(db: Session, scenario: InvestigationScenario, payload: dict) -
     db.commit()
 
 
+async def _parse_business_submit_request(
+    request: Request,
+) -> tuple[BusinessSubmitRequest, list[tuple[str, bytes, str | None]]]:
+    content_type = request.headers.get("content-type", "")
+    uploads: list[tuple[str, bytes, str | None]] = []
+    if content_type.startswith("multipart/form-data"):
+        form = await request.form()
+        raw = form.get("payload")
+        if not raw:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="缺少 payload 字段")
+        payload = BusinessSubmitRequest.model_validate_json(str(raw))
+        for item in form.getlist("files"):
+            if isinstance(item, UploadFile):
+                content = await item.read()
+                uploads.append((item.filename or "upload.bin", content, item.content_type))
+        return payload, uploads
+    body = await request.json()
+    payload = BusinessSubmitRequest.model_validate(body)
+    return payload, uploads
+
+
+def _require_uploaded_files_if_policy(uploads: list[tuple[str, bytes, str | None]]) -> None:
+    policy = load_rules().get("material_intake_policy") or {}
+    if policy.get("philosophy") == "upload_first" and policy.get("archive_source_files") and not uploads:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="请上传投资方案文件后再提交（系统将归档原文件并抽取核对表）",
+        )
+
+
+@router.get("/rules/classification", response_model=RulesClassificationResponse)
+def rules_classification(_: User = Depends(get_current_user)):
+    return get_classification()
+
+
+@router.get("/rules/packs", response_model=list[RulesPackSummary])
+def rules_packs(
+    include_planned: bool = Query(default=False),
+    _: User = Depends(get_current_user),
+):
+    return list_packs(include_planned=include_planned)
+
+
 @router.get("/rules/catalog", response_model=RulesCatalogResponse)
-def rules_catalog(_: User = Depends(get_current_user)):
-    return get_rules_catalog()
+def rules_catalog(
+    pack_id: Optional[str] = Query(default=None, description="规则包 ID，默认使用 index.json 中的 default_pack_id"),
+    _: User = Depends(get_current_user),
+):
+    try:
+        return get_rules_catalog(pack_id)
+    except RulesPackNotFoundError as exc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)) from exc
 
 
 @router.get("/rules/demo-template")
@@ -79,7 +138,7 @@ def mining_demo_template(_: User = Depends(get_current_user)):
 
 @router.post("/scenarios/extract-document", response_model=DocumentExtractResponse)
 async def extract_scenario_document(
-    file: UploadFile = File(..., description="投资方案 .txt / .md / .docx / .pdf（≤2MB）"),
+    file: UploadFile = File(..., description="投资方案 .txt / .md / .docx / .pdf（≤200MB）"),
     _: User = Depends(get_current_user),
 ):
     """从上传方案抽取客观事实，预填协查表单（规则引擎；配置 LLM 时优先 AI 抽取）。"""
@@ -90,6 +149,51 @@ async def extract_scenario_document(
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return DocumentExtractResponse(filename=filename, **result)
+
+
+@router.post("/scenarios/extract-documents", response_model=DocumentExtractBatchResponse)
+async def extract_scenario_documents(
+    files: List[UploadFile] = File(..., description="投资方案，可上传多个（每个≤200MB，合计≤2GB）"),
+    _: User = Depends(get_current_user),
+):
+    """逐文件抽取事实，并合并去重为一份预填表单。"""
+    if not files:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="请至少上传一个文件")
+
+    uploads: list[tuple[str, bytes]] = []
+    for upload in files:
+        filename = upload.filename or "upload.txt"
+        content = await upload.read()
+        uploads.append((filename, content))
+
+    try:
+        successes, failures, merged, conflicts = extract_documents_batch(uploads)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    per_file = [DocumentExtractResponse(filename=filename, **result) for filename, result in successes]
+    if len(successes) == 1:
+        merged_filename = successes[0][0]
+    elif len(successes) <= 3:
+        merged_filename = "、".join(filename for filename, _ in successes)
+    else:
+        merged_filename = f"{len(successes)} 个文件"
+
+    merged_response = DocumentExtractResponse(filename=merged_filename, **merged)
+    if failures:
+        merged_response = merged_response.model_copy(
+            update={
+                "disclaimer": merged_response.disclaimer
+                + f" 以下文件抽取失败已跳过：{'；'.join(failures)}"
+            }
+        )
+
+    return DocumentExtractBatchResponse(
+        files=per_file,
+        merged=merged_response,
+        failed=failures,
+        conflicts=[FieldConflict(**item) for item in conflicts],
+    )
 
 
 @router.post("/scenarios", response_model=ScenarioResponse, status_code=201)
@@ -310,14 +414,16 @@ def create_demo_scenario(
 
 
 @router.post("/scenarios/submit-materials", response_model=ScenarioResponse, status_code=201)
-def submit_scenario_materials(
-    payload: BusinessSubmitRequest,
+async def submit_scenario_materials(
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """业务：提交项目材料，协查范围由法务确认后再生成清单。"""
     require_role(current_user, (ROLE_BUSINESS,))
-    scenario = run_business_submit_materials(db, current_user, payload)
+    payload, uploads = await _parse_business_submit_request(request)
+    _require_uploaded_files_if_policy(uploads)
+    scenario = run_business_submit_materials(db, current_user, payload, uploads=uploads)
     return scenario_to_response(scenario)
 
 
@@ -388,21 +494,87 @@ def confirm_scenario_scope(
     return scenario_to_response(scenario)
 
 
-@router.post("/scenarios/{scenario_id}/revise-and-resubmit", response_model=ScenarioResponse)
-def revise_and_resubmit_scenario(
+@router.post("/scenarios/{scenario_id}/material-review/preview")
+def preview_material_review(
     scenario_id: int,
-    payload: BusinessSubmitRequest,
+    body: MaterialReviewPreviewRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_legal_user),
+):
+    """法务：预览选定维度下的材料完整性（自动缺项检测）。"""
+    scenario = _load_accessible_scenario(db, scenario_id, current_user)
+    if scenario.status != "pending_scope":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="仅待确认协查范围的项目可预览材料完整性",
+        )
+    try:
+        return assess_material_completeness(scenario, body.compliance_dimensions)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post("/scenarios/{scenario_id}/return-materials", response_model=ScenarioResponse)
+def return_scenario_materials(
+    scenario_id: int,
+    body: MaterialReturnRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_legal_user),
+):
+    """法务：字段级驳回业务提交表，业务补充后回到待确认范围。"""
+    scenario = _load_accessible_scenario(db, scenario_id, current_user)
+    try:
+        scenario = run_return_materials(
+            db,
+            current_user,
+            scenario,
+            body.compliance_dimensions,
+            body.missing_fields,
+            note=body.note,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return scenario_to_response(scenario)
+
+
+@router.post("/scenarios/{scenario_id}/revise-and-resubmit", response_model=ScenarioResponse)
+async def revise_and_resubmit_scenario(
+    scenario_id: int,
+    request: Request,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """业务：法务退回后在同一项目补充材料并重新提交（待法务再次确认范围）。"""
     require_role(current_user, (ROLE_BUSINESS,))
     scenario = _load_owned_scenario(db, scenario_id, current_user.id)
+    payload, uploads = await _parse_business_submit_request(request)
     try:
-        scenario = run_revise_and_resubmit(db, current_user, scenario, payload)
+        scenario = run_revise_and_resubmit(db, current_user, scenario, payload, uploads=uploads)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return scenario_to_response(scenario)
+
+
+@router.get("/scenarios/{scenario_id}/material-files/{stored_name}")
+def download_scenario_material_file(
+    scenario_id: int,
+    stored_name: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """下载业务提交时归档的原始方案文件（业务本人或法务）。"""
+    scenario = db.query(InvestigationScenario).filter(InvestigationScenario.id == scenario_id).first()
+    if not scenario:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="项目不存在")
+    if not is_legal_role(current_user) and scenario.user_id != current_user.id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="无权下载该文件")
+
+    path = resolve_archived_file_path(scenario_id, stored_name)
+    if not path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件不存在")
+
+    display_name = stored_name.split("__", 1)[1] if "__" in stored_name else stored_name
+    return FileResponse(path, filename=display_name, media_type="application/octet-stream")
 
 
 @router.post("/scenarios/{scenario_id}/retrieve", response_model=LegalRetrievalResponse)

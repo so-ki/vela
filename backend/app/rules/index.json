@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0",
+  "default_pack_id": "brazil_new_energy",
+  "regions": [
+    {
+      "id": "latin_america",
+      "name": "拉美",
+      "name_en": "Latin America",
+      "countries": [
+        {
+          "id": "brazil",
+          "name": "巴西",
+          "name_pt": "Brasil",
+          "default_pack_id": "brazil_new_energy",
+          "status": "active"
+        }
+      ]
+    }
+  ],
+  "packs": [
+    {
+      "id": "brazil_new_energy",
+      "file": "brazil_new_energy.json",
+      "region": "latin_america",
+      "primary_country": "brazil",
+      "status": "active"
+    }
+  ]
+}

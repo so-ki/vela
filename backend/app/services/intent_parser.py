@@ -12,7 +12,7 @@ from app.services.llm_client import get_llm_config
 VALID_DIMENSIONS = {"labor", "foreign_investment", "tax", "industry_access"}
 
 INTENT_SYSTEM = """你是 Vela 出海法务平台的意图解析助手。
-任务：从中文投资/设厂场景描述中抽取审查维度与关键词，辅助生成《专项核查清单》。
+任务：从中文巴西投资场景描述中抽取审查维度与关键词，辅助生成《专项核查清单》（不限于设厂）。
 
 硬性规则：
 1. 仅输出 JSON，不要 markdown
