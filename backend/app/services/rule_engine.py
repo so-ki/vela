@@ -380,7 +380,7 @@ def get_demo_scenario_template(pack_id: str | None = None) -> dict[str, Any]:
         "capacity_notes": "首年最多 1000 台电动客车及配套电池",
         "facility_notes": "厂房 32,000 m² + 20,000 m²；含研发中心",
         "known_risks": "关注本地雇佣合规、外资设立、州级税收激励及工业许可/环评",
-        "compliance_dimensions": ["labor", "foreign_investment", "tax", "industry_access"],
+        "compliance_dimensions": ["labor", "foreign_investment", "tax", "environment", "industry_access"],
         "board_date": "2013-12-03",
         "start_date": "2015-06-01",
         "production_date": "2020-10-01",

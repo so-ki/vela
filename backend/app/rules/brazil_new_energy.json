@@ -2,7 +2,7 @@
   "pack": {
     "id": "brazil_new_energy",
     "name": "巴西 · 投资协查",
-    "version": "2.4",
+    "version": "2.5",
     "region": "latin_america",
     "primary_country": "brazil",
     "industry_focus": "新能源及相关投资",
@@ -87,7 +87,7 @@
       "name": "外资准入",
       "name_pt": "Investimento Estrangeiro",
       "order": 2,
-      "description": "100% 外资子公司设立、行业外资限制及注册备案"
+      "description": "外资设立与行业限制、注册备案；并购/合资场景可选 CADE 集中申报筛查"
     },
     "tax": {
       "id": "tax",
@@ -96,12 +96,19 @@
       "order": 3,
       "description": "联邦、州（圣保罗）、市级税种及投资激励"
     },
+    "environment": {
+      "id": "environment",
+      "name": "环保许可",
+      "name_pt": "Licenciamento Ambiental (IBAMA/EIA)",
+      "order": 4,
+      "description": "IBAMA/州环境厅许可、环境影响评估（EIA/RIMA）、排放与危废合规"
+    },
     "industry_access": {
       "id": "industry_access",
       "name": "行业准入与安全生产",
       "name_pt": "Licenciamento e Segurança",
-      "order": 4,
-      "description": "工业许可、制造业登记、产品认证及安全生产要求"
+      "order": 5,
+      "description": "建设许可、制造业登记、产品认证及 NR 安全生产要求"
     }
   },
   "ui_groups": [
@@ -125,6 +132,7 @@
     "labor": ["description"],
     "foreign_investment": ["investment_structure", "investment_destination", "funding_source", "description"],
     "tax": ["description", "funding_source", "project_content_scale"],
+    "environment": ["investment_destination", "project_content_scale", "description"],
     "industry_access": ["investment_destination", "project_content_scale", "description"]
   },
   "checklist_items": [
@@ -192,6 +200,15 @@
       "triggers": ["投资", "汇回", "外汇"]
     },
     {
+      "id": "FOR-005",
+      "dimension": "foreign_investment",
+      "title": "CADE 经营者集中申报筛查",
+      "description": "若涉及并购、股权收购、合资控制或资产集中，评估是否须向 CADE（经济防御管理委员会）提交集中申报或备案。",
+      "priority": "medium",
+      "always_include": false,
+      "triggers": ["并购", "收购", "合并", "CADE", "反垄断", "集中", "股权", "合资", "控制"]
+    },
+    {
       "id": "TAX-001",
       "dimension": "tax",
       "title": "联邦层企业所得税（IRPJ/CSLL）",
@@ -248,8 +265,8 @@
     {
       "id": "IND-003",
       "dimension": "industry_access",
-      "title": "电池生产安全与危废管理",
-      "description": "磷酸铁锂电池产线涉及化学品存储、危废处置、NR-12/NR-10 等安全生产规范。",
+      "title": "产线电气与机械安全（NR-10/NR-12）",
+      "description": "制造产线须落实 NR-10 电气安全、NR-12 机械设备安全、操作培训及第三方检测安排。",
       "priority": "high",
       "always_include": false,
       "triggers": ["电池", "磷酸铁锂", "防火", "安全", "回收"]
@@ -284,17 +301,44 @@
       "triggers": ["客车", "大巴", "公交", "组装", "1000", "电动"]
     },
     {
-      "id": "IND-007",
-      "dimension": "industry_access",
-      "title": "锂化合物与电池进口危化品合规",
-      "description": "磷酸铁锂及电解液等进口涉及的 ANVISA/IBAMA 分类、危险品运输（IMDG）、仓储与口岸申报要求。",
+      "id": "ENV-001",
+      "dimension": "environment",
+      "title": "大型工业项目环评（EIA/RIMA）",
+      "description": "新建或扩建工业设施须评估是否需要完整环境影响评估（EIA/RIMA）、IBAMA/州环境厅审批周期及公众参与程序。",
+      "priority": "high",
+      "always_include": false,
+      "triggers": ["厂房", "平方米", "m²", "建设", "工厂", "制造", "投产", "扩建"]
+    },
+    {
+      "id": "ENV-002",
+      "dimension": "environment",
+      "title": "延伸生产者责任（PNRS）与固废管理",
+      "description": "工业项目须符合国家固体废物政策（PNRS），评估生产废弃物、包装物及电池等产品的回收计划与逆向物流义务。",
+      "priority": "medium",
+      "always_include": false,
+      "triggers": ["电池", "回收", "可回收", "pack", "废弃物", "固废"]
+    },
+    {
+      "id": "ENV-003",
+      "dimension": "environment",
+      "title": "化学品与危废进口环境合规（IBAMA/ANVISA）",
+      "description": "化学品、锂化合物及危废进口涉及的 IBAMA/ANVISA 分类、危险品运输（IMDG）、仓储与口岸申报要求。",
       "priority": "high",
       "always_include": false,
       "sub_sectors": ["battery_pack"],
-      "triggers": ["电池", "磷酸铁锂", "进口", "铁锂", "lithium"]
+      "triggers": ["电池", "磷酸铁锂", "进口", "铁锂", "lithium", "化学品", "危废"]
     },
     {
-      "id": "IND-008",
+      "id": "ENV-004",
+      "dimension": "environment",
+      "title": "工业废水、废气与噪声排放合规",
+      "description": "评估制造活动是否触发废水处理、大气排放及噪声控制的许可与监测义务。",
+      "priority": "medium",
+      "always_include": false,
+      "triggers": ["制造", "生产", "工厂", "排放", "废水", "废气", "噪声"]
+    },
+    {
+      "id": "TAX-005",
       "dimension": "industry_access",
       "title": "光伏组件能效与 PROINFA/PROCEL 合规",
       "description": "太阳能电池板生产的 INMETRO 能效标签、PROCEL 认证及并网前 ANEEL 登记要求。",
@@ -314,27 +358,7 @@
       "triggers": ["储能", "storage", "电网", "系统"]
     },
     {
-      "id": "IND-010",
-      "dimension": "industry_access",
-      "title": "延伸生产者责任（PNRS）与电池回收",
-      "description": "动力电池及包装物须符合国家固体废物政策（PNRS），评估回收计划、逆向物流及与制造许可的联动。",
-      "priority": "medium",
-      "always_include": false,
-      "sub_sectors": ["battery_pack"],
-      "triggers": ["电池", "回收", "可回收", "pack"]
-    },
-    {
-      "id": "IND-011",
-      "dimension": "industry_access",
-      "title": "大型工业项目环评（EIA/RIMA）",
-      "description": "32,000 m² 级制造设施须评估是否需要完整环境影响评估（EIA/RIMA）、IBAMA/州环境厅审批周期及公众参与程序。",
-      "priority": "high",
-      "always_include": false,
-      "sub_sectors": ["electric_bus", "battery_pack"],
-      "triggers": ["厂房", "平方米", "m²", "32,000", "20,000", "建设", "工厂"]
-    },
-    {
-      "id": "TAX-005",
+      "id": "IND-008",
       "dimension": "tax",
       "title": "PADIS / PRODEIC 等新能源制造激励资格",
       "description": "筛查信息技术/自动化（PADIS）、圣保罗州 PRODEIC 等联邦/州激励对客车、电池、光伏产线的适用条件与合规义务。",

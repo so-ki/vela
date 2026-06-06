@@ -1,5 +1,5 @@
 {
-  "version": "1.2",
+  "version": "1.3",
   "jurisdiction": "brazil",
   "sources": [
     {
@@ -501,7 +501,7 @@
       "url": "https://www.jusbrasil.com.br/",
       "title_pt": "Jusbrasil - Licenciamento Ambiental em São Paulo",
       "title_zh": "Jusbrasil — 圣保罗州环境许可实践",
-      "dimension": "industry_access",
+      "dimension": "environment",
       "level": "state",
       "validity": "vigente",
       "published_at": "2022-06-01",
@@ -514,8 +514,8 @@
         "环境许可"
       ],
       "checklist_codes": [
-        "IND-002",
-        "IND-003"
+        "ENV-001",
+        "ENV-004"
       ],
       "text_pt": "A jurisprudência e prática administrativa paulista reforçam a necessidade de licenciamento ambiental prévio para instalações industriais de grande porte, incluindo montagem de baterias e linhas de veículos elétricos, com exigência de estudos de impacto e condicionantes operacionais.",
       "text_zh": "圣保罗州司法与行政实践强调大型工业设施（含电池与电动车产线）须事先取得环境许可，并提交环境影响研究及运营附加条件。"
@@ -552,7 +552,7 @@
       "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:lei:1998-07-20;9965",
       "title_pt": "Lei nº 9.965/1998 - Política Nacional de Meio Ambiente (Licenciamento)",
       "title_zh": "第9965/1998号法 — 国家环境政策（许可框架）",
-      "dimension": "industry_access",
+      "dimension": "environment",
       "level": "federal",
       "validity": "vigente",
       "published_at": "1998-07-20",
@@ -564,8 +564,8 @@
         "许可"
       ],
       "checklist_codes": [
-        "IND-002",
-        "IND-003"
+        "ENV-001",
+        "ENV-004"
       ],
       "text_pt": "Estabelece o Sistema Nacional de Meio Ambiente (SISNAMA) e o licenciamento ambiental como instrumento de controle de atividades efetiva ou potencialmente poluidoras, aplicável a empreendimentos industriais de médio e grande porte.",
       "text_zh": "建立国家环境系统（SISNAMA），对实际或潜在污染活动实施环境许可，适用于中大型工业项目。"
@@ -602,7 +602,7 @@
       "url": "https://www.lexml.gov.br/",
       "title_pt": "Lei nº 9.782/1998 - ANVISA Produtos Químicos",
       "title_zh": "第9782/1998号法 — ANVISA 化学品监管",
-      "dimension": "industry_access",
+      "dimension": "environment",
       "level": "federal",
       "validity": "vigente",
       "published_at": "1998-01-15",
@@ -614,7 +614,7 @@
         "电池"
       ],
       "checklist_codes": [
-        "IND-007"
+        "ENV-003"
       ],
       "text_pt": "Cria a Agência Nacional de Vigilância Sanitária (ANVISA) e regula produtos químicos e substâncias sujeitas a controle sanitário, relevante para importação de compostos de lítio e materiais para fabricação de baterias.",
       "text_zh": "设立 ANVISA 并监管受卫生管控的化学品，与锂化合物及电池材料进口相关。"
@@ -672,7 +672,7 @@
       "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:lei:2010-08-02;12305",
       "title_pt": "Lei nº 12.305/2010 - Política Nacional de Resíduos Sólidos (PNRS)",
       "title_zh": "第12305/2010号法 — 国家固体废物政策 PNRS",
-      "dimension": "industry_access",
+      "dimension": "environment",
       "level": "federal",
       "validity": "vigente",
       "published_at": "2010-08-02",
@@ -684,8 +684,7 @@
         "EPR"
       ],
       "checklist_codes": [
-        "IND-010",
-        "IND-003"
+        "ENV-002"
       ],
       "text_pt": "Institui a Política Nacional de Resíduos Sólidos, estabelecendo responsabilidade compartilhada e logística reversa para produtos pós-consumo, incluindo pilhas e baterias industriais.",
       "text_zh": "建立国家固体废物政策，规定生产者延伸责任及电池等产品的逆向物流义务。"
@@ -697,7 +696,7 @@
       "url": "https://www.lexml.gov.br/",
       "title_pt": "Decreto nº 3.822/2006 - EIA/RIMA",
       "title_zh": "第3822/2006号法令 — 环境影响评估 EIA/RIMA",
-      "dimension": "industry_access",
+      "dimension": "environment",
       "level": "federal",
       "validity": "vigente",
       "published_at": "2006-12-13",
@@ -709,7 +708,7 @@
         "环境许可"
       ],
       "checklist_codes": [
-        "IND-011"
+        "ENV-001"
       ],
       "text_pt": "Regulamenta o licenciamento ambiental e a exigência de Estudo de Impacto Ambiental (EIA) e Relatório de Impacto (RIMA) para empreendimentos de significativo impacto, como plantas industriais de grande porte.",
       "text_zh": "规范环境许可，对具有重大环境影响的大型工业项目要求 EIA/RIMA 环评报告。"
@@ -738,6 +737,30 @@
       ],
       "text_pt": "Institui o Programa de Apoio ao Desenvolvimento Tecnológico da Indústria de Semicondutores (PADIS) e regimes correlatos de incentivo fiscal para atividades de alta tecnologia e automação industrial.",
       "text_zh": "设立 PADIS 等高科技与工业自动化税收优惠计划，与新能源制造产线相关。"
+    },
+    {
+      "id": "lexml-lei-12529-cade",
+      "source": "lexml",
+      "urn": "urn:lex:br:federal:lei:2011-11-30;12529",
+      "url": "https://www.lexml.gov.br/",
+      "title_pt": "Lei nº 12.529/2011 - Defesa da Concorrência (CADE)",
+      "title_zh": "第12529/2011号法 — 竞争法（CADE 集中申报）",
+      "dimension": "foreign_investment",
+      "level": "federal",
+      "validity": "vigente",
+      "published_at": "2011-11-30",
+      "tags": [
+        "CADE",
+        "concentração",
+        "并购",
+        "反垄断",
+        "合资"
+      ],
+      "checklist_codes": [
+        "FOR-005"
+      ],
+      "text_pt": "Estabelece o Sistema Brasileiro de Defesa da Concorrência e prevê notificação obrigatória de atos de concentração econômica perante o CADE quando ultrapassados os limites de faturamento ou participação de mercado.",
+      "text_zh": "建立巴西竞争防御体系；经营者集中达到营业额或市场份额阈值时须向 CADE 强制申报。"
     },
     {
       "id": "lexml-decreto-3555-transferencia",

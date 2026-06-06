@@ -62,6 +62,7 @@ function dimensionLabel(id: string) {
     labor: '劳工用工',
     foreign_investment: '外资准入',
     tax: '联邦/州/市税制',
+    environment: '环保许可',
     industry_access: '行业准入与安全生产',
   }
   return labels[id] || id

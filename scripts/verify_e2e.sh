@@ -24,7 +24,7 @@ auth_header() {
 log "1. Health"
 curl -sf "$API/health" >/dev/null && ok "health" || bad "health"
 
-log "2. Rules catalog (Brazil investment pack v2.4)"
+log "2. Rules catalog (Brazil investment pack v2.5)"
 PACK=$(curl -sf "$API/rules/catalog" -H "$(auth_header "$(login legal@demo.vela)")")
 echo "$PACK" | python3 -c "
 import sys, json
@@ -32,7 +32,8 @@ d=json.load(sys.stdin)
 assert d.get('pack',{}).get('id')=='brazil_new_energy', d
 assert d.get('rules_pack_id')=='brazil_new_energy', d
 assert d.get('scene_defaults',{}).get('country')=='brazil', d
-print('pack:', d['pack'].get('name'))
+assert len(d.get('dimensions', [])) == 5, d.get('dimensions')
+print('pack:', d['pack'].get('name'), 'dims:', len(d['dimensions']))
 " && ok "catalog pack" || bad "catalog pack"
 
 log "2b. Rules classification tree"
@@ -61,7 +62,7 @@ SOLAR=$(curl -sf -X POST "$API/scenarios" -H "$(auth_header "$TOKEN")" -H 'Conte
   "investment_structure": "100% 外资",
   "description": "计划在坎皮纳斯建设太阳能电池板组件工厂，年产光伏组件 500MW，不涉及客车或动力电池生产。",
   "employee_count": 80,
-  "compliance_dimensions": ["labor","foreign_investment","tax","industry_access"]
+  "compliance_dimensions": ["labor","foreign_investment","tax","environment","industry_access"]
 }')
 SOLAR_TOTAL=$(echo "$SOLAR" | python3 -c "import sys,json; print(json.load(sys.stdin)['checklist']['total_items'])")
 if [ "$SOLAR_TOTAL" -lt "$TOTAL" ]; then ok "solar-only=$SOLAR_TOTAL < byd=$TOTAL"; else bad "solar-only=$SOLAR_TOTAL not shorter than byd=$TOTAL"; fi
@@ -79,7 +80,7 @@ print('status:', d['status'])
 LEGAL=$(login legal@demo.vela)
 SCOPE=$(curl -sf -X POST "$API/scenarios/$SUB_ID/confirm-scope" \
   -H "$(auth_header "$LEGAL")" -H 'Content-Type: application/json' \
-  -d '{"compliance_dimensions":["labor","foreign_investment","tax","industry_access"],"polish":false}')
+  -d '{"compliance_dimensions":["labor","foreign_investment","tax","environment","industry_access"],"polish":false}')
 echo "$SCOPE" | python3 -c "
 import sys, json
 d=json.load(sys.stdin)
@@ -159,7 +160,7 @@ STOR=$(curl -sf -X POST "$API/scenarios" -H "$(auth_header "$TOKEN")" -H 'Conten
   "investment_structure": "100% 外资",
   "description": "计划在坎皮纳斯建设工业级储能系统组装工厂，不涉及电动客车制造。约120名本地雇员，首年200MWh产能，厂房12000平方米。",
   "employee_count": 120,
-  "compliance_dimensions": ["labor","foreign_investment","tax","industry_access"]
+  "compliance_dimensions": ["labor","foreign_investment","tax","environment","industry_access"]
 }')
 STOR_TOTAL=$(echo "$STOR" | python3 -c "import sys,json; print(json.load(sys.stdin)['checklist']['total_items'])")
 if [ "$STOR_TOTAL" -lt "$TOTAL" ]; then ok "storage-only=$STOR_TOTAL < byd=$TOTAL"; else bad "storage=$STOR_TOTAL"; fi

@@ -17,13 +17,14 @@ MAX_BATCH_FILES = 50
 MAX_BATCH_TOTAL_BYTES = MAX_BYTES * 10
 ALLOWED_SUFFIXES = {".txt", ".md", ".docx", ".pdf"}
 
-VALID_DIMENSIONS = ["labor", "foreign_investment", "tax", "industry_access"]
+VALID_DIMENSIONS = ["labor", "foreign_investment", "tax", "environment", "industry_access"]
 
 DIMENSION_KEYWORDS: dict[str, list[str]] = {
     "labor": ["雇员", "员工", "用工", "CLT", "工会", "外派", "岗位"],
-    "foreign_investment": ["外资", "子公司", "100%", "全资", "合资", "CNPJ", "投资结构"],
+    "foreign_investment": ["外资", "子公司", "100%", "全资", "合资", "CNPJ", "投资结构", "并购", "CADE"],
     "tax": ["税", "ICMS", "关税", "激励", "PADIS", "进口设备"],
-    "industry_access": ["许可", "环评", "厂房", "认证", "电池", "客车", "光伏", "储能", "设厂", "制造"],
+    "environment": ["环评", "EIA", "IBAMA", "环境", "排放", "危废", "PNRS", "RIMA"],
+    "industry_access": ["许可", "厂房", "认证", "电池", "客车", "光伏", "储能", "设厂", "制造", "Alvará", "INMETRO"],
 }
 
 EXTRACT_SYSTEM = """你是 Vela 出海法务平台的文档事实抽取助手。
@@ -55,7 +56,7 @@ EXTRACT_SYSTEM = """你是 Vela 出海法务平台的文档事实抽取助手。
 硬性规则：
 1. 仅输出 JSON，不要 markdown
 2. 只抽取文档中明确出现的信息，不得编造法条、风险结论或未提及的数字
-3. compliance_dimensions 只能从 labor, foreign_investment, tax, industry_access 中选择
+3. compliance_dimensions 只能从 labor, foreign_investment, tax, environment, industry_access 中选择
 4. 若某字段文档未提及，返回 null 或空字符串
 5. facts 数组为每个已填字段提供依据：field、value、source_snippet（原文短引≤40字）
 

@@ -22,7 +22,7 @@ region（区域）
 | 文件 | 作用 |
 |------|------|
 | `index.json` | 区域 / 国家 / 规则包注册表与默认 pack |
-| `brazil_new_energy.json` | 巴西 · 投资协查 v2.4 |
+| `brazil_new_energy.json` | 巴西 · 投资协查 v2.5 |
 
 ## API
 

@@ -9,14 +9,14 @@ import httpx
 from app.core.config import get_settings
 from app.services.llm_client import get_llm_config
 
-VALID_DIMENSIONS = {"labor", "foreign_investment", "tax", "industry_access"}
+VALID_DIMENSIONS = {"labor", "foreign_investment", "tax", "environment", "industry_access"}
 
 INTENT_SYSTEM = """你是 Vela 出海法务平台的意图解析助手。
 任务：从中文巴西投资场景描述中抽取审查维度与关键词，辅助生成《专项核查清单》（不限于设厂）。
 
 硬性规则：
 1. 仅输出 JSON，不要 markdown
-2. dimensions 只能从以下取值中选择子集：labor, foreign_investment, tax, industry_access
+2. dimensions 只能从以下取值中选择子集：labor, foreign_investment, tax, environment, industry_access
 3. 不得编造具体法条或结论
 4. summary_zh 一句话概括场景合规关注点（≤80字）"""
 
