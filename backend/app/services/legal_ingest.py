@@ -58,11 +58,12 @@ def ingest_corpus(force: bool = False) -> dict[str, Any]:
                 collection = get_legal_collection()
 
             if force or collection.count() == 0:
+                from app.services.corpus_text_cleaner import text_for_retrieval
+
                 ids, documents, metadatas = [], [], []
                 for doc in sources:
                     ids.append(doc["id"])
-                    combined = f"{doc['title_pt']}\n{doc['text_pt']}\n{doc.get('text_zh', '')}"
-                    documents.append(combined)
+                    documents.append(text_for_retrieval(doc))
                     metadatas.append(_doc_metadata(doc))
                 collection.add(ids=ids, documents=documents, metadatas=metadatas)
 

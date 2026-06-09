@@ -67,7 +67,15 @@ chmod +x scripts/verify_e2e.sh
 ./scripts/verify_e2e.sh
 ```
 
-覆盖：巴西投资协查 v2.4、BYD 24 条清单、子赛道差异化、法务驳回→业务可见、方案上传抽取、矿产 501。
+覆盖：巴西投资协查 v2.9、BYD 24 条清单、子赛道差异化、法务驳回→业务可见、方案上传抽取、矿产 501。
+
+语料清洗后若需重建向量索引：`curl -X POST http://127.0.0.1:8000/api/v1/legal/index?force=true`（需法务登录 token）。
+
+## 演示与门控文档
+
+- [复赛 Golden Path](docs/DEMO_GOLDEN_PATH.md)
+- [匹配度与 S1/S2/S3 门控](docs/match_tier_and_gate.md)
+- [合规与安全边界](docs/compliance_and_security.md)
 
 ## 样本文件
 

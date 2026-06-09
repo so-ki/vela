@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 from app.core.chroma_client import _chroma_available
+from app.services.corpus_text_cleaner import excerpt_for_display, text_for_retrieval
 from app.services.legal_ingest import load_corpus
 
 SOURCE_LABELS = {
@@ -38,7 +39,7 @@ def _score_doc(
         score += 45.0
     tags = set(t.lower() for t in doc.get("tags", []))
     title_tokens = _tokenize(doc.get("title_pt", "") + " " + doc.get("title_zh", ""))
-    text_tokens = _tokenize(doc.get("text_pt", "") + " " + doc.get("text_zh", ""))
+    text_tokens = _tokenize(text_for_retrieval(doc))
     overlap = len(query_tokens & (tags | title_tokens | text_tokens))
     score += overlap * 8.0
     return score
@@ -46,6 +47,7 @@ def _score_doc(
 
 def _format_hit(doc: dict[str, Any], match_score: float, item_code: str, *, match_threshold: int = 70) -> dict[str, Any]:
     source = doc.get("source", "lexml")
+    excerpt_pt, excerpt_zh = excerpt_for_display(doc)
     requires_review = match_score < match_threshold
     return {
         "id": doc["id"],
@@ -55,8 +57,8 @@ def _format_hit(doc: dict[str, Any], match_score: float, item_code: str, *, matc
         "url": doc.get("url", ""),
         "title_pt": doc.get("title_pt", ""),
         "title_zh": doc.get("title_zh", ""),
-        "excerpt_pt": (doc.get("text_pt") or "")[:600],
-        "excerpt_zh": doc.get("text_zh", ""),
+        "excerpt_pt": excerpt_pt,
+        "excerpt_zh": excerpt_zh,
         "validity": doc.get("validity", "vigente"),
         "level": doc.get("level", "federal"),
         "published_at": doc.get("published_at", ""),
