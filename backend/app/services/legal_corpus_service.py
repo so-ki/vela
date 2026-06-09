@@ -12,7 +12,14 @@ from app.services.rules_registry import load_rules
 
 VALID_SOURCES = {"lexml", "stf", "stj", "jusbrasil"}
 VALID_LEVELS = {"federal", "state", "municipal", "case_law"}
-VALID_DIMENSIONS = {"labor", "foreign_investment", "tax", "environment", "industry_access"}
+VALID_DIMENSIONS = {
+    "labor",
+    "foreign_investment",
+    "tax",
+    "environment",
+    "industry_access",
+    "data_compliance",
+}
 
 
 def _save_corpus(corpus: dict[str, Any]) -> None:
@@ -105,6 +112,7 @@ def get_corpus_meta() -> dict[str, Any]:
         {"id": "tax", "name": "税制"},
         {"id": "environment", "name": "环保许可"},
         {"id": "industry_access", "name": "行业准入"},
+        {"id": "data_compliance", "name": "数据合规"},
     ]
 
     checklist_codes = [

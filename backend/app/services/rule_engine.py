@@ -80,6 +80,7 @@ def get_rules_catalog(pack_id: str | None = None) -> dict[str, Any]:
         "material_fields": rules.get("material_fields", []),
         "material_intake_policy": rules.get("material_intake_policy", {}),
         "dimension_field_requirements": rules.get("dimension_field_requirements", {}),
+        "dimension_elements": rules.get("dimension_elements", {}),
     }
 
 
@@ -276,16 +277,19 @@ def generate_checklist(scenario: ScenarioInput, pack_id: str | None = None) -> d
     # State/city overlay: ensure referenced items included
     state_overlay = rules.get("state_overlays", {}).get(scenario.state, {})
     city_overlay = state_overlay.get("cities", {}).get(scenario.city, {})
-    extra_ids = set(city_overlay.get("extra_items", []))
+    extra_ids = set(state_overlay.get("extra_items", [])) | set(city_overlay.get("extra_items", []))
     item_by_id = {i["id"]: i for i in rules["checklist_items"]}
     existing_ids = {i["id"] for i in scored_items}
+    loc_label = f"{state_overlay.get('name', scenario.state)}" + (
+        f" · {city_overlay.get('name', scenario.city)}" if city_overlay else ""
+    )
     for eid in extra_ids:
         if eid in item_by_id and eid not in existing_ids and item_by_id[eid]["dimension"] in selected:
             extra = {
                 **item_by_id[eid],
                 "relevance_score": 6,
-                "matched_triggers": ["campinas"],
-                "rationale": "坎皮纳斯市/圣保罗州地域叠加必查项。",
+                "matched_triggers": [scenario.state, scenario.city],
+                "rationale": f"{loc_label} 地域叠加必查项。",
             }
             scored_items.append(extra)
 

@@ -7,7 +7,6 @@ import { REVIEW_FIELD_LABELS, allReviewFieldsFromCatalog, collectMissingSubmitRe
 import {
   applySceneDefaults,
   countryLabelForCatalog,
-  regionLabelForCatalog,
   sceneDefaultsFromCatalog,
 } from '@/config/sceneClassification'
 import { createDemoScenario, createScenario, extractDocumentsFromFiles, fetchDemoTemplate, fetchRulesCatalog, fetchScenario, reviseAndResubmitScenario, submitMaterialsScenario } from '@/api/client'
@@ -170,7 +169,6 @@ function applyBusinessSubmitDefaults<T extends Record<string, unknown>>(payload:
   return applySceneDefaults(payload, catalog.value)
 }
 
-const activeRegionLabel = computed(() => regionLabelForCatalog(catalog.value))
 const activeCountryLabel = computed(() => countryLabelForCatalog(catalog.value))
 
 onMounted(async () => {
@@ -785,14 +783,7 @@ function shouldHighlightField(fieldPrefix: string): boolean {
         </p>
         <p class="muted" v-else-if="!auth.isBusiness">输入业务场景描述，系统将映射法律审查维度并生成《专项核查清单》。</p>
         <p class="muted material-intake-note" v-else-if="auth.isBusiness && !editMode">
-          请<strong>上传巴西投资方案</strong>（可多个文件）；系统按<strong>巴西法域</strong>抽取并核对，不限于设厂场景。全部上传完成后点击<strong>确认并核对</strong>。
-        </p>
-        <p class="industry-pack-note" v-if="catalog?.pack?.name && auth.isBusiness && !editMode">
-          协查法域：<strong>{{ activeCountryLabel }}</strong><span class="muted">（{{ activeRegionLabel }}首发）</span>
-          · {{ catalog.pack.name }}
-          <span v-if="catalog.rules_pack_id" class="muted"> · {{ catalog.rules_pack_id }}</span>
-          <span v-if="catalog.pack.industry_focus"> · {{ catalog.pack.industry_focus }}</span>
-          <span v-if="catalog.pack.focus"> · {{ catalog.pack.focus }}</span>
+          请<strong>上传投资方案</strong>（Word、PDF 等，可多个文件）；系统抽取事实供核对。<strong>协查法域与范围由法务确认</strong>，业务端无需选择法域。
         </p>
         <p class="industry-pack-note" v-else-if="catalog?.pack?.name && !auth.isBusiness">
           协查法域：<strong>{{ activeCountryLabel }}</strong> · {{ catalog.pack.name }}

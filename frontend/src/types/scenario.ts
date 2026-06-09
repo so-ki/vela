@@ -85,6 +85,17 @@ export interface RulesCatalog {
     order?: number
   }>
   dimension_field_requirements?: Record<string, string[]>
+  dimension_elements?: Record<
+    string,
+    Array<{
+      id: string
+      label: string
+      required?: boolean
+      maps_to_fields?: string[]
+      extract_hints?: string[]
+      feeds_checklist?: string[]
+    }>
+  >
   material_intake_policy?: {
     philosophy?: string
     business_action?: string
@@ -213,6 +224,139 @@ export interface Scenario {
   can_revise?: boolean
   revision_round?: number
   document_extract?: DocumentExtractSnapshot | null
+  investigation_adequacy?: InvestigationAdequacy | null
+  gate_a_allows_review?: boolean
+  can_return_materials?: boolean
+  incremental_regen?: IncrementalRegen | null
+  conflict_flags?: ConflictFlag[]
+  investigation_settings?: InvestigationSettings | null
+  playbook_deviations?: PlaybookDeviation[]
+  grounding_report?: GroundingReport | null
+  verification_report?: VerificationReport | null
+}
+
+export interface GroundingReport {
+  total_hits?: number
+  grounded_hits?: number
+  grounding_rate?: number
+  ungrounded_codes?: string[]
+  requires_legal_check?: boolean
+}
+
+export interface VerificationReport {
+  all_passed?: boolean
+  summary?: string
+  blocked_export_recommendation?: boolean
+  passes?: Array<{
+    id: string
+    label: string
+    passed: boolean
+    detail: string
+  }>
+}
+
+export interface PlaybookDeviation {
+  id: string
+  code: string
+  title: string
+  comment?: string | null
+  recorded_at?: string
+}
+
+export interface InvestigationSettings {
+  match_threshold?: number
+  retrieval_top_k?: number
+  expansion_enabled?: boolean
+}
+
+export interface ConflictFlag {
+  id: string
+  conflict_type: string
+  severity: 'low' | 'medium' | 'high' | string
+  title: string
+  summary: string
+  material_claim?: string
+  source_label?: string
+  suggested_action?: string
+  affected_brief_sections?: string[]
+}
+
+export interface InvestigationAdequacyElement {
+  id: string
+  label: string
+  required: boolean
+  status: 'covered' | 'at_risk' | 'missing' | 'not_applicable'
+  rationale: string
+  excerpt: string
+  source_label: string
+  linked_codes: string[]
+  avg_match_score: number
+  passed_count: number
+  blocked_count: number
+  carry_forward?: boolean
+}
+
+export interface InvestigationAdequacyDimension {
+  dimension_id: string
+  dimension_name: string
+  dimension_name_pt: string
+  is_complete: boolean
+  elements: InvestigationAdequacyElement[]
+  law_preview: GateLawPreviewHit[]
+  missing_element_ids: string[]
+}
+
+export interface TierReport {
+  S1?: number
+  S2?: number
+  S3?: number
+  s3_codes?: string[]
+  has_hard_block?: boolean
+}
+
+export interface InvestigationAdequacy {
+  mode: string
+  compliance_dimensions: string[]
+  is_material_complete: boolean
+  is_investigation_ready: boolean
+  suggest_material_return: string[]
+  auto_missing_elements: string[]
+  material_precheck_missing: string[]
+  element_labels: Record<string, string>
+  dimensions: InvestigationAdequacyDimension[]
+  tier_report?: TierReport
+  brief_summary: {
+    passed_count: number
+    blocked_count: number
+    status?: string
+  }
+  carry_forward_stats?: {
+    elements_carried?: number
+    elements_recomputed?: number
+  }
+}
+
+export interface IncrementalRegen {
+  mode: 'incremental' | string
+  changed_fields: string[]
+  target_elements: string[]
+  target_codes: string[]
+  frozen_codes: string[]
+  regenerated_at: string
+  rag_stats?: {
+    refreshed?: number
+    carried?: number
+    zero_hit_items?: string[]
+  }
+  adequacy_stats?: {
+    elements_carried?: number
+    elements_recomputed?: number
+  }
+  review_stats?: {
+    items_carried?: number
+    items_invalidated?: number
+    items_refreshed?: number
+  }
 }
 
 export interface DocumentExtractFileSnapshot {
@@ -310,6 +454,12 @@ export interface MaterialFeedbackItem {
   dimensions: string[]
 }
 
+export interface MaterialElementFeedbackItem {
+  element_id: string
+  label: string
+  dimensions: string[]
+}
+
 export interface MaterialFeedback {
   return_kind: string
   is_returned: boolean
@@ -318,13 +468,53 @@ export interface MaterialFeedback {
   return_note?: string | null
   selected_dimensions: string[]
   missing_fields: string[]
+  missing_elements?: string[]
   missing_by_dimension: Record<string, string[]>
+  missing_elements_by_dimension?: Record<string, string[]>
   field_labels: Record<string, string>
+  element_labels?: Record<string, string>
   items: MaterialFeedbackItem[]
+  element_items?: MaterialElementFeedbackItem[]
+}
+
+export interface GateElementPreview {
+  id: string
+  label: string
+  required: boolean
+  status: 'filled' | 'missing' | 'not_applicable'
+  excerpt: string
+  source_label: string
+  matched_hints?: string[]
+  filled_fields?: string[]
+  feeds_checklist?: string[]
+}
+
+export interface GateLawPreviewHit {
+  id: string
+  title_zh: string
+  title_pt: string
+  source_label: string
+  url: string
+  excerpt_zh: string
+  preview_score: number
+}
+
+export interface GateDimensionBlock {
+  dimension_id: string
+  dimension_name: string
+  dimension_name_pt: string
+  is_complete: boolean
+  elements: GateElementPreview[]
+  law_preview: GateLawPreviewHit[]
 }
 
 export interface MaterialReviewPreview {
   compliance_dimensions: string[]
+  gate_mode?: string
+  is_complete?: boolean
+  dimensions?: GateDimensionBlock[]
+  auto_missing_elements?: string[]
+  element_labels?: Record<string, string>
   required_fields: string[]
   auto_missing_fields: string[]
   missing_by_dimension: Record<string, string[]>
@@ -430,6 +620,8 @@ export interface ReviewItem {
   external_counsel_required?: boolean
   legal_hits?: LegalHit[]
   reviewed_at?: string | null
+  carry_forward?: boolean
+  invalidated?: boolean
 }
 
 export interface ReviewState {
@@ -445,4 +637,5 @@ export interface ReviewState {
   can_finalize: boolean
   can_export: boolean
   can_return_to_business?: boolean
+  version_label?: string | null
 }

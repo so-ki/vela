@@ -1,0 +1,86 @@
+{
+  "version": "1.0",
+  "description": "巴西官方法源门户索引 — LexML · Planalto · STF · gov.br，无需 API Key",
+  "portals": [
+    {
+      "id": "lexml",
+      "label_zh": "LexML Brasil 联邦立法检索",
+      "label_pt": "LexML Brasil",
+      "url": "https://www.lexml.gov.br/",
+      "search_url_template": "https://www.lexml.gov.br/busca/search?keyword={query}",
+      "role": "metadata_index",
+      "dimensions": ["foreign_investment", "labor", "tax", "environment", "industry_access", "data_compliance"],
+      "notes_zh": "巴西国会/司法部主导的联邦法律统一标识（URN）与检索入口，相当于官方法条索引 API（HTTP 公开）。"
+    },
+    {
+      "id": "planalto-legislacao",
+      "label_zh": "Planalto 总统府立法",
+      "label_pt": "Planalto — Legislação",
+      "url": "http://www4.planalto.gov.br/legislacao/",
+      "search_url_template": "http://www4.planalto.gov.br/legislacao/",
+      "role": "legislation_text",
+      "dimensions": ["foreign_investment", "labor", "tax", "environment", "data_compliance"],
+      "notes_zh": "联邦法律、法令、宪法等官方法案全文（HTML）。"
+    },
+    {
+      "id": "stf",
+      "label_zh": "STF 联邦最高法院",
+      "label_pt": "Supremo Tribunal Federal",
+      "url": "http://www.stf.jus.br/",
+      "search_url_template": "https://portal.stf.jus.br/jurisprudencia/",
+      "role": "case_law",
+      "dimensions": ["foreign_investment", "labor", "tax", "environment", "data_compliance"],
+      "notes_zh": "宪法解释、重要判决与司法信息官方门户。"
+    },
+    {
+      "id": "stj",
+      "label_zh": "STJ 高等司法法院",
+      "label_pt": "Superior Tribunal de Justiça",
+      "url": "https://scon.stj.jus.br/SCON/",
+      "search_url_template": "https://scon.stj.jus.br/SCON/",
+      "role": "case_law",
+      "dimensions": ["foreign_investment", "tax", "labor"],
+      "notes_zh": "联邦普通法领域判例检索（与 STF 宪法/特别管辖互补）。"
+    },
+    {
+      "id": "trabalho",
+      "label_zh": "劳动与就业部（CLT 等）",
+      "label_pt": "Ministério do Trabalho e Emprego",
+      "url": "https://www.gov.br/trabalho-e-emprego/pt-br",
+      "search_url_template": "https://www.gov.br/trabalho-e-emprego/pt-br",
+      "role": "agency_portal",
+      "dimensions": ["labor"],
+      "notes_zh": "劳动法、雇佣合规、工作许可等行政规则与指南。"
+    },
+    {
+      "id": "previdencia",
+      "label_zh": "社会保障部（社保/养老金）",
+      "label_pt": "Ministério da Previdência Social",
+      "url": "https://www.gov.br/previdencia/pt-br",
+      "search_url_template": "https://www.gov.br/previdencia/pt-br",
+      "role": "agency_portal",
+      "dimensions": ["labor"],
+      "notes_zh": "社会保险、养老金相关规则；与 CLT 劳动雇佣法互补，非替代。"
+    },
+    {
+      "id": "receita-federal",
+      "label_zh": "联邦税务局",
+      "label_pt": "Receita Federal",
+      "url": "https://www.gov.br/receitafederal/pt-br",
+      "search_url_template": "https://www.gov.br/receitafederal/pt-br",
+      "role": "agency_portal",
+      "dimensions": ["tax"],
+      "notes_zh": "联邦税务规则、CIDE、进口税等。"
+    },
+    {
+      "id": "ibama",
+      "label_zh": "IBAMA 环境许可",
+      "label_pt": "IBAMA",
+      "url": "https://www.gov.br/ibama/pt-br",
+      "search_url_template": "https://www.gov.br/ibama/pt-br",
+      "role": "agency_portal",
+      "dimensions": ["environment"],
+      "notes_zh": "环境许可、Licenciamento 相关官方信息。"
+    }
+  ]
+}

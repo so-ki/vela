@@ -190,7 +190,7 @@ onUnmounted(() => {
   <div class="material-review-page">
     <header class="page-header material-review-page-head">
       <div>
-        <p class="eyebrow dark">业务协查 · 巴西法域材料核对</p>
+        <p class="eyebrow dark">业务协查 · 材料核对</p>
         <h1>修改材料信息</h1>
         <p class="muted">
           <span class="badge ok">{{ extractModeLabel }}</span>

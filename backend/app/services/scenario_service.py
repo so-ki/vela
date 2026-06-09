@@ -20,6 +20,7 @@ from app.services.material_review_service import (
     build_material_return_record,
     business_feedback_from_material_review,
 )
+from app.services.project_hub_service import ensure_project_hub
 from app.services.rule_engine import (
     ScenarioInput,
     generate_checklist,
@@ -28,7 +29,8 @@ from app.services.rule_engine import (
     load_rules,
 )
 from app.services.rules_registry import resolve_pack_id, resolve_scenario_pack_id
-from app.services.material_file_storage import save_scenario_material_files
+from app.services.playbook_agent_service import generate_playbook_draft
+from app.services.investigation_adequacy_service import gate_a_allows_checklist_review
 
 
 def _pack_labels(action_type: str, pack_id: str | None = None) -> tuple[str, str]:
@@ -76,7 +78,7 @@ def _materials_only_payload(
     }
     if document_extract:
         data["document_extract"] = document_extract
-    return data
+    return ensure_project_hub(data)
 
 
 def create_scenario_materials_only(
@@ -159,6 +161,18 @@ def business_submit_to_create_request(payload: BusinessSubmitRequest) -> Scenari
     return ScenarioCreateRequest(**payload.model_dump(), compliance_dimensions=[])
 
 
+def merge_business_resubmit_request(
+    scenario: InvestigationScenario,
+    payload: BusinessSubmitRequest,
+) -> ScenarioCreateRequest:
+    """业务补充提交：仅覆盖请求中显式提供的字段，避免部分表单把未填项清空。"""
+    base = scenario_to_create_request(scenario)
+    updates = payload.model_dump(exclude_unset=True)
+    updates.pop("compliance_dimensions", None)
+    updates["compliance_dimensions"] = []
+    return base.model_copy(update=updates)
+
+
 def scenario_to_create_request(scenario: InvestigationScenario) -> ScenarioCreateRequest:
     pack_id = resolve_scenario_pack_id(
         rules_pack_id=scenario.rules_pack_id,
@@ -220,7 +234,8 @@ def create_scenario_with_checklist(
         rules_pack_id=pack_id,
     )
 
-    checklist_data = generate_checklist(scenario_input, pack_id)
+    checklist_data = generate_playbook_draft(scenario_input, user_id=user.id, pack_id=pack_id)
+    checklist_data = ensure_project_hub(checklist_data)
 
     scenario = InvestigationScenario(
         user_id=user.id,
@@ -338,7 +353,12 @@ def regenerate_scenario_checklist(
     """在同一 scenario 上重新生成清单（保留 revision_history 由调用方处理）。"""
     _apply_payload_to_scenario(scenario, payload)
     pack_id = _resolve_payload_pack_id(payload)
-    checklist_data = generate_checklist(_payload_from_request(payload), pack_id)
+    checklist_data = generate_playbook_draft(
+        _payload_from_request(payload),
+        user_id=scenario.user_id,
+        pack_id=pack_id,
+    )
+    checklist_data = ensure_project_hub(checklist_data)
 
     if not scenario.checklist:
         raise ValueError("场景缺少核查清单")
@@ -365,6 +385,7 @@ def _material_feedback_resp(scenario: InvestigationScenario) -> MaterialFeedback
 def scenario_to_response(scenario: InvestigationScenario) -> ScenarioResponse:
     checklist_resp = None
     checklist_payload = scenario.checklist.payload if scenario.checklist else {}
+    material_review = checklist_payload.get("material_review") or {}
     resolved_pack_id = resolve_scenario_pack_id(
         rules_pack_id=scenario.rules_pack_id,
         country=scenario.country,
@@ -385,15 +406,30 @@ def scenario_to_response(scenario: InvestigationScenario) -> ScenarioResponse:
             detected_sub_sectors=payload.get("detected_sub_sectors", []),
             detected_action_type=payload["detected_action_type"],
             detected_action_type_name=payload["detected_action_type_name"],
-            selected_dimensions=payload["selected_dimensions"],
-            sections=payload["sections"],
+            selected_dimensions=list(
+                payload.get("selected_dimensions")
+                or scenario.compliance_dimensions
+                or material_review.get("selected_dimensions")
+                or []
+            ),
+            sections=payload.get("sections") or [],
             disclaimer=payload["disclaimer"],
             created_at=scenario.checklist.created_at,
         )
 
     payload = checklist_payload
     revision_round = int(payload.get("revision_round") or 0)
-    material_review = payload.get("material_review") or {}
+    review = payload.get("review") or {}
+    can_return_materials = scenario.status in {
+        "pending_scope",
+        "pending_legal_review",
+        "review_in_progress",
+        "brief_generated",
+        "brief_blocked",
+    } and review.get("status") not in ("approved", "partial", "rejected")
+
+    adequacy = payload.get("investigation_adequacy")
+    gate_a_allows_review = gate_a_allows_checklist_review(adequacy)
 
     return ScenarioResponse(
         id=scenario.id,
@@ -427,6 +463,15 @@ def scenario_to_response(scenario: InvestigationScenario) -> ScenarioResponse:
         can_revise=scenario.status == "returned_for_revision",
         revision_round=revision_round,
         document_extract=document_extract_for_scenario(scenario),
+        investigation_adequacy=payload.get("investigation_adequacy"),
+        gate_a_allows_review=gate_a_allows_review,
+        can_return_materials=can_return_materials,
+        incremental_regen=payload.get("incremental_regen"),
+        conflict_flags=list(payload.get("conflict_flags") or []),
+        investigation_settings=payload.get("investigation_settings"),
+        grounding_report=payload.get("grounding_report"),
+        verification_report=payload.get("verification_report"),
+        playbook_deviations=list(payload.get("playbook_deviations") or []),
     )
 
 

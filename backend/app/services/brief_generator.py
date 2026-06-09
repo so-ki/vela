@@ -35,6 +35,14 @@ def _citation(hit: dict[str, Any]) -> dict[str, Any]:
 
 
 def _gate_item(item: dict[str, Any], *, threshold: int) -> tuple[str, Optional[str], float, bool]:
+    if item.get("tier"):
+        return (
+            item.get("gate_status", "blocked"),
+            item.get("block_reason"),
+            float(item.get("match_score") or 0),
+            bool(item.get("requires_review", item.get("tier") != "S1")),
+        )
+
     hits = item.get("legal_hits") or []
     best = _best_hit(hits)
     score = float(best.get("match_score", 0)) if best else 0.0
@@ -173,6 +181,9 @@ def generate_brief(
                 "match_score": score,
                 "requires_review": requires_review,
                 "block_reason": block_reason,
+                "tier": item.get("tier", "S1" if gate_status == "passed" else "S2"),
+                "tier_label": item.get("tier_label", ""),
+                "hard_block": bool(item.get("hard_block")),
                 "risk_zh": _risk_text_zh(item, best, gate_status, block_reason),
                 "risk_pt": _risk_text_pt(item, best, gate_status, block_reason),
                 "citations": [_citation(h) for h in hits[:3]],

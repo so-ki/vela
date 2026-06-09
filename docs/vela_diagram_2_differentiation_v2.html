@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Vela 图2 · 差异化与借鉴</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "PingFang SC","Microsoft YaHei",sans-serif; background:#eef2f6; padding:32px; }
+    .board {
+      width:1280px; margin:0 auto; background:#fff; border-radius:14px;
+      box-shadow:0 10px 40px rgba(26,58,92,.1); overflow:hidden;
+    }
+    .hdr {
+      background:linear-gradient(90deg,#1a3a5c,#2d5a87); color:#fff;
+      padding:20px 28px; text-align:center;
+    }
+    .hdr h1{font-size:22px;} .hdr p{margin-top:6px;font-size:13px;opacity:.92;}
+    .body{padding:22px 26px 26px;}
+    .hub{
+      text-align:center; padding:14px 18px; border:2px solid #1a3a5c; border-radius:10px;
+      background:#f8fafc; margin-bottom:18px;
+    }
+    .hub strong{font-size:15px;color:#1a3a5c;}
+    .hub span{display:block;margin-top:4px;font-size:12px;color:#64748b;}
+    .cols{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px;}
+    .col{border-radius:12px; padding:14px 14px 12px; min-height:320px;}
+    .col-h{
+      font-size:13px; font-weight:700; margin-bottom:12px; padding-bottom:8px;
+      border-bottom:2px solid rgba(0,0,0,.08);
+    }
+    .c-claude{background:#eff6ff; border:2px solid #3b82f6;}
+    .c-claude .col-h{color:#1d4ed8;}
+    .c-lavern{background:#faf5ff; border:2px solid #a855f7;}
+    .c-lavern .col-h{color:#7e22ce;}
+    .c-vela{background:#ecfdf5; border:2px solid #10b981;}
+    .c-vela .col-h{color:#047857;}
+    .item{margin-bottom:11px; padding:10px; background:rgba(255,255,255,.75); border-radius:8px;}
+    .item:last-child{margin-bottom:0;}
+    .item b{display:block;font-size:12px;color:#1e293b;margin-bottom:4px;}
+    .item span{font-size:10px;color:#475569;line-height:1.45;}
+    .tag-src{
+      display:inline-block;font-size:9px;padding:1px 6px;border-radius:4px;
+      margin-bottom:4px;font-weight:600;
+    }
+    .src-c{background:#dbeafe;color:#1e40af;}
+    .src-l{background:#f3e8ff;color:#6b21a8;}
+    .src-v{background:#d1fae5;color:#065f46;}
+    .foot{
+      margin-top:16px; padding:12px 16px; background:#1a3a5c; color:#fff;
+      border-radius:10px; font-size:12px; line-height:1.55; text-align:center;
+    }
+  </style>
+</head>
+<body>
+  <div class="board">
+    <header class="hdr">
+      <h1>图2 · Vela 差异化能力（借鉴 + 自研）</h1>
+      <p>左：Claude for Legal 工作流 · 中：Lavern 对抗与 grounding · 右：巴西出海场景自研</p>
+    </header>
+    <div class="body">
+      <div class="hub">
+        <strong>总定位：出海投资项目法务工作台（非查法条首页）</strong>
+        <span>借鉴国际 Legal AI 范式，落在「巴西法域 + 项目闭环 + 法务可签」</span>
+      </div>
+
+      <div class="cols">
+        <div class="col c-claude">
+          <div class="col-h">借鉴 Claude for Legal</div>
+          <div class="item">
+            <span class="tag-src src-c">Cold-start</span>
+            <b>冷启动访谈 → Playbook Profile</b>
+            <span>8 题配置法域/行业/底线/底稿风格；上传 docx 解析 house rules</span>
+          </div>
+          <div class="item">
+            <span class="tag-src src-c">Playbook Agent</span>
+            <b>规则包自动生成核查清单</b>
+            <span>场景 + Profile → 清单草稿，法务确认后执行</span>
+          </div>
+          <div class="item">
+            <span class="tag-src src-c">Regulatory Feed</span>
+            <b>语料维护 Agent + 变更通知</b>
+            <span>CAMEX/IBAMA/ANPD 等源站 + 本地语料 Diff；影响项目推送法务</span>
+          </div>
+          <div class="item">
+            <span class="tag-src src-c">Commercial Legal</span>
+            <b>合同审查模块</b>
+            <span>Playbook 注入 house rules；RED/YELLOW/GREEN + 项目联动</span>
+          </div>
+          <div class="item">
+            <span class="tag-src src-c">Project-centric</span>
+            <b>项目 Hub 而非能力入口</b>
+            <span>协查/合同/尽调/统摄同一 project_id，非三个独立产品</span>
+          </div>
+        </div>
+
+        <div class="col c-lavern">
+          <div class="col-h">借鉴 Lavern</div>
+          <div class="item">
+            <span class="tag-src src-l">Grounding</span>
+            <b>摘录 ↔ 语料原文校验</b>
+            <span>RAG 命中须 grounding 通过；否则强制「需法务复核」</span>
+          </div>
+          <div class="item">
+            <span class="tag-src src-l">Tier Gate</span>
+            <b>S1 / S2 / S3 分级门控</b>
+            <span>S3 高优 + 零/弱依据 → 硬阻断，不可静默通过</span>
+          </div>
+          <div class="item">
+            <span class="tag-src src-l">Red Team</span>
+            <b>Analyst 汇总 + Red Team 对抗</b>
+            <span>汇总≠挑错；Red Team 专找材料/协查/合同/尽调矛盾</span>
+          </div>
+          <div class="item">
+            <span class="tag-src src-l">Light Agents</span>
+            <b>轻量多 Agent（非 67 个）</b>
+            <span>复赛 LLM 加深辩论；当前规则 MVP 已跑通链路</span>
+          </div>
+        </div>
+
+        <div class="col c-vela">
+          <div class="col-h">巴西出海 · 自研差异化</div>
+          <div class="item">
+            <span class="tag-src src-v">Brazil Connector</span>
+            <b>语料 → LexML live → 门户降级</b>
+            <span>三级引证 tier；查不到不编法条，给官方检索入口</span>
+          </div>
+          <div class="item">
+            <span class="tag-src src-v">Gate A</span>
+            <b>材料构成要件 + RAG 双门控</b>
+            <span>材料不齐或匹配度不达标 → 锁定清单复核</span>
+          </div>
+          <div class="item">
+            <span class="tag-src src-v">Incremental</span>
+            <b>增量协查 + 定稿不 silent 改</b>
+            <span>补材料只重算变更项；语料更新只通知不重写底稿</span>
+          </div>
+          <div class="item">
+            <span class="tag-src src-v">Cross-module</span>
+            <b>项目统摄 · 跨模块冲突检测</b>
+            <span>协查 S3、合同 RED、DD 缺项统一 issue 表</span>
+          </div>
+          <div class="item">
+            <span class="tag-src src-v">vs 北大法宝</span>
+            <b>不拼中国法条库规模</b>
+            <span>垂直巴西 + 全流程；法宝作国内法补充而非主位竞争</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="foot">
+        复赛加深：Claude 侧 Reg Feed 全文抓取 + 模板驱动 Word｜Lavern 侧 LLM Red Team 辩论链｜自研侧 LexML 缓存与州法扩库
+      </div>
+    </div>
+  </div>
+</body>
+</html>

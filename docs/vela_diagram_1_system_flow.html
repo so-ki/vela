@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Vela 图1 · 系统流程与功能</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f5f7fa;
+      padding: 36px;
+    }
+    .sheet {
+      width: 1200px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(26,58,92,.12);
+    }
+    .head {
+      background: linear-gradient(90deg, #1a3a5c, #2d5a87);
+      color: #fff;
+      padding: 22px 32px;
+    }
+    .head h1 { font-size: 24px; }
+    .head p { margin-top: 6px; font-size: 14px; opacity: .92; }
+    .body { padding: 28px 32px 32px; }
+    .main-flow-label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #64748b;
+      letter-spacing: .1em;
+      margin-bottom: 14px;
+    }
+    .flow {
+      display: flex;
+      align-items: stretch;
+      gap: 0;
+    }
+    .step {
+      flex: 1;
+      min-width: 0;
+      position: relative;
+    }
+    .step-inner {
+      background: #f8fafc;
+      border: 2px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 14px 12px;
+      height: 100%;
+      text-align: center;
+    }
+    .step-num {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      background: #1a3a5c;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      line-height: 26px;
+      margin: 0 auto 8px;
+    }
+    .step strong { display: block; font-size: 14px; color: #1e293b; margin-bottom: 6px; }
+    .step span { font-size: 11px; color: #64748b; line-height: 1.45; }
+    .chev {
+      flex: 0 0 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #e67e22;
+      font-size: 20px;
+      font-weight: 700;
+    }
+    .branch {
+      margin-top: 22px;
+      padding: 18px 20px;
+      border: 2px dashed #cbd5e1;
+      border-radius: 12px;
+      background: #fafbfc;
+    }
+    .branch-title {
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: #1a3a5c;
+      margin-bottom: 14px;
+    }
+    .modules {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .mod {
+      border-radius: 10px;
+      padding: 14px;
+      text-align: center;
+    }
+    .mod strong { display: block; font-size: 14px; margin-bottom: 6px; }
+    .mod span { font-size: 11px; line-height: 1.45; opacity: .9; }
+    .mod-a { background: #eff6ff; border: 1.5px solid #93c5fd; color: #1e40af; }
+    .mod-b { background: #fff7ed; border: 1.5px solid #fdba74; color: #9a3412; }
+    .mod-c { background: #f5f3ff; border: 1.5px solid #c4b5fd; color: #5b21b6; }
+    .footer-row {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .foot-box {
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 12px;
+      line-height: 1.5;
+    }
+    .foot-box strong { display: block; margin-bottom: 4px; font-size: 13px; }
+    .roles { background: #ecfdf5; border: 1px solid #6ee7b7; color: #065f46; }
+    .backend { background: #fef2f2; border: 1px dashed #fca5a5; color: #991b1b; }
+    .legend {
+      margin-top: 16px;
+      text-align: center;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <header class="head">
+      <h1>图1 · Vela 出海法务台 — 系统流程与功能总览</h1>
+      <p>一条主链路完成协查定稿 · 同一项目延伸合同 / 尽调 / 统摄 · 后台持续维护法源</p>
+    </header>
+    <div class="body">
+      <div class="main-flow-label">主流程（按时间顺序）</div>
+      <div class="flow">
+        <div class="step"><div class="step-inner"><div class="step-num">1</div><strong>冷启动</strong><span>访谈配置 Playbook<br/>行业·底线·底稿风格</span></div></div>
+        <div class="chev">→</div>
+        <div class="step"><div class="step-inner"><div class="step-num">2</div><strong>业务提交</strong><span>中文材料<br/>表格·附件归档</span></div></div>
+        <div class="chev">→</div>
+        <div class="step"><div class="step-inner"><div class="step-num">3</div><strong>法务定范围</strong><span>勾选合规维度<br/>阈值·法条条数</span></div></div>
+        <div class="chev">→</div>
+        <div class="step"><div class="step-inner"><div class="step-num">4</div><strong>协查包</strong><span>清单+RAG法条<br/>匹配度+简报草稿</span></div></div>
+        <div class="chev">→</div>
+        <div class="step"><div class="step-inner"><div class="step-num">5</div><strong>Gate A</strong><span>材料要件聚合<br/>未过则锁定复核</span></div></div>
+        <div class="chev">→</div>
+        <div class="step"><div class="step-inner"><div class="step-num">6</div><strong>法务复核</strong><span>逐条确认/驳回<br/>S3 硬阻断</span></div></div>
+        <div class="chev">→</div>
+        <div class="step"><div class="step-inner"><div class="step-num">7</div><strong>Word 定稿</strong><span>双语协查底稿<br/>版本号·免责声明</span></div></div>
+      </div>
+
+      <div class="branch">
+        <div class="branch-title">↓ 同一投资项目 · 项目中心（步骤 4–7 期间或之后并行）</div>
+        <div class="modules">
+          <div class="mod mod-a"><strong>投资协查</strong><span>主链路核心<br/>清单·法条·简报·复核</span></div>
+          <div class="mod mod-b"><strong>合同审查</strong><span>上传合同<br/>按 house rules 标红黄牌</span></div>
+          <div class="mod mod-c"><strong>尽职调查 + 统摄</strong><span>DD 缺项提示<br/>Analyst 汇总 · Red Team 挑矛盾</span></div>
+        </div>
+      </div>
+
+      <div class="footer-row">
+        <div class="foot-box roles"><strong>角色分工</strong>业务：交材料、补材料｜法务：定范围、复核、定稿、维护语料</div>
+        <div class="foot-box backend"><strong>后台辅线</strong>语料维护 Agent：法条变更扫描 → 通知受影响项目（已定稿不自动改）</div>
+      </div>
+      <p class="legend">Vela 出海法务台 · 星瀚杯复赛 · 图1 系统流程</p>
+    </div>
+  </div>
+</body>
+</html>

@@ -89,13 +89,13 @@ onMounted(async () => {
           <p class="eyebrow dark">业务协查 · 进度跟踪</p>
           <h1>{{ scenario.project_name }}</h1>
           <p class="muted" v-if="canRevise && isMaterialReturn">
-            法务已驳回提交表中的缺项字段。请在本项目<strong>核对表中修改</strong>后重新提交，无需重新上传文件（除非法务另有要求）。
+            法务已驳回提交表中未覆盖的<strong>构成要件</strong>。请在本项目核对表中修改后重新提交，无需重新上传文件（除非法务另有要求）。
           </p>
           <p class="muted" v-else-if="canRevise">
             法务已退回本项目，请根据下方批注<strong>补充材料</strong>后重新提交（无需新建项目）。
           </p>
           <p class="muted" v-else-if="scenario.status === 'pending_scope'">
-            材料已提交。协查范围由<strong>法务筛选确认</strong>后将自动生成核查清单，您无需选择合规维度。
+            材料已提交。法务将选定协查维度并<strong>生成协查包</strong>（清单 + RAG + 简报），您无需选择合规维度。
           </p>
           <p class="muted" v-else>您无需在此做法律判断；法务反馈会显示在下方。</p>
           <p class="muted" v-if="scenario.revision_round">
@@ -134,6 +134,21 @@ onMounted(async () => {
         </p>
 
         <div
+          v-for="(elementIds, dimId) in materialFeedback.missing_elements_by_dimension || {}"
+          :key="`el-${dimId}`"
+          class="material-feedback-group"
+        >
+          <strong>{{ dimId === '_general' ? '通用' : dimensionLabel(String(dimId)) }}</strong>
+          <ul class="feedback-list compact">
+            <li v-for="eid in elementIds" :key="`${dimId}-${eid}`" class="feedback-item">
+              <span class="decision-badge rejected">需补充</span>
+              <strong>{{ materialFeedback.element_labels?.[eid] || eid }}</strong>
+            </li>
+          </ul>
+        </div>
+
+        <div
+          v-if="!(materialFeedback.missing_elements_by_dimension && Object.keys(materialFeedback.missing_elements_by_dimension).length)"
           v-for="(fields, dimId) in materialFeedback.missing_by_dimension"
           :key="dimId"
           class="material-feedback-group"

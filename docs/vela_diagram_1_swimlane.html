@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Vela 图1 · 泳道流程</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "PingFang SC","Microsoft YaHei",sans-serif; background:#eef2f6; padding:32px; }
+    .board {
+      width:1280px; margin:0 auto; background:#fff; border-radius:14px;
+      box-shadow:0 10px 40px rgba(26,58,92,.1); overflow:hidden;
+    }
+    .hdr {
+      background:linear-gradient(90deg,#1a3a5c,#2d5a87); color:#fff;
+      padding:20px 28px; text-align:center;
+    }
+    .hdr h1{font-size:22px;font-weight:700;}
+    .hdr p{margin-top:6px;font-size:13px;opacity:.92;}
+    .lanes{padding:20px 24px 24px; position:relative;}
+    .lane{display:grid; grid-template-columns:100px 1fr; gap:10px; margin-bottom:8px; min-height:72px;}
+    .tag{
+      border-radius:8px; color:#fff; font-size:12px; font-weight:700;
+      display:flex; align-items:center; justify-content:center; text-align:center; line-height:1.35; padding:8px 4px;
+    }
+    .biz{background:#2563eb;} .legal{background:#ea580c;} .ai{background:#7c3aed;} .out{background:#059669;}
+    .track{
+      display:flex; align-items:center; gap:6px; padding:8px 10px;
+      background:#fafbfc; border:1px solid #e5e7eb; border-radius:10px; flex-wrap:nowrap;
+    }
+    .node{
+      flex:1; min-width:0; background:#fff; border:1.5px solid #d1d5db; border-radius:8px;
+      padding:10px 8px; text-align:center; position:relative;
+    }
+    .node b{display:block;font-size:12px;color:#1e293b;margin-bottom:3px;}
+    .node i{font-style:normal;font-size:10px;color:#64748b;line-height:1.35;}
+    .num{
+      position:absolute; top:-7px; left:8px; width:18px;height:18px;border-radius:50%;
+      background:#1a3a5c;color:#fff;font-size:10px;font-weight:700;line-height:18px;
+    }
+    .arr{color:#e67e22;font-size:16px;font-weight:700;flex:0 0 18px;text-align:center;}
+    .aux{
+      position:absolute; right:20px; top:88px; width:148px;
+      border:2px dashed #dc2626; border-radius:10px; padding:12px 10px;
+      background:rgba(254,242,242,.6); font-size:10px; color:#991b1b; line-height:1.45;
+    }
+    .aux strong{display:block;font-size:11px;margin-bottom:6px;color:#dc2626;}
+    .foot{
+      margin:0 24px 20px; padding:12px 16px; background:#f8fafc; border-radius:8px;
+      font-size:11px; color:#64748b; text-align:center; line-height:1.55;
+    }
+    .legend{
+      display:flex; justify-content:center; gap:16px; flex-wrap:wrap;
+      padding:0 24px 16px; font-size:10px; color:#64748b;
+    }
+    .dot{width:10px;height:10px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle;}
+  </style>
+</head>
+<body>
+  <div class="board">
+    <header class="hdr">
+      <h1>图1 · Vela 系统流程（泳道图）</h1>
+      <p>从左到右读时间顺序 · 同一投资项目贯穿各层 · 右侧红框为并行后台</p>
+    </header>
+
+    <div class="lanes">
+      <div class="aux">
+        <strong>法规监测辅线</strong>
+        Reg Feed 扫描<br/>
+        语料 Diff + LexML 回溯<br/>
+        变更 → 通知法务<br/>
+        <em>已定稿不自动改</em>
+      </div>
+
+      <div class="lane">
+        <div class="tag biz">业务<br/>协同层</div>
+        <div class="track">
+          <div class="node"><span class="num">2</span><b>提交材料</b><i>中文方案·附件</i></div>
+          <div class="arr">→</div>
+          <div class="node"><b>（可选）补材料</b><i>法务打回后同项目重提</i></div>
+          <div class="arr">→</div>
+          <div class="node"><b>查看进度</b><i>待补充/复核/定稿</i></div>
+        </div>
+      </div>
+
+      <div class="lane">
+        <div class="tag legal">法务<br/>主导层</div>
+        <div class="track">
+          <div class="node"><span class="num">1</span><b>冷启动 Playbook</b><i>访谈·底线·底稿风格</i></div>
+          <div class="arr">→</div>
+          <div class="node"><span class="num">3</span><b>确认协查范围</b><i>维度·阈值·法条数</i></div>
+          <div class="arr">→</div>
+          <div class="node"><span class="num">6</span><b>逐条复核</b><i>确认/驳回/批注</i></div>
+          <div class="arr">→</div>
+          <div class="node"><span class="num">7</span><b>定稿导出</b><i>Word·版本号</i></div>
+        </div>
+      </div>
+
+      <div class="lane">
+        <div class="tag ai">AI<br/>引擎层</div>
+        <div class="track">
+          <div class="node"><span class="num">4</span><b>生成协查包</b><i>清单·RAG·简报草稿</i></div>
+          <div class="arr">→</div>
+          <div class="node"><span class="num">5</span><b>Gate A 门控</b><i>要件聚合·S1-S3</i></div>
+          <div class="arr">→</div>
+          <div class="node"><b>合同审查</b><i>house rules</i></div>
+          <div class="arr">+</div>
+          <div class="node"><b>尽职调查</b><i>缺项·映射</i></div>
+          <div class="arr">+</div>
+          <div class="node"><b>项目统摄</b><i>Analyst·RedTeam</i></div>
+        </div>
+      </div>
+
+      <div class="lane">
+        <div class="tag out">结果<br/>输出层</div>
+        <div class="track">
+          <div class="node"><b>双语协查底稿</b><i>Word 导出</i></div>
+          <div class="arr">+</div>
+          <div class="node"><b>合同风险清单</b><i>红/黄/绿</i></div>
+          <div class="arr">+</div>
+          <div class="node"><b>DD issue 表</b><i>缺项提示</i></div>
+          <div class="arr">+</div>
+          <div class="node"><b>冲突 issue 表</b><i>跨模块矛盾</i></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="legend">
+      <span><i class="dot" style="background:#2563eb"></i>业务</span>
+      <span><i class="dot" style="background:#ea580c"></i>法务</span>
+      <span><i class="dot" style="background:#7c3aed"></i>AI</span>
+      <span><i class="dot" style="background:#059669"></i>输出</span>
+      <span><i class="dot" style="background:#dc2626;border:1px dashed #dc2626"></i>监测辅线</span>
+      <span>主路径：1→7 编号步骤</span>
+    </div>
+    <div class="foot">核心：一个 project_id 串联协查 · 合同 · 尽调 · 统摄 · 所有 AI 产出须经法务复核后定稿</div>
+  </div>
+</body>
+</html>

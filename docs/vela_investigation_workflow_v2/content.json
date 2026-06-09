@@ -1,0 +1,145 @@
+[
+  {
+    "id": "sheet-root",
+    "class": "sheet",
+    "title": "Vela 协查流程 v2",
+    "rootTopic": {
+      "id": "root",
+      "class": "topic",
+      "title": "Vela 协查流程\n（一遍生成 + 统一复核）",
+      "structureClass": "org.xmind.ui.logic.right",
+      "children": {
+        "attached": [
+          {
+            "id": "n1",
+            "title": "0 · 业务提交材料",
+            "children": {
+              "attached": [
+                { "id": "n1a", "title": "上传方案 + 填写核对表" },
+                { "id": "n1b", "title": "状态：pending_scope\n（待生成协查包）" },
+                { "id": "n1c", "title": "业务不选合规维度" }
+              ]
+            }
+          },
+          {
+            "id": "n2",
+            "title": "1 · 法务：选定范围（生成前）",
+            "children": {
+              "attached": [
+                { "id": "n2a", "title": "勾选 5 大合规维度\n劳工 / 外资 / 税务 / 环保 / 行业准入" },
+                { "id": "n2b", "title": "材料预检（可选）\n仅供参考 · 不阻断生成" },
+                { "id": "n2c", "title": "可提前打回业务\n（明显缺材料时）" },
+                {
+                  "id": "n2d",
+                  "title": "【生成协查包】\n法务一次点击",
+                  "children": {
+                    "attached": [
+                      { "id": "n2d1", "title": "API：POST /generate-investigation" },
+                      { "id": "n2d2", "title": "不再「确认范围并锁死」" }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "id": "n3",
+            "title": "2–5 · 系统：一次生成（后台流水线）",
+            "children": {
+              "attached": [
+                { "id": "n3a", "title": "② 核查项定位\n场景 / 子行业 / 清单条目触发" },
+                { "id": "n3b", "title": "③ 生成核查清单\n按维度 + 规则包" },
+                { "id": "n3c", "title": "③ 多源 RAG\nLexML · STF · STJ · Jusbrasil" },
+                { "id": "n3d", "title": "④ 跨语种 + 匹配度\n阈值 70 · 低于需法务复核" },
+                { "id": "n3e", "title": "⑤ 生成双语简报草稿" },
+                { "id": "n3f", "title": "状态 → pending_legal_review" }
+              ]
+            }
+          },
+          {
+            "id": "n4",
+            "title": "Gate A · 构成要件（生成后聚合）",
+            "children": {
+              "attached": [
+                { "id": "n4a", "title": "数据来源（同源，非两套 RAG）\n条目 RAG + 匹配度 + 材料预检" },
+                { "id": "n4b", "title": "按维度展示构成要件" },
+                {
+                  "id": "n4c",
+                  "title": "每项状态",
+                  "children": {
+                    "attached": [
+                      { "id": "n4c1", "title": "已覆盖 covered" },
+                      { "id": "n4c2", "title": "待核实 at_risk" },
+                      { "id": "n4c3", "title": "缺项 missing" }
+                    ]
+                  }
+                },
+                { "id": "n4d", "title": "UI：InvestigationAdequacyPanel\n复核页上半部" },
+                {
+                  "id": "n4e",
+                  "title": "不齐 → 打回补充材料",
+                  "children": {
+                    "attached": [
+                      { "id": "n4e1", "title": "未定稿前均可打回" },
+                      { "id": "n4e2", "title": "已生成协查包会归档草稿\ninvestigation_draft_history" },
+                      { "id": "n4e3", "title": "业务改核对表 → 重新生成协查包" }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "id": "n5",
+            "title": "6 · 法务：统一复核（同页下半）",
+            "children": {
+              "attached": [
+                { "id": "n5a", "title": "逐条核查清单\n确认 / 驳回 / 批注" },
+                { "id": "n5b", "title": "查看法源片段 + 匹配度 + 简报" },
+                { "id": "n5c", "title": "门控未过线 → 重点复核" },
+                { "id": "n5d", "title": "可标记需外聘巴西律所" },
+                { "id": "n5e", "title": "材料不足 vs 法律结论不对\n前者打回材料 · 后者驳回条目" },
+                { "id": "n5f", "title": "全部处理完 → 提交定稿" }
+              ]
+            }
+          },
+          {
+            "id": "n6",
+            "title": "7 · 导出归档",
+            "children": {
+              "attached": [
+                { "id": "n6a", "title": "Word / PDF 协查底稿" },
+                { "id": "n6b", "title": "含复核记录 + 免责声明" },
+                { "id": "n6c", "title": "状态：review_approved / partial / rejected" }
+              ]
+            }
+          },
+          {
+            "id": "n7",
+            "title": "前端体验（法务可见步骤）",
+            "children": {
+              "attached": [
+                { "id": "n7a", "title": "Step A：勾维 → 生成协查包" },
+                { "id": "n7b", "title": "Step B：Gate A 聚合 + 清单复核（同一页）" },
+                { "id": "n7c", "title": "Step C：定稿 → 导出" },
+                { "id": "n7d", "title": "②–⑤ 不对法务逐步暴露" }
+              ]
+            }
+          },
+          {
+            "id": "n8",
+            "title": "与旧版差异",
+            "children": {
+              "attached": [
+                { "id": "n8a", "title": "旧：Gate A 阻断 → 确认 → 再 RAG" },
+                { "id": "n8b", "title": "新：先全量生成 → 再 Gate A 聚合判断" },
+                { "id": "n8c", "title": "旧：确认后难打回材料" },
+                { "id": "n8d", "title": "新：未定稿前随时打回" }
+              ]
+            }
+          }
+        ]
+      }
+    }
+  }
+]

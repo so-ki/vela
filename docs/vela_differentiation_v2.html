@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=1600" />
+  <title>差异化能力</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 1568px; }
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      background: #eef1f5;
+      padding: 24px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .canvas {
+      width: 1520px;
+      margin: 0 auto;
+      background: #f5f7fa;
+      border-radius: 4px;
+      box-shadow: 0 8px 32px rgba(26, 58, 92, 0.12);
+      overflow: hidden;
+    }
+    .hdr {
+      background: linear-gradient(180deg, #1a3a5c 0%, #234a72 100%);
+      color: #fff;
+      text-align: center;
+      padding: 28px 40px 24px;
+    }
+    .hdr h1 { font-size: 28px; font-weight: 700; letter-spacing: 2px; }
+    .hdr p { margin-top: 10px; font-size: 14px; color: rgba(255,255,255,.82); }
+
+    .hub {
+      margin: 24px 32px 0;
+      padding: 18px 28px;
+      text-align: center;
+      border: 2px solid #1a3a5c;
+      border-radius: 10px;
+      background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+      position: relative;
+    }
+    .hub::before, .hub::after {
+      content: "";
+      position: absolute;
+      top: 50%;
+      width: 40px;
+      height: 2px;
+      background: #1a3a5c;
+    }
+    .hub::before { left: 24px; }
+    .hub::after { right: 24px; }
+    .hub strong { font-size: 17px; color: #1a3a5c; letter-spacing: 1px; }
+    .hub span { display: block; margin-top: 6px; font-size: 13px; color: #64748b; }
+
+    .matrix-wrap { padding: 20px 28px 8px; }
+
+    .matrix {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+    }
+
+    .cell {
+      background: #fff;
+      border-radius: 10px;
+      border: 1.5px solid #e2e8f0;
+      padding: 18px 16px 16px;
+      min-height: 148px;
+      position: relative;
+      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.05);
+      transition: none;
+    }
+    .cell::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      border-radius: 10px 10px 0 0;
+    }
+    .cell:nth-child(1)::before { background: #2563eb; }
+    .cell:nth-child(2)::before { background: #ea580c; }
+    .cell:nth-child(3)::before { background: #059669; }
+    .cell:nth-child(4)::before { background: #7c3aed; }
+    .cell:nth-child(5)::before { background: #dc2626; }
+    .cell:nth-child(6)::before { background: #0891b2; }
+    .cell:nth-child(7)::before { background: #9333ea; }
+    .cell:nth-child(8)::before { background: #ca8a04; }
+    .cell:nth-child(9)::before { background: #be185d; }
+
+    .cell:nth-child(1) { background: linear-gradient(135deg, #eff6ff 0%, #fff 60%); }
+    .cell:nth-child(2) { background: linear-gradient(135deg, #fff7ed 0%, #fff 60%); }
+    .cell:nth-child(3) { background: linear-gradient(135deg, #ecfdf5 0%, #fff 60%); }
+    .cell:nth-child(4) { background: linear-gradient(135deg, #f5f3ff 0%, #fff 60%); border-color: #c4b5fd; }
+    .cell:nth-child(5) { background: linear-gradient(135deg, #fef2f2 0%, #fff 60%); }
+    .cell:nth-child(6) { background: linear-gradient(135deg, #ecfeff 0%, #fff 60%); }
+    .cell:nth-child(7) { background: linear-gradient(135deg, #faf5ff 0%, #fff 60%); }
+    .cell:nth-child(8) { background: linear-gradient(135deg, #fffbeb 0%, #fff 60%); }
+    .cell:nth-child(9) { background: linear-gradient(135deg, #fdf2f8 0%, #fff 60%); }
+
+    .num {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: #1a3a5c;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .cell:nth-child(4) .num { background: #7c3aed; }
+
+    .badge {
+      display: inline-block;
+      font-size: 9px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      letter-spacing: .5px;
+    }
+    .badge-core { background: #dbeafe; color: #1d4ed8; }
+    .badge-diff { background: #ede9fe; color: #6d28d9; }
+    .badge-new { background: #fef3c7; color: #b45309; }
+
+    .cell h2 {
+      font-size: 15px;
+      color: #0f172a;
+      margin-bottom: 10px;
+      padding-right: 36px;
+      line-height: 1.35;
+    }
+    .cell ul {
+      list-style: none;
+      font-size: 11px;
+      color: #475569;
+      line-height: 1.6;
+    }
+    .cell ul li::before { content: "▸ "; color: #94a3b8; font-size: 10px; }
+
+    .vs-strip {
+      margin: 16px 32px 0;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 12px;
+    }
+    .vs {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 11px;
+      color: #64748b;
+      line-height: 1.55;
+    }
+    .vs b { display: block; font-size: 12px; color: #1a3a5c; margin-bottom: 4px; }
+
+    .foot {
+      margin: 20px 32px 24px;
+      background: #1a3a5c;
+      border-radius: 8px;
+      padding: 16px 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 20px;
+    }
+    .foot-left {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    .chip {
+      font-size: 11px;
+      color: #cbd5e1;
+      padding: 4px 10px;
+      border: 1px solid rgba(255,255,255,.2);
+      border-radius: 20px;
+    }
+    .foot-right {
+      font-size: 11px;
+      color: #94a3b8;
+      text-align: right;
+      line-height: 1.55;
+    }
+    .foot-right b { color: #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <header class="hdr">
+      <h1>差异化能力</h1>
+      <p>九大系统能力 · 构成可签、可学习、可统摄的巴西出海法务工作台</p>
+    </header>
+
+    <div class="hub">
+      <strong>一个投资项目 = 一个法务工作台</strong>
+      <span>协查 · 合同 · 尽调 · 统摄 · 同一 project_id · 非分散 AI 工具</span>
+    </div>
+
+    <div class="matrix-wrap">
+      <div class="matrix">
+        <div class="cell">
+          <span class="num">01</span>
+          <span class="badge badge-core">工作台</span>
+          <h2>项目制工作台</h2>
+          <ul>
+            <li>以投资项目为单元组织全部法务动作</li>
+            <li>清单、合同、尽调在同一上下文交叉验证</li>
+            <li>相对查法条工具：强流程闭环</li>
+          </ul>
+        </div>
+        <div class="cell">
+          <span class="num">02</span>
+          <span class="badge badge-core">冷启动</span>
+          <h2>Playbook 冷启动</h2>
+          <ul>
+            <li>访谈固化法域、行业、底线与底稿风格</li>
+            <li>上传 Word 解析 house rules，一次配置全程复用</li>
+            <li>降低巴西法条冷启动门槛</li>
+          </ul>
+        </div>
+        <div class="cell">
+          <span class="num">03</span>
+          <span class="badge badge-core">合规</span>
+          <h2>可引用 · 可签</h2>
+          <ul>
+            <li>法条绑 URN + Grounding 校验 · S3 硬阻断</li>
+            <li>Gate A 与逐条复核通过后才 Word 定稿</li>
+            <li>已定稿不因新法 silent 修改</li>
+          </ul>
+        </div>
+        <div class="cell">
+          <span class="num">04</span>
+          <span class="badge badge-diff">核心差异</span>
+          <h2>Playbook 偏好闭环</h2>
+          <ul>
+            <li>复核确认/驳回 · 阈值 · Top-N · Playbook 偏差</li>
+            <li>写入个人偏好 → 下次协查自动应用</li>
+            <li>越用越贴律所习惯，非通用 ChatGPT</li>
+          </ul>
+        </div>
+        <div class="cell">
+          <span class="num">05</span>
+          <span class="badge badge-diff">对抗</span>
+          <h2>统摄 + Red Team</h2>
+          <ul>
+            <li>Analyst 中性汇总项目全貌</li>
+            <li>Red Team 专挑材料/协查/合同/尽调矛盾</li>
+            <li>汇总与挑错分离，非单点生成</li>
+          </ul>
+        </div>
+        <div class="cell">
+          <span class="num">06</span>
+          <span class="badge badge-diff">法源</span>
+          <h2>法源常新</h2>
+          <ul>
+            <li>语料 Agent 监测 Diff + LexML · Planalto 回溯</li>
+            <li>通知受影响项目 · 订阅提醒</li>
+            <li>解决语料非实时法的信任问题</li>
+          </ul>
+        </div>
+        <div class="cell">
+          <span class="num">07</span>
+          <span class="badge badge-new">效率</span>
+          <h2>增量协查</h2>
+          <ul>
+            <li>业务补材料后只重算变更核查项</li>
+            <li>已通过条目沿用上一轮结论</li>
+            <li>节省复核成本 · 避免全量重做</li>
+          </ul>
+        </div>
+        <div class="cell">
+          <span class="num">08</span>
+          <span class="badge badge-new">引证</span>
+          <h2>多源法条引证链</h2>
+          <ul>
+            <li>语料 → LexML URN → Planalto · STF · gov.br</li>
+            <li>三级降级 · 查不到不编法条</li>
+            <li>只给可核对入口与免责声明</li>
+          </ul>
+        </div>
+        <div class="cell">
+          <span class="num">09</span>
+          <span class="badge badge-new">质量</span>
+          <h2>跨模块冲突检测</h2>
+          <ul>
+            <li>协查 S3 · 合同 RED · 尽调缺项汇入 issue 表</li>
+            <li>标注严重度与建议动作</li>
+            <li>避免各模块结论「各说各话」</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="vs-strip">
+      <div class="vs">
+        <b>vs 查法条平台</b>
+        北大法宝类强检索；我们强「一个投资项目走完全流程 + 可签交付物」
+      </div>
+      <div class="vs">
+        <b>vs 通用 Legal AI</b>
+        问答型工具弱 Grounding；我们有 Gate A、S3 硬拦、引证链与人机复核
+      </div>
+      <div class="vs">
+        <b>vs 单模块工具</b>
+        合同或尽调孤立运行；我们统摄 + 冲突检测 + 偏好闭环形成系统壁垒
+      </div>
+    </div>
+
+    <footer class="foot">
+      <div class="foot-left">
+        <span class="chip">LexML · Planalto · STF · gov.br</span>
+        <span class="chip">70 分门控 S1/S2/S3</span>
+        <span class="chip">中葡双语底稿</span>
+        <span class="chip">审计日志</span>
+      </div>
+      <div class="foot-right">
+        <b>交付</b>：双语 Word · 四类 issue 表 · 审计包 · Playbook 偏好可导出复盘
+      </div>
+    </footer>
+  </div>
+</body>
+</html>

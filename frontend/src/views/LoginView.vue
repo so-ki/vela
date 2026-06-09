@@ -85,7 +85,7 @@ function startSsoLogin() {
 
       <p class="auth-footer" v-if="ssoConfig === null || ssoConfig.allow_open_registration">
         还没有账户？
-        <RouterLink to="/register">注册企业法务账户</RouterLink>
+        <RouterLink to="/register">注册账户</RouterLink>
       </p>
 
       <p class="demo-hint" v-if="ssoConfig?.allow_password_login !== false">

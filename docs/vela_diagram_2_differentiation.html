@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>Vela 图2 · 差异化能力</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #f5f7fa;
+      padding: 36px;
+    }
+    .sheet {
+      width: 1200px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 14px;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(26,58,92,.12);
+    }
+    .head {
+      background: linear-gradient(90deg, #1a3a5c, #2d5a87);
+      color: #fff;
+      padding: 22px 32px;
+      text-align: center;
+    }
+    .head h1 { font-size: 24px; }
+    .head p { margin-top: 6px; font-size: 14px; opacity: .92; }
+    .body { padding: 28px 32px 32px; }
+    .center-hub {
+      text-align: center;
+      margin-bottom: 24px;
+      padding: 16px;
+      border: 2px solid #1a3a5c;
+      border-radius: 12px;
+      background: #f8fafc;
+    }
+    .center-hub strong { font-size: 16px; color: #1a3a5c; }
+    .center-hub span { display: block; margin-top: 6px; font-size: 13px; color: #64748b; }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .pillar {
+      border-radius: 12px;
+      padding: 18px 20px;
+      min-height: 160px;
+    }
+    .pillar h2 {
+      font-size: 15px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .pillar h2 em {
+      font-style: normal;
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 28px;
+      text-align: center;
+    }
+    .vs { font-size: 12px; color: #64748b; margin-bottom: 8px; line-height: 1.5; }
+    .we { font-size: 12px; line-height: 1.55; }
+    .we b { color: #1e293b; }
+    .p1 { background: #eff6ff; border: 2px solid #3b82f6; }
+    .p1 h2 em { background: #2563eb; }
+    .p2 { background: #fff7ed; border: 2px solid #f97316; }
+    .p2 h2 em { background: #ea580c; }
+    .p3 { background: #ecfdf5; border: 2px solid #10b981; }
+    .p3 h2 em { background: #059669; }
+    .p4 { background: #f5f3ff; border: 2px solid #8b5cf6; }
+    .p4 h2 em { background: #7c3aed; }
+    .bottom {
+      margin-top: 20px;
+      padding: 14px 18px;
+      background: #1a3a5c;
+      color: #fff;
+      border-radius: 10px;
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    .legend { margin-top: 14px; text-align: center; font-size: 11px; color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="sheet">
+    <header class="head">
+      <h1>图2 · Vela 出海法务台 — 四大差异化能力</h1>
+      <p>相对「查法条工具」与「通用 Legal AI 演示」，我们刻意做的四个系统级选择</p>
+    </header>
+    <div class="body">
+      <div class="center-hub">
+        <strong>定位差异：不做法条搜索引擎，做「出海投资项目法务工作台」</strong>
+        <span>功能之间通过 project_id 串联，而不是三个互不相干的 AI 功能入口</span>
+      </div>
+
+      <div class="grid">
+        <div class="pillar p1">
+          <h2><em>1</em>项目制闭环</h2>
+          <p class="vs">常见做法：查法条、审合同、做尽调 分散在不同工具</p>
+          <p class="we"><b>我们：</b>一个巴西投资项目 = 一个项目中心。协查定稿、合同 RED 线、DD 缺项、统摄冲突 共用同一上下文，避免「清单说 A、合同写 B」。</p>
+        </div>
+        <div class="pillar p2">
+          <h2><em>2</em>巴西可引用</h2>
+          <p class="vs">常见做法：大模型直接生成法条段落，难以核对</p>
+          <p class="we"><b>我们：</b>语料库 + LexML Connector，每条核查项绑 Top-N 法条片段与 URN；匹配度低于阈值标「需复核」，零依据高优项 S3 硬阻断。</p>
+        </div>
+        <div class="pillar p3">
+          <h2><em>3</em>人机可签</h2>
+          <p class="vs">常见做法：AI 输出即交付，法务不敢背锅</p>
+          <p class="we"><b>我们：</b>Gate A 材料门控 → 逐条复核 → 定稿版本号；语料更新只通知、不 silent 改已定稿报告，满足企业法务审计要求。</p>
+        </div>
+        <div class="pillar p4">
+          <h2><em>4</em>统摄 + 对抗</h2>
+          <p class="vs">常见做法：只生成正文，不主动找矛盾</p>
+          <p class="we"><b>我们：</b>项目统摄跑 Analyst（中性汇总）+ Red Team（专挑材料/协查/合同/尽调矛盾），把「汇总」和「挑错」拆成两个 Agent。</p>
+        </div>
+      </div>
+
+      <div class="bottom">
+        复赛强化方向：法源 Agent 让「可引用」更常新 · LLM 加深 Red Team · 星瀚 Playbook 模板驱动 Word 导出
+      </div>
+      <p class="legend">Vela 出海法务台 · 星瀚杯复赛 · 图2 差异化</p>
+    </div>
+  </div>
+</body>
+</html>

@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vela 出海法务台 · 技术架构与复赛路径</title>
+  <style>
+    :root {
+      --bg: #f5f7fa;
+      --primary: #1a3a5c;
+      --primary-light: #2d5a87;
+      --accent: #e67e22;
+      --biz: #2563eb;
+      --legal: #ea580c;
+      --ai: #7c3aed;
+      --out: #059669;
+      --aux: #dc2626;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --surface: #ffffff;
+      --radius: 12px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 32px 24px 48px;
+      min-width: 1100px;
+    }
+    .poster {
+      max-width: 1280px;
+      margin: 0 auto;
+      background: var(--surface);
+      border-radius: 16px;
+      box-shadow: 0 8px 40px rgba(26, 58, 92, 0.12);
+      overflow: hidden;
+    }
+    .header {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: #fff;
+      padding: 28px 36px 24px;
+    }
+    .header h1 { font-size: 28px; font-weight: 700; letter-spacing: 0.02em; }
+    .header p { margin-top: 8px; font-size: 15px; opacity: 0.92; line-height: 1.6; }
+    .badge-row { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
+    .badge {
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+    }
+    .content { padding: 28px 32px 32px; }
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      margin-bottom: 14px;
+    }
+    .swimlanes {
+      display: grid;
+      grid-template-rows: auto auto auto auto;
+      gap: 10px;
+      position: relative;
+    }
+    .lane {
+      display: grid;
+      grid-template-columns: 120px 1fr;
+      gap: 12px;
+      align-items: stretch;
+      min-height: 88px;
+    }
+    .lane-label {
+      border-radius: var(--radius);
+      color: #fff;
+      font-weight: 700;
+      font-size: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 12px 8px;
+      line-height: 1.4;
+    }
+    .lane-biz .lane-label { background: var(--biz); }
+    .lane-legal .lane-label { background: var(--legal); }
+    .lane-ai .lane-label { background: var(--ai); }
+    .lane-data .lane-label { background: var(--out); }
+    .lane-body {
+      display: flex;
+      gap: 10px;
+      align-items: stretch;
+      flex-wrap: wrap;
+      padding: 10px;
+      background: #fafbfc;
+      border: 1px solid #e5e7eb;
+      border-radius: var(--radius);
+      position: relative;
+    }
+    .node {
+      flex: 1;
+      min-width: 140px;
+      background: var(--surface);
+      border: 1.5px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 12px 14px;
+      position: relative;
+    }
+    .node-num {
+      position: absolute;
+      top: -8px;
+      left: 10px;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .lane-biz .node-num { background: var(--biz); }
+    .lane-legal .node-num { background: var(--legal); }
+    .lane-ai .node-num { background: var(--ai); }
+    .lane-data .node-num { background: var(--out); }
+    .node strong { display: block; font-size: 14px; margin-bottom: 6px; margin-top: 4px; }
+    .node span { font-size: 12px; color: var(--muted); line-height: 1.45; }
+    .arrow-row {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 20px;
+      color: var(--primary-light);
+      font-size: 18px;
+      opacity: 0.7;
+    }
+    .side-panel {
+      margin-top: 28px;
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 20px;
+    }
+    .roadmap {
+      border: 1.5px dashed #cbd5e1;
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
+    }
+    .roadmap h3 {
+      font-size: 16px;
+      color: var(--primary);
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .roadmap h3::before {
+      content: "";
+      width: 4px;
+      height: 18px;
+      background: var(--accent);
+      border-radius: 2px;
+    }
+    .phase {
+      margin-bottom: 14px;
+      padding-left: 14px;
+      border-left: 3px solid var(--primary-light);
+    }
+    .phase:last-child { margin-bottom: 0; }
+    .phase-title { font-size: 13px; font-weight: 700; color: var(--primary); }
+    .phase ul { margin-top: 6px; padding-left: 16px; }
+    .phase li { font-size: 12px; color: var(--muted); line-height: 1.55; margin-bottom: 3px; }
+    .aux-lane {
+      border: 2px dashed var(--aux);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      background: rgba(220, 38, 38, 0.04);
+    }
+    .aux-lane h3 { font-size: 14px; color: var(--aux); margin-bottom: 10px; }
+    .aux-lane p { font-size: 12px; color: var(--muted); line-height: 1.55; margin-bottom: 8px; }
+    .aux-items { display: flex; flex-wrap: wrap; gap: 6px; }
+    .aux-tag {
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 6px;
+      background: #fff;
+      border: 1px solid rgba(220,38,38,0.25);
+      color: #991b1b;
+    }
+    .legend {
+      margin-top: 24px;
+      padding: 16px 20px;
+      background: #f8fafc;
+      border-radius: var(--radius);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      align-items: center;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .legend-item { display: flex; align-items: center; gap: 8px; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 3px; }
+    .flow-note {
+      margin-top: 16px;
+      font-size: 12px;
+      color: var(--muted);
+      text-align: center;
+    }
+    .connector-svg {
+      position: absolute;
+      right: -170px;
+      top: 0;
+      width: 160px;
+      height: 100%;
+      pointer-events: none;
+    }
+    @media print {
+      body { padding: 0; background: #fff; }
+      .poster { box-shadow: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="poster" id="vela-poster">
+    <header class="header">
+      <h1>Vela 出海法务台 · 产品架构与复赛技术路径</h1>
+      <p>项目制出海法务工作台：一个投资项目贯穿协查、合同、尽调与统摄分析，AI 辅助但不替代法务定稿</p>
+      <div class="badge-row">
+        <span class="badge">星瀚杯 · 出海法务</span>
+        <span class="badge">巴西法域 · LexML 溯源</span>
+        <span class="badge">人机协同 · 门控可签</span>
+      </div>
+    </header>
+
+    <div class="content">
+      <div class="section-title">主流程架构（泳道式）</div>
+
+      <div class="swimlanes">
+        <!-- 业务层 -->
+        <div class="lane lane-biz">
+          <div class="lane-label">业务<br/>协同层</div>
+          <div class="lane-body">
+            <div class="node"><span class="node-num">1</span><strong>提交项目材料</strong><span>中文方案、表格、附件归档</span></div>
+            <div class="node"><span class="node-num">2</span><strong>补充材料</strong><span>法务打回后同项目修订重提</span></div>
+            <div class="node"><span class="node-num">3</span><strong>查看进度</strong><span>待补充 / 复核中 / 已定稿</span></div>
+          </div>
+        </div>
+        <div class="arrow-row">▼ 材料就绪 · 进入法务主导</div>
+
+        <!-- 法务层 -->
+        <div class="lane lane-legal">
+          <div class="lane-label">法务<br/>主导层</div>
+          <div class="lane-body">
+            <div class="node"><span class="node-num">4</span><strong>冷启动 Playbook</strong><span>访谈配置行业、底线、底稿风格</span></div>
+            <div class="node"><span class="node-num">5</span><strong>确认协查范围</strong><span>勾选维度 · 阈值 · 法条条数</span></div>
+            <div class="node"><span class="node-num">6</span><strong>项目中心</strong><span>协查 · 合同审查 · 尽职调查</span></div>
+            <div class="node"><span class="node-num">7</span><strong>复核定稿</strong><span>逐条确认 · Word 导出 · 审计留痕</span></div>
+          </div>
+        </div>
+        <div class="arrow-row">▼ 调用 AI 引擎 · 结果须法务签核</div>
+
+        <!-- AI 层 -->
+        <div class="lane lane-ai">
+          <div class="lane-label">AI<br/>引擎层</div>
+          <div class="lane-body">
+            <div class="node"><span class="node-num">8</span><strong>规则 + 清单</strong><span>场景识别 · 核查项自动生成</span></div>
+            <div class="node"><span class="node-num">9</span><strong>多源 RAG</strong><span>语料检索 · LexML 降级 · Top-N 绑定</span></div>
+            <div class="node"><span class="node-num">10</span><strong>门控分级</strong><span>匹配度阈值 · S1/S2/S3 · Grounding</span></div>
+            <div class="node"><span class="node-num">11</span><strong>多 Agent</strong><span>Analyst 统摄 · Red Team 挑错</span></div>
+          </div>
+        </div>
+        <div class="arrow-row">▼ 法源支撑 · 后台持续更新</div>
+
+        <!-- 数据层 -->
+        <div class="lane lane-data">
+          <div class="lane-label">法源<br/>数据层</div>
+          <div class="lane-body">
+            <div class="node"><span class="node-num">12</span><strong>法条语料库</strong><span>LexML / STF / STJ 精选索引</span></div>
+            <div class="node"><span class="node-num">13</span><strong>Brazil Connector</strong><span>本地优先 · 实时补检索 · 门户兜底</span></div>
+            <div class="node"><span class="node-num">14</span><strong>语料维护 Agent</strong><span>Reg Feed · LexML 回溯 · 变更通知</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="side-panel">
+        <div class="roadmap">
+          <h3>复赛三条技术路径</h3>
+          <div class="phase">
+            <div class="phase-title">路径 A · 法源常新（数据可信）</div>
+            <ul>
+              <li>LexML 官方文本批量回溯 + 缓存，降低「法条过时」</li>
+              <li>Reg Feed 从「能打开网页」升级为「抓到变更摘要」</li>
+              <li>语料变更 → 自动通知受影响项目 / 合同 / 尽调</li>
+            </ul>
+          </div>
+          <div class="phase">
+            <div class="phase-title">路径 B · 智能加深（Agent 可交付）</div>
+            <ul>
+              <li>LLM Analyst + Red Team 多轮辩论（非纯规则）</li>
+              <li>冷启动上传 docx → 自动抽取 house rules / 底稿样例</li>
+              <li>合同 / 尽调结果变更 → 触发协查增量重跑</li>
+            </ul>
+          </div>
+          <div class="phase">
+            <div class="phase-title">路径 C · 工程可试点（稳定上线）</div>
+            <ul>
+              <li>PostgreSQL + 云部署 + LexML 调用限流缓存</li>
+              <li>E2E 全绿 · 飞书 / SSO 可选接入</li>
+              <li>星瀚 Playbook 模板驱动 Word 导出版式</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="aux-lane">
+          <h3>并行辅线 · 法规动态监测</h3>
+          <p>CAMEX · IBAMA · ANPD · 州法激励等官方源站轮询 + 本地语料 Diff；<strong>不自动改已定稿</strong>，只推法务复核。</p>
+          <div class="aux-items">
+            <span class="aux-tag">Policy Diff</span>
+            <span class="aux-tag">订阅提醒</span>
+            <span class="aux-tag">门户降级</span>
+            <span class="aux-tag">S3 硬阻断</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="legend">
+        <div class="legend-item"><span class="legend-dot" style="background:var(--biz)"></span>业务协同层</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--legal)"></span>法务主导层</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--ai)"></span>AI 引擎层</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--out)"></span>法源数据层</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--aux); border:1px dashed var(--aux)"></span>法规监测辅线（虚线框）</div>
+        <div class="legend-item">实线箭头 = 主流程 · 紫色曲线 = 迭代回路（增量协查）</div>
+      </div>
+      <p class="flow-note">导出图片：浏览器打开本页 → 截图或打印为 PDF · 文件名建议 vela_ai_tech_architecture.png</p>
+    </div>
+  </div>
+</body>
+</html>

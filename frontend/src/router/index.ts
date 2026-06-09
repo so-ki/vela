@@ -34,6 +34,18 @@ const router = createRouter({
           meta: { requiresDisclaimer: true },
         },
         {
+          path: 'onboarding',
+          name: 'cold-start',
+          component: () => import('@/views/ColdStartView.vue'),
+          meta: { requiresDisclaimer: true },
+        },
+        {
+          path: 'projects/:id',
+          name: 'project-hub',
+          component: () => import('@/views/ProjectHubView.vue'),
+          meta: { requiresDisclaimer: true },
+        },
+        {
           path: 'scenarios/new',
           name: 'scenario-create',
           component: () => import('@/views/ScenarioCreateView.vue'),

@@ -5,6 +5,7 @@ import {
   approveAllReview,
   downloadDocxExport,
   downloadPdfExport,
+  downloadAuditBundle,
   fetchBrief,
   fetchExportConfig,
   fetchReview,
@@ -16,6 +17,7 @@ import {
   updateReviewItem,
 } from '@/api/client'
 import LegalMaterialGatePanel from '@/components/LegalMaterialGatePanel.vue'
+import InvestigationAdequacyPanel from '@/components/InvestigationAdequacyPanel.vue'
 import { useAuthStore } from '@/stores/auth'
 import type { BriefItem, LegalHit, ReviewItem, ReviewState, RiskBrief, RulesCatalog, Scenario } from '@/types/scenario'
 
@@ -31,6 +33,7 @@ const finalizing = ref(false)
 const returning = ref(false)
 const exporting = ref(false)
 const exportingPdf = ref(false)
+const exportingAudit = ref(false)
 const exportDocxLabel = ref('法律研究意见书')
 const error = ref<string | null>(null)
 const comments = ref<Record<string, string>>({})
@@ -137,11 +140,26 @@ const isLocked = computed(() =>
   review.value ? !['in_progress'].includes(review.value.status) || !auth.isLegal : true,
 )
 
-const showMaterialGate = computed(
+const showScopePanel = computed(
   () => auth.isLegal && scenario.value?.status === 'pending_scope',
 )
 
-const showChecklistReview = computed(() => !showMaterialGate.value && !!review.value)
+const showInvestigationAdequacy = computed(
+  () =>
+    !!catalog.value &&
+    !!scenario.value?.investigation_adequacy &&
+    scenario.value.status !== 'pending_scope',
+)
+
+const gateAAllowsReview = computed(
+  () => scenario.value?.gate_a_allows_review !== false,
+)
+
+const showChecklistReview = computed(() => !showScopePanel.value && gateAAllowsReview.value)
+
+const showGateABlock = computed(
+  () => !showScopePanel.value && showInvestigationAdequacy.value && !gateAAllowsReview.value,
+)
 
 const filteredItems = computed(() => {
   const items = review.value?.items || []
@@ -221,6 +239,10 @@ async function loadReviewData(id: number) {
     review.value = null
     return
   }
+  if (!gateAAllowsReview.value) {
+    review.value = null
+    return
+  }
   try {
     review.value = await fetchReview(id)
   } catch {
@@ -259,14 +281,14 @@ onMounted(async () => {
   }
 })
 
-async function onScopeConfirmed(updated: Scenario) {
+async function onInvestigationGenerated(updated: Scenario) {
   scenario.value = updated
   loading.value = true
   error.value = null
   try {
     await loadReviewData(updated.id)
   } catch (e: unknown) {
-    error.value = e instanceof Error ? e.message : '清单已生成，但复核工作台加载失败'
+    error.value = e instanceof Error ? e.message : '协查包已生成，但复核工作台加载失败'
   } finally {
     loading.value = false
   }
@@ -403,6 +425,25 @@ async function runExport() {
   }
 }
 
+async function runExportAudit() {
+  if (!scenario.value || !review.value?.can_export) return
+  exportingAudit.value = true
+  error.value = null
+  try {
+    const { blob, filename } = await downloadAuditBundle(scenario.value.id)
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch (e: unknown) {
+    error.value = extractError(e)
+  } finally {
+    exportingAudit.value = false
+  }
+}
+
 function extractError(e: unknown): string {
   if (typeof e === 'object' && e !== null && 'response' in e) {
     const resp = (e as { response?: { data?: { detail?: string } } }).response
@@ -479,8 +520,8 @@ function openFullBrief(code: string) {
         <div>
           <p class="eyebrow dark">法务复核工作台</p>
           <h1>{{ scenario.project_name }}</h1>
-          <p class="meta" v-if="showMaterialGate">
-            请先完成<strong>协查范围与材料完整性</strong>，确认后将同页进入清单复核。
+          <p class="meta" v-if="showScopePanel">
+            确认或调整协查维度后，系统将<strong>自动生成协查包</strong>，随后在本页统一复核。
           </p>
           <template v-else-if="review">
             <p class="meta">
@@ -493,6 +534,7 @@ function openFullBrief(code: string) {
               <span class="badge" :class="review.status === 'approved' ? 'ok' : review.status === 'in_progress' ? 'pri-medium' : 'err'">
                 {{ statusLabel[review.status] || review.status }}
               </span>
+              <span v-if="review.version_label" class="badge ok">定稿 {{ review.version_label }}</span>
             </p>
           </template>
         </div>
@@ -542,28 +584,79 @@ function openFullBrief(code: string) {
             >
               {{ exportingPdf ? '导出中…' : '导出 PDF' }}
             </button>
+            <button
+              type="button"
+              class="btn-secondary"
+              :disabled="!review.can_export || exportingAudit"
+              @click="runExportAudit"
+            >
+              {{ exportingAudit ? '导出中…' : '导出审计包 JSON' }}
+            </button>
           </template>
         </div>
       </header>
 
       <LegalMaterialGatePanel
-        v-if="showMaterialGate && catalog"
+        v-if="showScopePanel && catalog"
         :scenario="scenario"
         :catalog="catalog"
-        @scope-confirmed="onScopeConfirmed"
+        @investigation-generated="onInvestigationGenerated"
+      />
+
+      <InvestigationAdequacyPanel
+        v-if="showInvestigationAdequacy && catalog && scenario.investigation_adequacy"
+        :scenario="scenario"
+        :catalog="catalog"
+        :adequacy="scenario.investigation_adequacy"
+        :can-return="!!scenario.can_return_materials && auth.isLegal"
+        :blocks-review="showGateABlock"
+        :incremental-regen="scenario.incremental_regen"
         @materials-returned="onMaterialsReturned"
       />
 
-      <section v-if="showMaterialGate" class="panel review-section-pending">
-        <h2>② 清单复核</h2>
-        <p class="muted">完成上方范围确认并生成清单后，将在此处展开核查条目复核。</p>
+      <section
+        v-if="showInvestigationAdequacy && (scenario.grounding_report || scenario.verification_report)"
+        class="panel quality-reports-section"
+      >
+        <h2>引证校验与三 Pass 验证</h2>
+        <p class="muted">借鉴 Lavern 引证 grounding + 简化 verification；定稿后可导出完整 audit bundle。</p>
+        <div v-if="scenario.grounding_report" class="quality-report-block">
+          <strong>引证 Grounding</strong>
+          <span class="badge" :class="scenario.grounding_report.requires_legal_check ? 'warn' : 'ok'">
+            命中率 {{ Math.round((scenario.grounding_report.grounding_rate ?? 1) * 100) }}%
+          </span>
+          <p v-if="scenario.grounding_report.ungrounded_codes?.length" class="muted">
+            待核条目：{{ scenario.grounding_report.ungrounded_codes.join('、') }}
+          </p>
+        </div>
+        <ul v-if="scenario.verification_report?.passes?.length" class="verification-pass-list">
+          <li v-for="pass in scenario.verification_report.passes" :key="pass.id">
+            <span class="badge" :class="pass.passed ? 'ok' : 'rejected'">{{ pass.passed ? '通过' : '待确认' }}</span>
+            <strong>{{ pass.label }}</strong>
+            <span class="muted">{{ pass.detail }}</span>
+          </li>
+        </ul>
       </section>
 
-      <template v-else-if="review">
-        <section class="review-checklist-section">
+      <section v-if="showGateABlock" class="panel review-section-pending gate-a-block-panel">
+        <h2>② 清单条目复核（已锁定）</h2>
+        <p class="muted">
+          构成要件尚未完备，请先在上方的 Gate A 视图中<strong>打回业务补充材料</strong>。材料补齐并重新生成协查包通过后，方可进入清单复核。
+        </p>
+      </section>
+
+      <template v-else-if="showChecklistReview">
+        <section v-if="review" class="review-checklist-section">
           <div class="review-section-head panel">
-            <h2>② 清单复核</h2>
-            <p class="muted">对核查清单条目逐条确认或驳回；全部处理完成后方可定稿并导出。</p>
+            <h2>② 清单条目复核</h2>
+            <p class="muted">对核查清单逐条确认或驳回；全部处理完成后方可定稿并导出。</p>
+            <p v-if="scenario.incremental_regen?.mode === 'incremental'" class="incremental-regen-banner">
+              补材料后增量生成：{{ scenario.incremental_regen.review_stats?.items_carried ?? 0 }} 条沿用上一轮结论，
+              {{ scenario.incremental_regen.target_codes.length }} 条需重新审核
+              <template v-if="(scenario.incremental_regen.review_stats?.items_invalidated ?? 0) > 0">
+                （其中 {{ scenario.incremental_regen.review_stats?.items_invalidated }} 条原已确认，因材料变更已重置）
+              </template>。
+            </p>
           </div>
 
           <div class="disclaimer-banner">
@@ -654,6 +747,8 @@ function openFullBrief(code: string) {
                     <span class="badge decision-badge" :class="item.decision">
                       {{ item.decision === 'approved' ? '已确认' : item.decision === 'rejected' ? '已驳回' : '待复核' }}
                     </span>
+                    <span v-if="item.carry_forward && item.decision === 'approved'" class="badge ok sm">沿用</span>
+                    <span v-if="item.invalidated" class="badge warn sm">材料变更</span>
                   </div>
                   <h3>{{ item.title }}</h3>
                 </div>
@@ -784,9 +879,17 @@ function openFullBrief(code: string) {
         </div>
       </section>
 
-      <p class="muted panel" v-if="!reviewSections.length">当前筛选下暂无条目。</p>
+      <p class="muted panel" v-if="review && !reviewSections.length">当前筛选下暂无条目。</p>
+        </section>
+        <section v-else class="panel review-section-pending">
+          <p class="muted">协查包已生成，正在加载复核条目…</p>
         </section>
       </template>
+
+      <section v-if="showScopePanel" class="panel review-section-pending">
+        <h2>② 统一复核</h2>
+        <p class="muted">协查包生成完成后，Gate A 与清单条目复核将自动出现在下方。</p>
+      </section>
 
       <p class="error banner-error" v-if="error && scenario">{{ error }}</p>
     </template>

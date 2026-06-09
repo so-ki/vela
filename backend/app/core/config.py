@@ -53,6 +53,13 @@ class Settings(BaseSettings):
     qwen_model: str = "qwen-plus"
     llm_polish_enabled: bool = True
 
+    # Agent / tier gate (Legal-Skills-inspired)
+    match_threshold_default: int = 70
+    retrieval_top_k_default: int = 3
+    corpus_agent_interval_hours: int = 6
+    tier_s3_hard_block: bool = True
+    agent_polish_default: bool = False
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]

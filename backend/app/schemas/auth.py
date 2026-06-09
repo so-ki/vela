@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -15,6 +15,10 @@ class UserBase(BaseModel):
 class UserRegister(UserBase):
     password: str = Field(min_length=8, max_length=128)
     accept_disclaimer: bool = Field(description="必须勾选同意免责声明")
+    role: Literal["legal", "business"] = Field(
+        default="legal",
+        description="账户类型：legal 法务复核 / business 业务协同",
+    )
 
 
 class UserLogin(BaseModel):

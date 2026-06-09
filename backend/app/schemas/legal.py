@@ -72,8 +72,11 @@ class LegalStatusResponse(BaseModel):
     sources: dict[str, str] = Field(
         default_factory=lambda: {
             "lexml": "https://www.lexml.gov.br/",
-            "stf": "https://portal.stf.jus.br/jurisprudencia/",
+            "planalto": "http://www4.planalto.gov.br/legislacao/",
+            "stf": "http://www.stf.jus.br/",
             "stj": "https://scon.stj.jus.br/SCON/",
+            "trabalho": "https://www.gov.br/trabalho-e-emprego/pt-br",
+            "previdencia": "https://www.gov.br/previdencia/pt-br",
             "jusbrasil": "https://www.jusbrasil.com.br/",
         }
     )
@@ -85,6 +88,23 @@ class LegalMonitorAlert(BaseModel):
     title: str
     message: str
     detected_at: str
+    scenario_id: Optional[int] = None
+    affected_checklist_codes: List[str] = Field(default_factory=list)
+
+
+class LegalMonitorSubscription(BaseModel):
+    scenario_id: int
+    project_name: str = ""
+    checklist_codes: List[str] = Field(default_factory=list)
+    compliance_dimensions: List[str] = Field(default_factory=list)
+    subscribed_at: str
+
+
+class LegalMonitorDiff(BaseModel):
+    computed_at: str
+    changed_documents: List[dict[str, Any]] = Field(default_factory=list)
+    affected_checklist_codes: List[str] = Field(default_factory=list)
+    has_changes: bool = False
 
 
 class LegalMonitorResponse(BaseModel):
@@ -97,6 +117,9 @@ class LegalMonitorResponse(BaseModel):
     corpus_fingerprint: Optional[str] = None
     alerts: List[LegalMonitorAlert] = Field(default_factory=list)
     subscription_note: str = ""
+    subscriptions: List[LegalMonitorSubscription] = Field(default_factory=list)
+    subscription_count: int = 0
+    last_diff: Optional[LegalMonitorDiff] = None
 
 
 class LegalMonitorScanResponse(BaseModel):
@@ -105,6 +128,13 @@ class LegalMonitorScanResponse(BaseModel):
     new_alerts: List[LegalMonitorAlert]
     alerts: List[LegalMonitorAlert]
     index: LegalIndexResponse
+    diff: Optional[LegalMonitorDiff] = None
+
+
+class LegalMonitorSubscribeRequest(BaseModel):
+    scenario_id: int
+    checklist_codes: Optional[List[str]] = None
+    compliance_dimensions: Optional[List[str]] = None
 
 
 class LegalCorpusDocument(BaseModel):

@@ -1,0 +1,68 @@
+{
+  "version": "1.0",
+  "description": "结构化合同 House Rules · must_have / must_not / exceptions · 配合 grounding 与 Red Team",
+  "rules": [
+    {
+      "id": "liability_cap",
+      "label": "责任限制与赔偿",
+      "severity": "high",
+      "detect_patterns": ["responsabilidade", "liability", "责任", "赔偿", "indemn", "indeniza"],
+      "must_not": [
+        "responsabilidade ilimitada",
+        "unlimited liability",
+        "无上限",
+        "uncapped indirect",
+        "perdas indiretas ilimitadas"
+      ],
+      "must_have": [
+        "limitação de responsabilidade",
+        "limitation of liability",
+        "责任上限",
+        "limite de responsabilidade",
+        "cap on liability"
+      ],
+      "exceptions": ["dolo", "willful misconduct", "故意", "重大过失", "fraude"],
+      "guidance": "核查责任上限、间接损失排除、交叉赔偿条款是否符合 house standard。"
+    },
+    {
+      "id": "governing_law",
+      "label": "适用法律与争议解决",
+      "severity": "high",
+      "detect_patterns": ["foro", "jurisdição", "jurisdicao", "governing law", "管辖", "适用法律", "arbitra", "arbitragem"],
+      "must_not": ["exclusive jurisdiction outside brazil", "外国法院专属管辖"],
+      "must_have": ["foro", "jurisdição", "arbitra", "管辖", "适用法律", "lei brasileira", "巴西"],
+      "exceptions": [],
+      "guidance": "巴西投资合同应明确适用法、仲裁/法院管辖及语言。"
+    },
+    {
+      "id": "lgpd_dpa",
+      "label": "LGPD / 数据处理",
+      "severity": "high",
+      "detect_patterns": ["LGPD", "dados pessoais", "personal data", "数据保护", "隐私", "proteção de dados", "protecao de dados"],
+      "must_not": ["transferência internacional sem", "cross-border transfer without", "无合法基础跨境"],
+      "must_have": ["LGPD", "dados pessoais", "controlador", "operador", "DPA", "数据处理", "personal data"],
+      "exceptions": [],
+      "guidance": "数据处理角色、跨境传输、DPA 必备条款与 ANPD 要求。"
+    },
+    {
+      "id": "termination",
+      "label": "解除与退出",
+      "severity": "medium",
+      "detect_patterns": ["rescisão", "rescisao", "termination", "解除", "终止"],
+      "must_not": [],
+      "must_have": ["notifica", "通知", "notice period", "prazo"],
+      "exceptions": ["for cause", "有因解除"],
+      "guidance": "核查解除权、通知期、本地化义务与资产处置。"
+    },
+    {
+      "id": "force_majeure",
+      "label": "不可抗力",
+      "severity": "medium",
+      "detect_patterns": ["force majeure", "caso fortuito", "不可抗力", "força maior"],
+      "must_not": [],
+      "must_have": ["force majeure", "caso fortuito", "不可抗力", "força maior"],
+      "exceptions": [],
+      "guidance": "定义范围、通知义务与责任豁免是否合理。"
+    }
+  ]
+}

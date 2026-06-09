@@ -62,6 +62,22 @@ echo ""
 
 trap 'kill 0' EXIT
 
-backend/.venv/bin/uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 --app-dir backend &
+(backend/.venv/bin/uvicorn app.main:app --reload --host 127.0.0.1 --port 8000 --app-dir backend) &
 (cd frontend && npm run dev -- --host 127.0.0.1 --port 5173) &
+
+# 等待前端就绪后自动打开浏览器（macOS / Linux）
+(
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    if curl -sf "http://127.0.0.1:5173" >/dev/null 2>&1; then
+      if command -v open >/dev/null 2>&1; then
+        open "http://127.0.0.1:5173"
+      elif command -v xdg-open >/dev/null 2>&1; then
+        xdg-open "http://127.0.0.1:5173"
+      fi
+      break
+    fi
+    sleep 1
+  done
+) &
+
 wait

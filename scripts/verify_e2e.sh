@@ -24,7 +24,7 @@ auth_header() {
 log "1. Health"
 curl -sf "$API/health" >/dev/null && ok "health" || bad "health"
 
-log "2. Rules catalog (Brazil investment pack v2.5)"
+log "2. Rules catalog (Brazil investment pack v2.9)"
 PACK=$(curl -sf "$API/rules/catalog" -H "$(auth_header "$(login legal@demo.vela)")")
 echo "$PACK" | python3 -c "
 import sys, json
@@ -32,7 +32,7 @@ d=json.load(sys.stdin)
 assert d.get('pack',{}).get('id')=='brazil_new_energy', d
 assert d.get('rules_pack_id')=='brazil_new_energy', d
 assert d.get('scene_defaults',{}).get('country')=='brazil', d
-assert len(d.get('dimensions', [])) == 5, d.get('dimensions')
+assert len(d.get('dimensions', [])) == 6, d.get('dimensions')
 print('pack:', d['pack'].get('name'), 'dims:', len(d['dimensions']))
 " && ok "catalog pack" || bad "catalog pack"
 

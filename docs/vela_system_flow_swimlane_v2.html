@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>系统流程与功能总览</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 1568px; }
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+      background: #eef1f5;
+      padding: 20px;
+      -webkit-font-smoothing: antialiased;
+    }
+    .canvas {
+      width: 1528px;
+      background: #f5f7fa;
+      border-radius: 4px;
+      box-shadow: 0 8px 32px rgba(26, 58, 92, 0.12);
+      overflow: hidden;
+    }
+    .hdr {
+      background: linear-gradient(180deg, #1a3a5c 0%, #234a72 100%);
+      color: #fff;
+      text-align: center;
+      padding: 26px 40px 22px;
+    }
+    .hdr h1 { font-size: 26px; font-weight: 700; letter-spacing: 3px; }
+    .hdr p { margin-top: 8px; font-size: 13px; color: rgba(255,255,255,.85); }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 248px 248px 300px 200px 132px;
+      gap: 0;
+      padding: 16px 14px 0;
+      position: relative;
+      height: 640px;
+    }
+
+    .col-h {
+      text-align: center;
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
+      padding: 10px 6px;
+      letter-spacing: 1px;
+      border-radius: 6px 6px 0 0;
+      margin: 0 4px;
+    }
+    .h-biz { background: #2563eb; }
+    .h-legal { background: #ea580c; }
+    .h-ai { background: #7c3aed; }
+    .h-out { background: #059669; }
+
+    .col {
+      position: relative;
+      border-left: 1px solid #e5e7eb;
+      border-right: 1px solid #e5e7eb;
+      background: rgba(255,255,255,.55);
+      margin-top: -1px;
+      height: 600px;
+    }
+    .col-biz { background: linear-gradient(180deg, rgba(37,99,235,.05), rgba(255,255,255,.6)); }
+    .col-legal { background: linear-gradient(180deg, rgba(234,88,12,.05), rgba(255,255,255,.6)); }
+    .col-ai { background: linear-gradient(180deg, rgba(124,58,237,.06), rgba(255,255,255,.6)); }
+    .col-out { background: linear-gradient(180deg, rgba(5,150,105,.05), rgba(255,255,255,.6)); }
+
+    .step {
+      position: absolute;
+      left: 8px;
+      right: 8px;
+      background: #fff;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 16px 12px 12px 16px;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, 0.07);
+    }
+    .step strong {
+      display: block;
+      font-size: 14px;
+      color: #0f172a;
+      margin-bottom: 8px;
+    }
+    .step ul {
+      list-style: none;
+      font-size: 11px;
+      color: #475569;
+      line-height: 1.55;
+    }
+    .step ul li::before { content: "• "; color: #94a3b8; }
+
+    .num {
+      position: absolute;
+      top: -12px;
+      left: 12px;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      color: #fff;
+      font-size: 12px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 5px rgba(0,0,0,.18);
+    }
+    .n-biz { background: #2563eb; }
+    .n-legal { background: #ea580c; }
+    .n-ai { background: #7c3aed; }
+    .n-out { background: #059669; }
+
+    .note-box {
+      border: 1.5px dashed #93c5fd;
+      background: #eff6ff;
+      padding: 10px;
+    }
+    .note-box strong { font-size: 12px; color: #1d4ed8; }
+
+    .pref {
+      position: absolute;
+      bottom: 12px;
+      left: 8px;
+      right: 8px;
+      background: #fff7ed;
+      border: 1px dashed #fdba74;
+      border-radius: 8px;
+      padding: 8px;
+      font-size: 10px;
+      color: #9a3412;
+      line-height: 1.45;
+      text-align: center;
+    }
+
+    .diamond-box {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      top: 300px;
+      text-align: center;
+    }
+    .diamond {
+      width: 108px;
+      height: 108px;
+      margin: 0 auto;
+      background: #fef9c3;
+      border: 2px solid #eab308;
+      transform: rotate(45deg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .diamond span {
+      transform: rotate(-45deg);
+      font-size: 11px;
+      font-weight: 700;
+      color: #854d0e;
+      line-height: 1.35;
+      display: block;
+      width: 80px;
+    }
+    .branch { font-size: 10px; color: #64748b; margin-top: 10px; line-height: 1.5; }
+    .branch em { font-style: normal; color: #7c3aed; font-weight: 700; }
+
+    .parallel {
+      position: absolute;
+      bottom: 14px;
+      left: 8px;
+      right: 8px;
+      display: flex;
+      gap: 4px;
+    }
+    .pbox {
+      flex: 1;
+      background: #faf5ff;
+      border: 1px solid #ddd6fe;
+      border-radius: 6px;
+      padding: 6px 2px;
+      text-align: center;
+      font-size: 10px;
+      font-weight: 600;
+      color: #5b21b6;
+    }
+    .pbox i { display: block; font-style: normal; font-size: 9px; color: #7c3aed; font-weight: 400; margin-top: 2px; }
+
+    .aux {
+      border: 2px dashed #ef4444;
+      border-radius: 10px;
+      background: #fff5f5;
+      padding: 10px 8px;
+      height: 600px;
+      margin-top: 38px;
+    }
+    .aux-t {
+      text-align: center;
+      font-size: 11px;
+      font-weight: 800;
+      color: #dc2626;
+      line-height: 1.45;
+      margin-bottom: 12px;
+      padding-top: 4px;
+    }
+    .aux-i {
+      background: #fff;
+      border: 1px solid #fecaca;
+      border-radius: 8px;
+      padding: 8px 4px;
+      margin-bottom: 8px;
+      text-align: center;
+    }
+    .aux-i b { display: block; font-size: 11px; color: #991b1b; margin-top: 4px; }
+    .aux-i small { font-size: 9px; color: #b91c1c; }
+
+    .ico {
+      width: 26px;
+      height: 26px;
+      margin: 0 auto;
+      border-radius: 6px;
+      background: #fee2e2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      color: #dc2626;
+      font-weight: 700;
+    }
+
+    .arrows {
+      position: absolute;
+      top: 54px;
+      left: 14px;
+      width: 1500px;
+      height: 600px;
+      pointer-events: none;
+      z-index: 20;
+    }
+
+    .foot {
+      margin: 14px 16px 18px;
+      background: #1a3a5c;
+      border-radius: 8px;
+      padding: 12px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .legend { display: flex; gap: 18px; font-size: 11px; color: #cbd5e1; flex-wrap: wrap; }
+    .leg { display: flex; align-items: center; gap: 6px; }
+    .ln { width: 26px; height: 3px; border-radius: 2px; }
+    .ln-main { background: #7c3aed; }
+    .ln-pre { border-top: 2px dashed #ea580c; height: 0; width: 26px; }
+    .ln-loop { border-top: 2px dashed #7c3aed; height: 0; width: 26px; }
+    .ln-aux { border-top: 2px dashed #ef4444; height: 0; width: 26px; }
+    .ln-pref { border-top: 2px dashed #059669; height: 0; width: 26px; }
+    .del { font-size: 11px; color: #94a3b8; }
+    .del b { color: #e2e8f0; }
+  </style>
+</head>
+<body>
+  <div class="canvas">
+    <header class="hdr">
+      <h1>系统流程与功能总览</h1>
+      <p>企业法务部 · 拉美投资前合规协查闭环 · 同一 project_id 贯穿</p>
+    </header>
+
+    <div style="position:relative;">
+      <div class="grid">
+        <div>
+          <div class="col-h h-biz">业务协同层</div>
+          <div class="col col-biz">
+            <div class="step" style="top: 36px;">
+              <span class="num n-biz">②</span>
+              <strong>场景输入 · 提交材料</strong>
+              <ul>
+                <li>投资/出海部门提交国别 · 行业 · 交易类型</li>
+                <li>中文场景描述 + 方案附件</li>
+                <li>材料核对表 · docx/pdf 解析</li>
+              </ul>
+            </div>
+            <div class="step note-box" style="top: 220px;">
+              <strong>补充材料</strong>
+              <ul>
+                <li>Gate A 打回或缺项后重提</li>
+                <li>触发增量协查（仅变更项）</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="col-h h-legal">法务主导层</div>
+          <div class="col col-legal">
+            <div class="step" style="top: 8px;">
+              <span class="num n-legal">①</span>
+              <strong>Playbook 冷启动</strong>
+              <ul>
+                <li>访谈固化法域 · 行业 · 风险偏好</li>
+                <li>上传 house rules · 组织 Playbook</li>
+                <li>一次配置 · 全程复用</li>
+              </ul>
+            </div>
+            <div class="step" style="top: 168px;">
+              <span class="num n-legal">③</span>
+              <strong>确认协查范围</strong>
+              <ul>
+                <li>勾选维度：劳动 · 环境 · 外资 · 税务 · 准入</li>
+                <li>设定匹配度阈值 · 每条 Top-N</li>
+                <li>订阅法规监测主题</li>
+              </ul>
+            </div>
+            <div class="step" style="top: 368px;">
+              <span class="num n-legal">⑥</span>
+              <strong>法务复核与定稿</strong>
+              <ul>
+                <li>逐条确认 / 驳回 / 批注</li>
+                <li>处理跨模块冲突 · S3 红旗</li>
+                <li>锁定版本 · 非正式法律意见</li>
+              </ul>
+            </div>
+            <div class="pref"><b>Playbook 偏好闭环</b><br/>复核行为 → 个人偏好 → 下次自动沿用</div>
+          </div>
+        </div>
+
+        <div>
+          <div class="col-h h-ai">AI 引擎层</div>
+          <div class="col col-ai">
+            <div class="step" style="top: 148px;">
+              <span class="num n-ai">④</span>
+              <strong>生成协查包</strong>
+              <ul>
+                <li>意图解析 · 专项核查清单</li>
+                <li>多源 RAG：本地语料 · LexML URN · Planalto · STF · gov.br</li>
+                <li>跨语种推理 · 中葡双语简报 · URN 引证</li>
+              </ul>
+            </div>
+            <div class="diamond-box">
+              <div class="diamond"><span>匹配度<br/>≥ 阈值？</span></div>
+              <div class="branch"><em>否</em> 扩大检索后重新推理<br/><em>是</em> 进入 Gate A 报告汇编</div>
+            </div>
+            <div class="step" style="top: 430px;">
+              <span class="num n-ai">⑤</span>
+              <strong>Gate A · 构成要件门控</strong>
+              <ul>
+                <li>已覆盖 / 待核实 / 缺项聚合</li>
+                <li>S3 低分硬拦 · 标红待法务介入</li>
+              </ul>
+            </div>
+            <div class="parallel">
+              <div class="pbox">合同审查<i>红黄绿</i></div>
+              <div class="pbox">尽调核查<i>缺项表</i></div>
+              <div class="pbox">项目统摄<i>Red Team</i></div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="col-h h-out">结果输出层</div>
+          <div class="col col-out">
+            <div class="step" style="top: 400px;">
+              <span class="num n-out">⑦</span>
+              <strong>导出与归档</strong>
+              <ul>
+                <li>协查 Word / PDF 双语底稿</li>
+                <li>合同表 · 尽调表 · 冲突 issue 表</li>
+                <li>审计日志 · 可引用 · 可签字</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div class="aux">
+          <div class="aux-t">辅线<br/>法规动态监测</div>
+          <div class="aux-i"><div class="ico">更</div><b>法源更新</b><small>LexML · Planalto · gov.br</small></div>
+          <div class="aux-i"><div class="ico">比</div><b>Diff 对比</b><small>语料 Agent</small></div>
+          <div class="aux-i"><div class="ico">铃</div><b>订阅提醒</b><small>影响面通知</small></div>
+          <div class="aux-i"><div class="ico">锁</div><b>定稿不改</b><small>silent 不变</small></div>
+        </div>
+      </div>
+
+      <svg class="arrows" viewBox="0 0 1500 600">
+        <defs>
+          <marker id="m" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#7c3aed"/></marker>
+          <marker id="o" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#ea580c"/></marker>
+          <marker id="r" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#ef4444"/></marker>
+        </defs>
+        <path d="M 252 70 Q 252 130 252 190" fill="none" stroke="#ea580c" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#o)"/>
+        <path d="M 130 130 L 252 130 L 252 210" fill="none" stroke="#7c3aed" stroke-width="2.5" marker-end="url(#m)"/>
+        <path d="M 380 250 L 500 250 L 500 210" fill="none" stroke="#7c3aed" stroke-width="2.5" marker-end="url(#m)"/>
+        <path d="M 630 230 L 630 290" fill="none" stroke="#7c3aed" stroke-width="2.5" marker-end="url(#m)"/>
+        <path d="M 560 350 Q 480 350 480 230 L 500 210" fill="none" stroke="#7c3aed" stroke-width="2" stroke-dasharray="6 4" marker-end="url(#m)"/>
+        <path d="M 630 410 L 630 460" fill="none" stroke="#7c3aed" stroke-width="2.5" marker-end="url(#m)"/>
+        <path d="M 500 510 L 380 510 L 380 460" fill="none" stroke="#7c3aed" stroke-width="2.5" marker-end="url(#m)"/>
+        <path d="M 380 530 L 380 560 L 880 560 L 880 480" fill="none" stroke="#7c3aed" stroke-width="2.5" marker-end="url(#m)"/>
+        <path d="M 130 280 Q 60 280 60 160 L 130 130" fill="none" stroke="#2563eb" stroke-width="1.5" stroke-dasharray="5 4"/>
+        <path d="M 380 480 Q 300 480 300 280 L 380 280" fill="none" stroke="#059669" stroke-width="1.5" stroke-dasharray="5 4"/>
+        <path d="M 1360 120 Q 1200 140 680 200" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#r)"/>
+        <path d="M 1360 320 Q 1250 380 680 480" fill="none" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="5 4" marker-end="url(#r)"/>
+      </svg>
+    </div>
+
+    <footer class="foot">
+      <div class="legend">
+        <div class="leg"><span class="ln ln-main"></span>主流程</div>
+        <div class="leg"><span class="ln ln-pre"></span>前置设定</div>
+        <div class="leg"><span class="ln ln-loop"></span>迭代回路</div>
+        <div class="leg"><span class="ln ln-aux"></span>辅线监测</div>
+        <div class="leg"><span class="ln ln-pref"></span>偏好闭环</div>
+      </div>
+      <div class="del"><b>交付物</b>：核查清单 · 双语简报 · 协查 Word · 四类 issue 表 · 审计包</div>
+    </footer>
+  </div>
+</body>
+</html>

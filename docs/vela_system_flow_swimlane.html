@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>系统流程与功能总览</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "PingFang SC","Microsoft YaHei",sans-serif; background:#eef2f6; padding:28px; }
+    .board { width:1180px; margin:0 auto; background:#fff; border-radius:14px; box-shadow:0 12px 40px rgba(26,58,92,.1); overflow:hidden; }
+    .hdr { background:linear-gradient(90deg,#1a3a5c,#2d5a87); color:#fff; padding:22px 32px; text-align:center; }
+    .hdr h1 { font-size:24px; font-weight:700; }
+    .hdr p { margin-top:6px; font-size:13px; opacity:.9; }
+    .hint { text-align:center; font-size:11px; color:#64748b; padding:14px 0 8px; }
+    .lanes { padding:0 24px 20px; position:relative; }
+    .lane { display:grid; grid-template-columns:88px 1fr; gap:10px; margin-bottom:8px; }
+    .tag { border-radius:8px; color:#fff; font-size:12px; font-weight:700; display:flex; align-items:center; justify-content:center; text-align:center; line-height:1.35; }
+    .biz{background:#2563eb;} .legal{background:#ea580c;} .ai{background:#7c3aed;} .out{background:#059669;}
+    .track { display:flex; align-items:center; gap:6px; padding:10px 12px; background:#f8fafc; border:1px solid #e5e7eb; border-radius:10px; }
+    .box { flex:1; min-width:0; background:#fff; border:1.5px solid #e2e8f0; border-radius:8px; padding:10px 8px; text-align:center; position:relative; }
+    .box.main { border-color:#1a3a5c; background:#fafcff; }
+    .box b { display:block; font-size:12px; color:#0f172a; margin-bottom:2px; }
+    .box i { font-style:normal; font-size:10px; color:#64748b; }
+    .n { position:absolute; top:-8px; left:8px; width:18px;height:18px;border-radius:50%;background:#1a3a5c;color:#fff;font-size:10px;font-weight:700;line-height:18px; }
+    .ar { color:#e67e22; font-size:15px; font-weight:800; flex:0 0 16px; }
+    .aux { position:absolute; right:20px; top:40px; width:130px; border:2px dashed #ef4444; border-radius:10px; padding:10px; background:#fff5f5; font-size:10px; color:#991b1b; line-height:1.5; }
+    .aux strong { display:block; color:#dc2626; font-size:11px; margin-bottom:4px; }
+    .foot { margin:0 24px 18px; padding:12px; background:#1a3a5c; color:#cbd5e1; border-radius:8px; font-size:11px; text-align:center; line-height:1.55; }
+    .leg { display:flex; justify-content:center; gap:16px; padding-bottom:12px; font-size:10px; color:#64748b; }
+    .d { width:12px;height:12px;border-radius:3px;display:inline-block;margin-right:4px;vertical-align:middle; }
+  </style>
+</head>
+<body>
+  <div class="board">
+    <header class="hdr">
+      <h1>系统流程与功能总览</h1>
+      <p>泳道图 · 左→右为时间顺序 · ①–⑦ 为主路径 · 同一 project_id 贯穿</p>
+    </header>
+    <p class="hint">自上而下：业务 → 法务 → AI → 输出</p>
+    <div class="lanes">
+      <div class="aux">
+        <strong>法规监测</strong>
+        语料 Agent<br/>变更通知<br/>定稿不改
+      </div>
+
+      <div class="lane">
+        <div class="tag biz">业务层</div>
+        <div class="track">
+          <div class="box main"><span class="n">②</span><b>提交材料</b><i>方案·附件</i></div>
+          <div class="ar">→</div>
+          <div class="box"><b>补充材料</b><i>打回后重提</i></div>
+        </div>
+      </div>
+
+      <div class="lane">
+        <div class="tag legal">法务层</div>
+        <div class="track">
+          <div class="box main"><span class="n">①</span><b>冷启动</b><i>Playbook 访谈</i></div>
+          <div class="ar">→</div>
+          <div class="box main"><span class="n">③</span><b>定范围</b><i>维度·阈值</i></div>
+          <div class="ar">→</div>
+          <div class="box main"><span class="n">⑥</span><b>复核</b><i>确认/驳回</i></div>
+          <div class="ar">→</div>
+          <div class="box main"><span class="n">⑦</span><b>定稿导出</b><i>Word·版本</i></div>
+        </div>
+      </div>
+
+      <div class="lane">
+        <div class="tag ai">AI 层</div>
+        <div class="track">
+          <div class="box main"><span class="n">④</span><b>协查包</b><i>清单·法条·简报</i></div>
+          <div class="ar">→</div>
+          <div class="box main"><span class="n">⑤</span><b>Gate A</b><i>要件·门控</i></div>
+          <div class="ar">+</div>
+          <div class="box"><b>合同</b><i>红黄绿</i></div>
+          <div class="ar">+</div>
+          <div class="box"><b>尽调</b><i>缺项</i></div>
+          <div class="ar">+</div>
+          <div class="box"><b>统摄</b><i>挑矛盾</i></div>
+        </div>
+      </div>
+
+      <div class="lane">
+        <div class="tag out">输出层</div>
+        <div class="track">
+          <div class="box"><b>协查 Word</b><i>双语底稿</i></div>
+          <div class="ar">+</div>
+          <div class="box"><b>合同表</b></div>
+          <div class="ar">+</div>
+          <div class="box"><b>尽调表</b></div>
+          <div class="ar">+</div>
+          <div class="box"><b>冲突表</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="leg">
+      <span><i class="d" style="background:#2563eb"></i>业务</span>
+      <span><i class="d" style="background:#ea580c"></i>法务</span>
+      <span><i class="d" style="background:#7c3aed"></i>AI</span>
+      <span><i class="d" style="background:#059669"></i>输出</span>
+    </div>
+    <div class="foot">AI 只产草稿 · 法务复核后定稿 · 偏好闭环：复核行为自动优化下次协查参数</div>
+  </div>
+</body>
+</html>

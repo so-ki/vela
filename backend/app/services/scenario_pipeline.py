@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import copy
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Optional
 
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
@@ -15,9 +15,21 @@ from app.schemas.scenario import BusinessSubmitRequest, ScenarioCreateRequest
 from app.services.audit import write_audit_log
 from app.services.brief_generator import generate_brief
 from app.services.legal_ingest import ingest_corpus
-from app.services.legal_rag import retrieve_for_checklist
+from app.services.conflict_detection_service import detect_material_conflicts
+from app.services.legal_monitor import upsert_scenario_subscription
+from app.services.quality_reports_service import attach_quality_reports
+from app.services.legal_agent_service import run_investigation_agent
+from app.services.user_preference_service import (
+    record_dimension_selection,
+    record_match_threshold_choice,
+    record_retrieval_top_k_choice,
+)
+from app.services.investigation_adequacy_service import aggregate_investigation_adequacy
+from app.services.incremental_investigation_service import (
+    can_run_incremental,
+    run_incremental_investigation_attach,
+)
 from app.services.material_review_service import (
-    assess_material_completeness,
     build_material_return_record,
 )
 from app.services.material_file_storage import save_scenario_material_files
@@ -25,7 +37,7 @@ from app.services.rule_engine import generate_checklist, get_material_field_labe
 from app.services.scenario_service import (
     _materials_only_payload,
     attach_document_extract_to_payload,
-    business_submit_to_create_request,
+    merge_business_resubmit_request,
     create_scenario_materials_only,
     create_scenario_with_checklist,
     regenerate_scenario_checklist,
@@ -33,28 +45,71 @@ from app.services.scenario_service import (
 )
 
 
+def _expansion_context(scenario: InvestigationScenario) -> str:
+    parts = [
+        scenario.description or "",
+        scenario.project_content_scale or "",
+        scenario.known_risks or "",
+        scenario.investment_structure or "",
+        scenario.facility_notes or "",
+        scenario.capacity_notes or "",
+    ]
+    return " ".join(p for p in parts if p)[:1200]
+
+
 def _attach_legal_and_brief(
     scenario: InvestigationScenario,
     payload: dict[str, Any],
     *,
     polish: bool,
+    match_threshold: int = 70,
+    retrieval_top_k: Optional[int] = None,
+    user_id: int | None = None,
 ) -> dict[str, Any]:
     ingest_corpus(force=False)
-    result = retrieve_for_checklist(payload.get("sections", []))
+    agent_result = run_investigation_agent(
+        payload.get("sections", []),
+        match_threshold=match_threshold,
+        retrieval_top_k=retrieval_top_k,
+        expansion_context=_expansion_context(scenario),
+        user_id=user_id,
+        polish=False,
+        state=scenario.state,
+        use_brazil_connector=True,
+    )
+    sections = agent_result["sections_with_legal"]
     payload = {
         **payload,
-        "sections_with_legal": result["sections"],
+        "sections_with_legal": sections,
         "legal_retrieved": True,
+        "grounding_report": agent_result.get("grounding_report"),
+        "tier_report": agent_result.get("tier_report"),
+        "agent_steps": agent_result.get("agent_steps"),
+        "retrieval_meta": agent_result.get("retrieval"),
     }
     scenario.checklist.payload = payload
 
     brief = generate_brief(
         scenario,
         payload,
-        sections_with_legal=result["sections"],
+        sections_with_legal=sections,
         polish=polish,
+        threshold=match_threshold,
     )
     payload = {**payload, "brief": brief}
+    payload = attach_quality_reports(
+        payload,
+        sections_with_legal=sections,
+        brief=brief,
+    )
+    payload["conflict_flags"] = detect_material_conflicts(scenario, payload)
+    payload["investigation_settings"] = {
+        "match_threshold": agent_result.get("match_threshold", match_threshold),
+        "retrieval_top_k": agent_result.get("retrieval_top_k", retrieval_top_k or 3),
+        "expansion_enabled": True,
+        "tier_policy": agent_result.get("tier_policy"),
+    }
+    payload["llm_config"] = agent_result.get("llm_config")
     scenario.checklist.payload = payload
     scenario.status = "brief_generated" if brief["status"] != "blocked" else "brief_blocked"
     return payload
@@ -71,30 +126,28 @@ def run_business_submit_materials(
     return create_scenario_materials_only(db, user, payload, uploads=uploads)
 
 
-def run_confirm_scope_and_generate(
+def run_generate_investigation_pack(
     db: Session,
     user: User,
     scenario: InvestigationScenario,
     compliance_dimensions: list[str],
     *,
     polish: bool = False,
+    match_threshold: int = 70,
+    retrieval_top_k: Optional[int] = None,
 ) -> InvestigationScenario:
-    """法务：确认协查范围并生成清单、法源绑定与双语简报，进入待复核。"""
+    """法务：选定协查维度并一次生成清单、法源检索、匹配度与简报，进入统一复核。"""
     if scenario.status != "pending_scope":
-        raise ValueError("当前状态不可确认协查范围")
-
-    assessment = assess_material_completeness(scenario, compliance_dimensions)
-    if assessment["auto_missing_fields"]:
-        labels = get_material_field_labels()
-        missing_labels = [labels.get(key, key) for key in assessment["auto_missing_fields"]]
-        raise ValueError(
-            f"提交表仍有缺项（{', '.join(missing_labels)}），请先驳回业务补充后再确认范围。"
-        )
+        raise ValueError("当前状态不可生成协查包，请确认项目处于待生成协查阶段")
 
     old_payload = copy.deepcopy(scenario.checklist.payload if scenario.checklist else {})
     document_extract = old_payload.get("document_extract")
     revision_history = list(old_payload.get("revision_history") or [])
     revision_round = int(old_payload.get("revision_round") or 0)
+    material_review_old = dict(old_payload.get("material_review") or {})
+    draft_history = list(old_payload.get("investigation_draft_history") or [])
+    use_incremental = can_run_incremental(old_payload, material_review_old)
+    previous_pack = draft_history[-1] if use_incremental else None
 
     base = scenario_to_create_request(scenario)
     request = base.model_copy(update={"compliance_dimensions": compliance_dimensions})
@@ -109,22 +162,70 @@ def run_confirm_scope_and_generate(
         checklist_payload["revision_history"] = revision_history
         checklist_payload["revision_round"] = revision_round
 
-    material_review = dict(old_payload.get("material_review") or {})
+    incremental_meta: dict[str, Any] | None = None
+    if use_incremental and previous_pack:
+        checklist_payload, incremental_meta = run_incremental_investigation_attach(
+            scenario,
+            checklist_payload,
+            previous_pack,
+            compliance_dimensions=compliance_dimensions,
+            baseline_snapshot=material_review_old["return_baseline_snapshot"],
+            returned_missing_elements=list(material_review_old.get("returned_missing_elements") or []),
+            polish=polish,
+            match_threshold=match_threshold,
+            retrieval_top_k=retrieval_top_k,
+            reviewer_name=user.full_name,
+            reviewer_id=user.id,
+        )
+        scenario.checklist.payload = checklist_payload
+        scenario.status = (
+            "brief_generated"
+            if (checklist_payload.get("brief") or {}).get("status") != "blocked"
+            else "brief_blocked"
+        )
+    else:
+        checklist_payload = _attach_legal_and_brief(
+            scenario,
+            checklist_payload,
+            polish=polish,
+            match_threshold=match_threshold,
+            retrieval_top_k=retrieval_top_k,
+            user_id=user.id,
+        )
+        adequacy = aggregate_investigation_adequacy(scenario, checklist_payload, compliance_dimensions)
+        checklist_payload["investigation_adequacy"] = adequacy
+        checklist_payload.pop("review", None)
+
+    material_review = dict(material_review_old)
     material_review.update(
         {
             "selected_dimensions": compliance_dimensions,
-            "status": "approved",
-            "approved_at": datetime.now(timezone.utc).isoformat(),
-            "approved_by": user.full_name,
-            "approved_by_id": user.id,
+            "status": "investigation_generated",
+            "match_threshold": match_threshold,
+            "retrieval_top_k": (checklist_payload.get("investigation_settings") or {}).get("retrieval_top_k")
+            or retrieval_top_k
+            or 3,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "generated_by": user.full_name,
+            "generated_by_id": user.id,
             "field_labels": get_material_field_labels(),
+            "element_labels": (checklist_payload.get("investigation_adequacy") or {}).get("element_labels")
+            or {},
         }
     )
+    material_review.pop("return_baseline_snapshot", None)
+    material_review.pop("returned_missing_elements", None)
+    material_review.pop("returned_missing_fields", None)
     checklist_payload["material_review"] = material_review
+    if incremental_meta:
+        checklist_payload["incremental_regen"] = incremental_meta
+    if draft_history:
+        checklist_payload["investigation_draft_history"] = draft_history
 
-    scenario.checklist.payload = checklist_payload
-    checklist_payload = _attach_legal_and_brief(scenario, checklist_payload, polish=polish)
-
+    record_match_threshold_choice(user.id, match_threshold)
+    effective_top_k = int((checklist_payload.get("investigation_settings") or {}).get("retrieval_top_k") or retrieval_top_k or 3)
+    record_retrieval_top_k_choice(user.id, effective_top_k)
+    record_dimension_selection(user.id, compliance_dimensions)
     scenario.status = "pending_legal_review"
     scenario.compliance_dimensions = compliance_dimensions
     scenario.checklist.payload = copy.deepcopy(checklist_payload)
@@ -132,20 +233,46 @@ def run_confirm_scope_and_generate(
     db.commit()
     db.refresh(scenario)
 
+    try:
+        upsert_scenario_subscription(scenario.id, scenario.project_name, checklist_payload)
+    except Exception:
+        pass
+
     brief = checklist_payload.get("brief") or {}
+    mode_note = ""
+    if incremental_meta:
+        mode_note = (
+            f"；增量更新 {len(incremental_meta.get('target_codes') or [])} 条，"
+            f"沿用 {len(incremental_meta.get('frozen_codes') or [])} 条"
+        )
     write_audit_log(
         db,
         user=user,
-        action="scenario.confirm_scope",
+        action="scenario.generate_investigation",
         resource_type="scenario",
         resource_id=str(scenario.id),
         detail=(
-            f"法务确认协查范围：{scenario.project_name}；"
+            f"法务生成协查包：{scenario.project_name}；"
             f"维度 {', '.join(compliance_dimensions)}；"
             f"通过 {brief.get('passed_count', 0)} 条，需复核 {brief.get('blocked_count', 0)} 条"
+            f"{mode_note}"
         ),
     )
     return scenario
+
+
+def run_confirm_scope_and_generate(
+    db: Session,
+    user: User,
+    scenario: InvestigationScenario,
+    compliance_dimensions: list[str],
+    *,
+    polish: bool = False,
+) -> InvestigationScenario:
+    """兼容旧接口：等同 run_generate_investigation_pack。"""
+    return run_generate_investigation_pack(
+        db, user, scenario, compliance_dimensions, polish=polish
+    )
 
 
 def run_generate_and_submit(
@@ -160,6 +287,11 @@ def run_generate_and_submit(
     checklist_payload = attach_document_extract_to_payload(scenario.checklist.payload, payload)
     scenario.checklist.payload = checklist_payload
     checklist_payload = _attach_legal_and_brief(scenario, checklist_payload, polish=polish)
+
+    dims = list(payload.compliance_dimensions or [])
+    if dims:
+        adequacy = aggregate_investigation_adequacy(scenario, checklist_payload, dims)
+        checklist_payload["investigation_adequacy"] = adequacy
 
     scenario.status = "pending_legal_review"
     scenario.checklist.payload = copy.deepcopy(checklist_payload)
@@ -182,33 +314,115 @@ def run_generate_and_submit(
     return scenario
 
 
+MATERIAL_RETURN_STATUSES = frozenset(
+    {
+        "pending_scope",
+        "pending_legal_review",
+        "review_in_progress",
+        "brief_generated",
+        "brief_blocked",
+    }
+)
+
+
+def _archive_investigation_draft(
+    payload: dict[str, Any],
+    *,
+    field_snapshot: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    return {
+        "archived_at": datetime.now(timezone.utc).isoformat(),
+        "brief": payload.get("brief"),
+        "sections": payload.get("sections"),
+        "sections_with_legal": payload.get("sections_with_legal"),
+        "investigation_adequacy": payload.get("investigation_adequacy"),
+        "review": payload.get("review"),
+        "selected_dimensions": payload.get("selected_dimensions"),
+        "total_items": payload.get("total_items"),
+        "field_snapshot": field_snapshot,
+        "incremental_regen": payload.get("incremental_regen"),
+    }
+
+
+def _reset_payload_after_material_return(
+    payload: dict[str, Any],
+    create_req: ScenarioCreateRequest,
+) -> dict[str, Any]:
+    materials_payload = _materials_only_payload(create_req)
+    for key in (
+        "document_extract",
+        "revision_history",
+        "revision_round",
+        "material_review",
+        "investigation_draft_history",
+    ):
+        if key in payload:
+            materials_payload[key] = payload[key]
+    return materials_payload
+
+
 def run_return_materials(
     db: Session,
     user: User,
     scenario: InvestigationScenario,
     compliance_dimensions: list[str],
-    missing_fields: list[str],
+    missing_fields: list[str] | None = None,
     *,
+    missing_elements: list[str] | None = None,
     note: str | None = None,
 ) -> InvestigationScenario:
-    """法务在确认范围前驳回业务提交表（字段级），业务补充后回到 pending_scope。"""
-    if scenario.status != "pending_scope":
-        raise ValueError("当前状态不可驳回材料，请确认项目处于待确认协查范围阶段")
+    """法务驳回业务材料（构成要件/字段）；未定稿前均可打回，已生成协查包会归档草稿。"""
+    if scenario.status not in MATERIAL_RETURN_STATUSES:
+        raise ValueError("当前状态不可打回补充材料")
+
+    payload = copy.deepcopy(scenario.checklist.payload or {})
+    review = payload.get("review") or {}
+    if review.get("status") in ("approved", "partial", "rejected"):
+        raise ValueError("协查已定稿，无法再打回补充材料")
 
     if not scenario.checklist:
         raise ValueError("场景缺少核查清单")
 
-    old_payload = copy.deepcopy(scenario.checklist.payload or {})
+    had_investigation = bool(payload.get("brief"))
+    if had_investigation:
+        from app.services.material_review_service import scenario_field_snapshot
+
+        archive = _archive_investigation_draft(
+            payload,
+            field_snapshot=scenario_field_snapshot(scenario),
+        )
+        history = list(payload.get("investigation_draft_history") or [])
+        history.append(archive)
+        payload["investigation_draft_history"] = history
+
     material_review = build_material_return_record(
         scenario,
         user,
         compliance_dimensions=compliance_dimensions,
         missing_fields=missing_fields,
+        missing_elements=missing_elements,
         note=note,
     )
-    old_payload["material_review"] = material_review
+    payload["material_review"] = material_review
+
+    if had_investigation:
+        create_req = scenario_to_create_request(scenario)
+        payload = _reset_payload_after_material_return(payload, create_req)
+        scenario.compliance_dimensions = []
+        if scenario.checklist:
+            scenario.checklist.title = payload["title"]
+            scenario.checklist.total_items = 0
+
+    payload.pop("brief", None)
+    payload.pop("sections_with_legal", None)
+    payload.pop("investigation_adequacy", None)
+    payload.pop("review", None)
+    payload.pop("sections", None)
+    payload.pop("legal_retrieved", None)
+    payload.pop("selected_dimensions", None)
+
     scenario.status = "returned_for_revision"
-    scenario.checklist.payload = old_payload
+    scenario.checklist.payload = payload
     flag_modified(scenario.checklist, "payload")
     db.commit()
     db.refresh(scenario)
@@ -222,7 +436,7 @@ def run_return_materials(
         detail=(
             f"法务驳回提交表：{scenario.project_name}；"
             f"维度 {', '.join(compliance_dimensions)}；"
-            f"缺项 {', '.join(missing_fields)}"
+            f"缺项 {', '.join(material_review.get('missing_elements') or missing_fields or [])}"
         ),
     )
     return scenario
@@ -268,7 +482,7 @@ def run_revise_and_resubmit(
             }
         )
 
-    create_req = business_submit_to_create_request(payload)
+    create_req = merge_business_resubmit_request(scenario, payload)
     scenario.project_name = create_req.project_name
     scenario.country = create_req.country
     scenario.state = create_req.state
@@ -307,14 +521,25 @@ def run_revise_and_resubmit(
     materials_payload["revision_round"] = len(revision_history)
 
     selected_dimensions = list(old_material.get("selected_dimensions") or [])
-    if selected_dimensions or material_history:
+    return_baseline_snapshot = old_material.get("submitted_snapshot")
+    returned_missing_elements = list(old_material.get("missing_elements") or [])
+    returned_missing_fields = list(old_material.get("missing_fields") or [])
+    investigation_draft_history = list(old_payload.get("investigation_draft_history") or [])
+
+    if selected_dimensions or material_history or return_baseline_snapshot:
         materials_payload["material_review"] = {
             "selected_dimensions": selected_dimensions,
             "status": "resubmitted",
             "revision_round": len(material_history),
             "history": material_history,
             "field_labels": get_material_field_labels(),
+            "return_baseline_snapshot": return_baseline_snapshot,
+            "returned_missing_elements": returned_missing_elements,
+            "returned_missing_fields": returned_missing_fields,
         }
+
+    if investigation_draft_history:
+        materials_payload["investigation_draft_history"] = investigation_draft_history
 
     if not scenario.checklist:
         raise ValueError("场景缺少核查清单")

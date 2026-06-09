@@ -7,11 +7,16 @@ import {
   deleteScenario,
   fetchLegalMonitor,
   fetchLegalStatus,
+  fetchCorpusAgentStatus,
+  fetchOnboardingStatus,
+  fetchPlaybookDeviations,
   fetchRulesCatalog,
   fetchScenarios,
   fetchSystemStatus,
   restoreDeletedScenario,
   scanLegalMonitor,
+  runCorpusMaintenanceAgent,
+  ackCorpusAgentNotification,
   unarchiveScenario,
 } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
@@ -22,10 +27,65 @@ const auth = useAuthStore()
 const router = useRouter()
 const status = ref<SystemStatus | null>(null)
 const legalStatus = ref<{ document_count?: number; mode?: string; sources_breakdown?: Record<string, number> } | null>(null)
-const legalMonitor = ref<{ alerts?: Array<{ title: string; message: string; level: string }>; last_scan_at?: string | null } | null>(null)
+const legalMonitor = ref<{
+  alerts?: Array<{ title: string; message: string; level: string; affected_checklist_codes?: string[] }>
+  last_scan_at?: string | null
+  subscription_count?: number
+  subscriptions?: Array<{ scenario_id: number; project_name: string; checklist_codes: string[] }>
+  last_diff?: {
+    has_changes?: boolean
+    affected_checklist_codes?: string[]
+    changed_documents?: Array<{ id: string; title_pt: string; change_type: string }>
+  } | null
+} | null>(null)
+const playbookDeviations = ref<{
+  stats?: { total?: number; top_rejected_codes?: Array<{ code: string; count: number }> }
+  deviations?: Array<{ code: string; title: string; project_name: string; comment?: string }>
+  rules_pack_loop?: {
+    pack_id?: string
+    pack_version?: string
+    pack_name?: string
+    workflow?: string
+    suggestion_count?: number
+    suggestions?: Array<{
+      id: string
+      code: string
+      title: string
+      suggestion_type: string
+      priority: string
+      rationale: string
+      proposed_changes?: Array<Record<string, unknown>>
+      sample_comments?: string[]
+    }>
+    export_hint?: string
+  }
+} | null>(null)
+const rulesPackLoopOpen = ref(true)
 const scanningLegal = ref(false)
+const runningCorpusAgent = ref(false)
+const corpusAgent = ref<{
+  unread_count?: number
+  last_run_at?: string | null
+  interval_hours?: number
+  notifications?: Array<{
+    id: string
+    title: string
+    summary: string
+    level: string
+    acknowledged?: boolean
+    affected_checklist_codes?: string[]
+    impacted_projects?: Array<{
+      scenario_id: number
+      project_name: string
+      material_files?: string[]
+      artifacts?: Array<{ type: string; label: string; path: string }>
+      suggested_actions?: string[]
+    }>
+  }>
+} | null>(null)
 const scenarios = ref<ScenarioSummary[]>([])
 const rulesCatalog = ref<RulesCatalog | null>(null)
+const onboardingComplete = ref(true)
 const loading = ref(true)
 const creatingSample = ref(false)
 const sampleError = ref<string | null>(null)
@@ -291,16 +351,25 @@ async function loadScenarios() {
 
 onMounted(async () => {
   try {
-    const tasks: Promise<unknown>[] = [fetchSystemStatus(), loadScenarios()]
+    const tasks: Promise<unknown>[] = [fetchSystemStatus(), loadScenarios(), fetchOnboardingStatus().catch(() => ({ completed: true }))]
     if (auth.isLegal) {
-      tasks.push(fetchLegalStatus().catch(() => null), fetchLegalMonitor().catch(() => null), fetchRulesCatalog().catch(() => null))
+      tasks.push(
+        fetchLegalStatus().catch(() => null),
+        fetchLegalMonitor().catch(() => null),
+        fetchCorpusAgentStatus().catch(() => null),
+        fetchRulesCatalog().catch(() => null),
+        fetchPlaybookDeviations().catch(() => null),
+      )
     }
     const results = await Promise.all(tasks)
     status.value = results[0] as SystemStatus
+    onboardingComplete.value = (results[2] as { completed?: boolean })?.completed !== false
     if (auth.isLegal) {
-      legalStatus.value = (results[2] as typeof legalStatus.value) ?? null
-      legalMonitor.value = (results[3] as typeof legalMonitor.value) ?? null
-      rulesCatalog.value = (results[4] as RulesCatalog | null) ?? null
+      legalStatus.value = (results[3] as typeof legalStatus.value) ?? null
+      legalMonitor.value = (results[4] as typeof legalMonitor.value) ?? null
+      corpusAgent.value = (results[5] as typeof corpusAgent.value) ?? null
+      rulesCatalog.value = (results[6] as RulesCatalog | null) ?? null
+      playbookDeviations.value = (results[7] as typeof playbookDeviations.value) ?? null
     }
   } finally {
     loading.value = false
@@ -312,7 +381,7 @@ async function runCreateSample() {
   sampleError.value = null
   try {
     const scenario = await createFullSample()
-    await router.push({ name: 'review', params: { id: scenario.id } })
+    await router.push({ name: 'project-hub', params: { id: scenario.id } })
   } catch {
     sampleError.value = '生成样本失败，请确认后端已启动'
   } finally {
@@ -325,9 +394,27 @@ async function runLegalScan() {
   try {
     legalMonitor.value = await scanLegalMonitor(false)
     legalStatus.value = await fetchLegalStatus()
+    corpusAgent.value = await fetchCorpusAgentStatus()
   } finally {
     scanningLegal.value = false
   }
+}
+
+async function runCorpusAgent() {
+  runningCorpusAgent.value = true
+  try {
+    await runCorpusMaintenanceAgent(true, true)
+    corpusAgent.value = await fetchCorpusAgentStatus()
+    legalMonitor.value = await fetchLegalMonitor()
+    legalStatus.value = await fetchLegalStatus()
+  } finally {
+    runningCorpusAgent.value = false
+  }
+}
+
+async function ackAgentNotification(id: string) {
+  await ackCorpusAgentNotification(id)
+  corpusAgent.value = await fetchCorpusAgentStatus()
 }
 
 const progressLabel: Record<string, string> = {
@@ -357,6 +444,7 @@ function businessProgressText(s: ScenarioSummary) {
 
 function scenarioLinks(s: ScenarioSummary) {
   return {
+    hub: `/projects/${s.id}`,
     progress: `/scenarios/${s.id}/progress`,
     extract: `/scenarios/${s.id}/extract`,
     edit: `/scenarios/${s.id}/edit`,
@@ -436,7 +524,7 @@ async function removeCompletedScenario(s: ScenarioSummary) {
         </p>
       </div>
       <div class="hero-stats">
-        <div class="stat">
+        <div v-if="auth.isLegal" class="stat">
           <span class="stat-label">法域</span>
           <span class="stat-value">巴西</span>
         </div>
@@ -445,6 +533,14 @@ async function removeCompletedScenario(s: ScenarioSummary) {
           <span class="stat-value">{{ auth.roleLabel }}</span>
         </div>
       </div>
+    </section>
+
+    <section v-if="!onboardingComplete" class="panel workbench-panel onboarding-banner">
+      <h2>首次使用 · 冷启动访谈</h2>
+      <p class="muted">
+        配置律所 Playbook 与合同模板偏好（借鉴 Claude for Legal），后续协查/合同/尽调将按您的模板生成。
+      </p>
+      <RouterLink to="/onboarding" class="btn-primary link-btn">开始冷启动（约 3 分钟）</RouterLink>
     </section>
 
     <!-- 业务：提交入口（全宽，与下方进度/回收站对齐） -->
@@ -467,7 +563,7 @@ async function removeCompletedScenario(s: ScenarioSummary) {
       </button>
       <div v-show="submitPanelOpen" class="workbench-panel-body">
         <p class="muted">
-          <strong>只需上传</strong>巴西投资方案（Word、PDF 等）；系统自动抽取并打开核对表，无需事先准备字段清单。提交后由<strong>法务确认协查范围</strong>。
+          <strong>只需上传</strong>投资方案（Word、PDF 等）；系统自动抽取并打开核对表，无需事先准备字段清单。提交后由<strong>法务确认协查法域与范围</strong>。
         </p>
         <ul class="panel-hints">
           <li>支持 <strong>.txt / .md / .docx / .pdf</strong>，可多个文件；原文件将归档供法务回看</li>
@@ -503,7 +599,7 @@ async function removeCompletedScenario(s: ScenarioSummary) {
         </button>
         <div v-show="corpusPanelOpen" class="workbench-panel-body">
         <p class="muted">
-          补充或更新平台<strong>法条检索语料</strong>，供后续协查绑定 Top-3 法条；保存后须<strong>重建索引</strong>，新协查才会引用最新内容。
+          补充或更新平台<strong>法条检索语料</strong>，供后续协查绑定法条（默认 Top-3，可在生成协查包时调整）；保存后须<strong>重建索引</strong>，新协查才会引用最新内容。
         </p>
         <ul class="panel-hints">
           <li>
@@ -520,16 +616,137 @@ async function removeCompletedScenario(s: ScenarioSummary) {
           </li>
         </ul>
         <p class="muted" v-else>暂无法规监测提醒。</p>
+        <p v-if="legalMonitor?.subscription_count" class="muted">
+          已订阅 <strong>{{ legalMonitor.subscription_count }}</strong> 个协查场景；
+          <template v-if="legalMonitor.last_diff?.has_changes">
+            最近 Diff 影响核查项：
+            <strong>{{ (legalMonitor.last_diff.affected_checklist_codes || []).slice(0, 6).join('、') }}</strong>
+          </template>
+          <template v-else>语料库自上次扫描以来无条目级变更。</template>
+        </p>
         <p class="error" v-if="sampleError">{{ sampleError }}</p>
         <div class="action-row stack-actions">
           <RouterLink to="/legal/corpus" class="btn-primary link-btn full">进入法源语料维护</RouterLink>
           <button type="button" class="btn-secondary full" :disabled="scanningLegal" @click="runLegalScan">
             {{ scanningLegal ? '扫描中…' : '手动扫描法规更新' }}
           </button>
+          <button type="button" class="btn-secondary full" :disabled="runningCorpusAgent" @click="runCorpusAgent">
+            {{ runningCorpusAgent ? 'Agent 运行中…' : '运行语料维护 Agent' }}
+          </button>
+        </div>
+        <div v-if="corpusAgent" class="corpus-agent-panel panel">
+          <div class="corpus-agent-head">
+            <strong>语料维护 Agent</strong>
+            <span v-if="corpusAgent.unread_count" class="badge err">{{ corpusAgent.unread_count }} 条未读</span>
+            <span class="muted sm">每 {{ corpusAgent.interval_hours ?? 6 }} 小时自动扫描 · 上次 {{ corpusAgent.last_run_at ? new Date(corpusAgent.last_run_at).toLocaleString() : '—' }}</span>
+          </div>
+          <p class="muted sm">
+            自动：Reg Feed 扫描 → LexML 回溯更新语料 → 分析协查/合同/尽调受影响项目 → 推送法务通知（不自动改已定稿）。
+          </p>
+          <ul v-if="corpusAgent.notifications?.length" class="agent-notifications">
+            <li v-for="n in corpusAgent.notifications.slice(0, 5)" :key="n.id" :class="{ unread: !n.acknowledged }">
+              <div class="agent-notif-head">
+                <span>{{ n.title }}</span>
+                <span class="badge pri-medium">{{ n.level }}</span>
+              </div>
+              <p class="muted sm">{{ n.summary }}</p>
+              <ul v-if="n.impacted_projects?.length" class="panel-hints">
+                <li v-for="p in n.impacted_projects.slice(0, 3)" :key="p.scenario_id">
+                  <RouterLink :to="`/projects/${p.scenario_id}`">{{ p.project_name }}</RouterLink>
+                  <span class="muted sm" v-if="p.material_files?.length"> · 材料：{{ p.material_files.slice(0, 2).join('、') }}</span>
+                  <ul v-if="p.artifacts?.length" class="panel-hints nested">
+                    <li v-for="a in p.artifacts.slice(0, 3)" :key="a.path">
+                      {{ a.type === 'contract' ? '合同' : a.type === 'diligence' ? '尽调' : '协查' }}：{{ a.label }}
+                    </li>
+                  </ul>
+                </li>
+              </ul>
+              <button
+                v-if="!n.acknowledged"
+                type="button"
+                class="btn-link sm"
+                @click="ackAgentNotification(n.id)"
+              >
+                标记已读
+              </button>
+            </li>
+          </ul>
+          <p v-else class="muted sm">暂无 Agent 通知；点击上方按钮可立即运行一次。</p>
         </div>
         <p class="muted panel-footnote">
-          监测为 MVP 能力，主要检测本地语料变更，不能替代 LexML 持续跟踪；已定稿底稿不会自动变更。
+          监测为 MVP 能力，主要检测本地语料变更 + LexML 回溯；已定稿底稿不会自动变更。
         </p>
+        <div v-if="playbookDeviations?.stats?.total" class="playbook-deviation-summary">
+          <strong>Playbook 偏差监测</strong>
+          <span class="muted">累计驳回 {{ playbookDeviations.stats.total }} 条</span>
+          <ul v-if="playbookDeviations.stats.top_rejected_codes?.length" class="panel-hints">
+            <li v-for="row in playbookDeviations.stats.top_rejected_codes.slice(0, 5)" :key="row.code">
+              {{ row.code }} · {{ row.count }} 次
+            </li>
+          </ul>
+        </div>
+        </div>
+      </section>
+
+      <section
+        class="panel workbench-panel collapsible-workbench rules-pack-loop-panel"
+        :class="{ 'is-open': rulesPackLoopOpen }"
+        v-if="auth.isLegal"
+      >
+        <button
+          type="button"
+          class="workbench-panel-toggle"
+          :aria-expanded="rulesPackLoopOpen"
+          @click="rulesPackLoopOpen = !rulesPackLoopOpen"
+        >
+          <span class="collapse-chevron sm" aria-hidden="true" />
+          <div class="workbench-panel-toggle-main">
+            <h2>规则包闭环</h2>
+            <span class="badge pri-medium">
+              {{ playbookDeviations?.rules_pack_loop?.suggestion_count ?? 0 }} 条建议
+            </span>
+            <span class="muted workbench-panel-summary">
+              {{ playbookDeviations?.rules_pack_loop?.pack_name ?? rulesCatalog?.pack?.name ?? '规则包' }}
+              v{{ playbookDeviations?.rules_pack_loop?.pack_version ?? rulesCatalog?.pack?.version ?? '—' }}
+            </span>
+          </div>
+        </button>
+        <div v-show="rulesPackLoopOpen" class="workbench-panel-body">
+          <p class="muted">
+            聚合法务复核<strong>驳回/偏差</strong>，生成规则包变更<strong>建议草案</strong>（只读，不会自动改 JSON）。
+            组织法务负责人审批后，手动更新
+            <code>{{ playbookDeviations?.rules_pack_loop?.export_hint ?? 'backend/app/rules/*.json' }}</code> 并 bump 版本号。
+          </p>
+          <p class="muted sm" v-if="playbookDeviations?.rules_pack_loop?.workflow">
+            {{ playbookDeviations.rules_pack_loop.workflow }}
+          </p>
+          <p class="muted" v-if="!playbookDeviations?.rules_pack_loop?.suggestion_count">
+            暂无足够偏差数据（需同一 checklist 累计驳回 ≥2 次）。多跑几次复核驳回后会在此出现建议。
+          </p>
+          <ul v-else class="rules-suggestion-list">
+            <li
+              v-for="s in playbookDeviations?.rules_pack_loop?.suggestions ?? []"
+              :key="s.id"
+              class="rules-suggestion-card"
+              :class="'prio-' + s.priority"
+            >
+              <div class="rules-suggestion-head">
+                <strong>{{ s.code }}</strong>
+                <span class="badge pri-medium">{{ s.suggestion_type }}</span>
+              </div>
+              <p class="rules-suggestion-title">{{ s.title }}</p>
+              <p class="muted sm">{{ s.rationale }}</p>
+              <ul v-if="s.proposed_changes?.length" class="panel-hints nested">
+                <li v-for="(ch, idx) in s.proposed_changes" :key="idx">
+                  {{ ch.field }} · {{ ch.action }}
+                  <span v-if="ch.hint" class="muted"> — {{ ch.hint }}</span>
+                </li>
+              </ul>
+              <ul v-if="s.sample_comments?.length" class="panel-hints nested">
+                <li v-for="(c, i) in s.sample_comments" :key="i">评论：{{ c }}</li>
+              </ul>
+            </li>
+          </ul>
         </div>
       </section>
 
@@ -580,17 +797,17 @@ async function removeCompletedScenario(s: ScenarioSummary) {
           <span class="collapse-chevron sm" aria-hidden="true" />
           <div class="workbench-panel-toggle-main">
             <h2>合规审查维度</h2>
-            <span class="badge ok">{{ rulesCatalog.dimensions.length }} 个维度</span>
+            <span class="badge ok">{{ rulesCatalog?.dimensions?.length ?? 0 }} 个维度</span>
           </div>
         </button>
         <div v-show="dimensionsPanelOpen" class="workbench-panel-body">
         <p class="muted">
-          协查法域 <strong>{{ rulesCatalog.pack?.name }}</strong>（巴西 · 拉美首发）下的
-          <strong>{{ rulesCatalog.dimensions.length }} 个协查维度</strong>；业务提交材料后，由法务在<strong>复核页</strong>筛选必要维度、确认材料并生成清单。
+          协查法域 <strong>{{ rulesCatalog?.pack?.name }}</strong>（巴西 · 拉美首发）下的
+          <strong>{{ rulesCatalog?.dimensions?.length ?? 0 }} 个协查维度</strong>；业务提交材料后，由法务在<strong>复核页</strong>筛选必要维度、确认材料并生成清单。
         </p>
         <div class="dimension-grid dimension-grid-readonly">
           <div
-            v-for="dim in rulesCatalog.dimensions"
+            v-for="dim in rulesCatalog?.dimensions ?? []"
             :key="dim.id"
             class="dimension-card readonly"
           >
@@ -729,6 +946,7 @@ async function removeCompletedScenario(s: ScenarioSummary) {
                     </span>
                   </div>
                   <div class="scenario-actions">
+                    <RouterLink :to="scenarioLinks(s).hub" class="btn-primary link-btn sm">项目中心</RouterLink>
                     <RouterLink
                       v-if="s.progress_status !== 'pending_scope'"
                       :to="scenarioLinks(s).checklist"
@@ -810,6 +1028,7 @@ async function removeCompletedScenario(s: ScenarioSummary) {
                     </span>
                   </div>
                   <div class="scenario-actions">
+                    <RouterLink :to="scenarioLinks(s).hub" class="btn-primary link-btn sm">项目中心</RouterLink>
                     <RouterLink :to="scenarioLinks(s).progress" class="btn-secondary link-btn sm">查看进度</RouterLink>
                     <RouterLink
                       v-if="group.id === 'needs_revision'"

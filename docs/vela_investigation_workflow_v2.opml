@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<opml version="2.0">
+  <head>
+    <title>Vela 协查流程 v2</title>
+  </head>
+  <body>
+    <outline text="Vela 协查流程（一遍生成 + 统一复核）">
+      <outline text="0 · 业务提交材料">
+        <outline text="上传方案 + 填写核对表"/>
+        <outline text="状态 pending_scope"/>
+      </outline>
+      <outline text="1 · 法务：选定范围（生成前）">
+        <outline text="勾选 5 大合规维度"/>
+        <outline text="材料预检（可选，不阻断）"/>
+        <outline text="【生成协查包】一次点击"/>
+      </outline>
+      <outline text="2–5 · 系统：一次生成">
+        <outline text="② 核查项定位"/>
+        <outline text="③ 核查清单 + 多源 RAG"/>
+        <outline text="④ 跨语种 + 匹配度（阈值70）"/>
+        <outline text="⑤ 双语简报草稿"/>
+      </outline>
+      <outline text="Gate A · 构成要件（生成后聚合）">
+        <outline text="条目 RAG + 匹配度 + 材料预检 同源"/>
+        <outline text="已覆盖 / 待核实 / 缺项"/>
+        <outline text="未定稿前随时打回补充材料"/>
+      </outline>
+      <outline text="6 · 法务：统一复核">
+        <outline text="清单逐条确认 / 驳回"/>
+        <outline text="定稿"/>
+      </outline>
+      <outline text="7 · 导出归档">
+        <outline text="Word / PDF 协查底稿"/>
+      </outline>
+    </outline>
+  </body>
+</opml>

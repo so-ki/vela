@@ -32,6 +32,7 @@ from app.schemas.document import DocumentExtractBatchResponse, DocumentExtractRe
 from app.schemas.legal import LegalRetrievalResponse
 from app.schemas.review import ReviewItemUpdateRequest, ReviewResponse, ReviewReturnRequest
 from app.services.audit import write_audit_log
+from app.services.audit_bundle_service import build_audit_bundle
 from app.services.brief_generator import generate_brief
 from app.services.document_extractor import extract_documents_batch, extract_facts_from_document
 from app.services.export_service import build_sample_docx, build_sample_pdf
@@ -46,13 +47,18 @@ from app.services.review_service import (
     review_to_response,
     update_review_item,
 )
+from app.services.playbook_deviation_service import (
+    append_scenario_deviation,
+    record_deviation,
+)
+from app.services.user_preference_service import record_review_decision
 from app.services.material_review_service import assess_material_completeness
 from app.services.material_file_storage import resolve_archived_file_path
 from app.services.rule_engine import get_demo_scenario_template, get_mining_demo_scenario_template, get_rules_catalog, load_rules
 from app.services.rules_registry import RulesPackNotFoundError, get_classification, list_packs, resolve_pack_id
 from app.services.scenario_pipeline import (
     run_business_submit_materials,
-    run_confirm_scope_and_generate,
+    run_generate_investigation_pack,
     run_generate_and_submit,
     run_return_materials,
     run_revise_and_resubmit,
@@ -479,15 +485,41 @@ def confirm_scenario_scope(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_legal_user),
 ):
-    """法务：确认协查范围并生成清单、法源与简报。"""
+    """法务：生成协查包（清单 + 法源 + 匹配度 + 简报）。兼容旧路径 confirm-scope。"""
     scenario = _load_accessible_scenario(db, scenario_id, current_user)
     try:
-        scenario = run_confirm_scope_and_generate(
+        scenario = run_generate_investigation_pack(
             db,
             current_user,
             scenario,
             body.compliance_dimensions,
             polish=body.polish,
+            match_threshold=body.match_threshold,
+            retrieval_top_k=body.retrieval_top_k,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    return scenario_to_response(scenario)
+
+
+@router.post("/scenarios/{scenario_id}/generate-investigation", response_model=ScenarioResponse)
+def generate_investigation_pack(
+    scenario_id: int,
+    body: ScopeConfirmRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_legal_user),
+):
+    """法务：选定维度并一次生成协查包，进入统一复核。"""
+    scenario = _load_accessible_scenario(db, scenario_id, current_user)
+    try:
+        scenario = run_generate_investigation_pack(
+            db,
+            current_user,
+            scenario,
+            body.compliance_dimensions,
+            polish=body.polish,
+            match_threshold=body.match_threshold,
+            retrieval_top_k=body.retrieval_top_k,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -501,12 +533,12 @@ def preview_material_review(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_legal_user),
 ):
-    """法务：预览选定维度下的材料完整性（自动缺项检测）。"""
+    """法务：材料预检（仅供参考，不阻断生成协查包）。"""
     scenario = _load_accessible_scenario(db, scenario_id, current_user)
     if scenario.status != "pending_scope":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="仅待确认协查范围的项目可预览材料完整性",
+            detail="仅待生成协查包的项目可预览材料预检",
         )
     try:
         return assess_material_completeness(scenario, body.compliance_dimensions)
@@ -521,7 +553,7 @@ def return_scenario_materials(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_legal_user),
 ):
-    """法务：字段级驳回业务提交表，业务补充后回到待确认范围。"""
+    """法务：打回业务补充材料（构成要件/字段）；协查未定稿前均可操作。"""
     scenario = _load_accessible_scenario(db, scenario_id, current_user)
     try:
         scenario = run_return_materials(
@@ -530,6 +562,7 @@ def return_scenario_materials(
             scenario,
             body.compliance_dimensions,
             body.missing_fields,
+            missing_elements=body.missing_elements,
             note=body.note,
         )
     except ValueError as exc:
@@ -854,6 +887,9 @@ def start_review(
 
     review = init_review(scenario, current_user)
     payload = copy.deepcopy(scenario.checklist.payload)
+    tier_report = payload.get("tier_report") or (payload.get("investigation_adequacy") or {}).get("tier_report")
+    if tier_report:
+        review["tier_report"] = tier_report
     payload["review"] = review
     scenario.status = "review_in_progress"
     _save_payload(db, scenario, payload)
@@ -896,6 +932,30 @@ def patch_review_item(
 
     payload = copy.deepcopy(scenario.checklist.payload)
     payload["review"] = review
+
+    target = next((i for i in review.get("items", []) if i["code"] == item_code), None)
+    if body.decision == "rejected" and target:
+        entry = record_deviation(
+            scenario_id=scenario.id,
+            project_name=scenario.project_name,
+            code=item_code,
+            title=target.get("title", item_code),
+            comment=body.comment,
+            reviewer_name=current_user.full_name,
+            match_score=float(target.get("match_score") or 0),
+            gate_status=target.get("gate_status", ""),
+        )
+        payload = append_scenario_deviation(payload, entry)
+
+    record_review_decision(
+        current_user.id,
+        code=item_code,
+        decision=body.decision,
+        comment=body.comment,
+        match_score=float((target or {}).get("match_score") or 0),
+        tier=(target or {}).get("tier", ""),
+    )
+
     _save_payload(db, scenario, payload)
 
     return ReviewResponse(**review_to_response(scenario_id, review))
@@ -971,12 +1031,29 @@ def finalize_scenario_review(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="复核尚未初始化")
 
     try:
-        review = finalize_review(copy.deepcopy(review))
+        payload = copy.deepcopy(scenario.checklist.payload)
+        revision_round = int(payload.get("revision_round") or 0)
+        finalize_history = list(payload.get("finalize_history") or [])
+        finalize_seq = len(finalize_history)
+        review = finalize_review(
+            copy.deepcopy(review),
+            revision_round=revision_round,
+            finalize_seq=finalize_seq,
+            tier_report=payload.get("tier_report") or (payload.get("investigation_adequacy") or {}).get("tier_report"),
+        )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
-    payload = copy.deepcopy(scenario.checklist.payload)
     payload["review"] = review
+    finalize_history.append(
+        {
+            "version": review.get("version_label"),
+            "status": review.get("status"),
+            "finalized_at": review.get("finalized_at"),
+        }
+    )
+    payload["finalize_history"] = finalize_history
+    payload["audit_bundle"] = build_audit_bundle(scenario, payload_override=payload)
     scenario.status = f"review_{review['status']}"
     _save_payload(db, scenario, payload)
 
@@ -990,6 +1067,32 @@ def finalize_scenario_review(
     )
 
     return ReviewResponse(**review_to_response(scenario_id, review))
+
+
+@router.get("/scenarios/{scenario_id}/export/audit-bundle")
+def export_audit_bundle(
+    scenario_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_legal_user),
+):
+    scenario = _load_accessible_scenario(db, scenario_id, current_user)
+    review = scenario.checklist.payload.get("review")
+    if not review or not review_to_response(scenario_id, review).get("can_export"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="请先完成法务复核定稿后再导出审计包",
+        )
+
+    bundle = scenario.checklist.payload.get("audit_bundle") or build_audit_bundle(scenario)
+    write_audit_log(
+        db,
+        user=current_user,
+        action="export.audit_bundle",
+        resource_type="scenario",
+        resource_id=str(scenario.id),
+        detail=f"导出审计包 v{bundle.get('bundle_version')}",
+    )
+    return bundle
 
 
 @router.get("/scenarios/{scenario_id}/export/docx")

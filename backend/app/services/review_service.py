@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from app.services.investigation_adequacy_service import gate_a_blocking_review_message
 from app.models.scenario import InvestigationScenario
 from app.models.user import User
 
@@ -35,7 +36,17 @@ def _legal_hits_by_code(payload: dict[str, Any]) -> dict[str, list[dict[str, Any
     return mapping
 
 
+def _assert_gate_a_allows_review(scenario: InvestigationScenario) -> None:
+    if not scenario.checklist:
+        return
+    payload = scenario.checklist.payload or {}
+    block = gate_a_blocking_review_message(payload.get("investigation_adequacy"))
+    if block:
+        raise ValueError(block)
+
+
 def init_review(scenario: InvestigationScenario, user: User) -> dict[str, Any]:
+    _assert_gate_a_allows_review(scenario)
     payload = scenario.checklist.payload
     brief = payload.get("brief")
     if not brief:
@@ -55,6 +66,8 @@ def init_review(scenario: InvestigationScenario, user: User) -> dict[str, Any]:
                 "dimension_name": item.get("dimension_name", ""),
                 "gate_status": item.get("gate_status", "unknown"),
                 "match_score": float(item.get("match_score", 0)),
+                "tier": item.get("tier", ""),
+                "hard_block": bool(item.get("hard_block")),
                 "decision": "pending",
                 "comment": None,
                 "external_counsel_required": False,
@@ -78,6 +91,16 @@ def _counts(items: list[dict[str, Any]]) -> tuple[int, int, int]:
     rejected = sum(1 for i in items if i.get("decision") == "rejected")
     pending = sum(1 for i in items if i.get("decision") not in ("approved", "rejected"))
     return approved, rejected, pending
+
+
+def _s3_blocks_finalize(items: list[dict[str, Any]], tier_report: dict[str, Any] | None) -> bool:
+    s3_codes = set((tier_report or {}).get("s3_codes") or [])
+    if not s3_codes:
+        return False
+    return any(
+        i.get("code") in s3_codes and i.get("decision") != "approved"
+        for i in items
+    )
 
 
 def update_review_item(
@@ -119,7 +142,13 @@ def approve_all_pending(review: dict[str, Any]) -> dict[str, Any]:
     return review
 
 
-def finalize_review(review: dict[str, Any]) -> dict[str, Any]:
+def finalize_review(
+    review: dict[str, Any],
+    *,
+    revision_round: int = 0,
+    finalize_seq: int = 0,
+    tier_report: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     if review.get("status") in ("approved", "rejected", "partial"):
         return review
 
@@ -128,6 +157,20 @@ def finalize_review(review: dict[str, Any]) -> dict[str, Any]:
     if pending > 0:
         raise ValueError(f"仍有 {pending} 条未复核，请全部确认或驳回后再定稿")
 
+    s3_codes = set((tier_report or {}).get("s3_codes") or [])
+    if s3_codes:
+        unresolved = [
+            i["code"]
+            for i in items
+            if i.get("code") in s3_codes and i.get("decision") != "approved"
+        ]
+        if unresolved:
+            shown = ", ".join(unresolved[:6])
+            extra = f" 等 {len(unresolved)} 条" if len(unresolved) > 6 else ""
+            raise ValueError(
+                f"S3 硬阻断条目须逐项「确认通过」后方可定稿：{shown}{extra}"
+            )
+
     if rejected == 0:
         status = "approved"
     elif approved == 0:
@@ -135,6 +178,8 @@ def finalize_review(review: dict[str, Any]) -> dict[str, Any]:
     else:
         status = "partial"
 
+    major = 1 + revision_round
+    review["version_label"] = f"v{major}.{finalize_seq}"
     review["status"] = status
     review["finalized_at"] = _utcnow().isoformat()
     review["approved_count"] = approved
@@ -143,13 +188,20 @@ def finalize_review(review: dict[str, Any]) -> dict[str, Any]:
     return review
 
 
-def review_to_response(scenario_id: int, review: dict[str, Any]) -> dict[str, Any]:
+def review_to_response(scenario_id: int, review: dict[str, Any], *, tier_report: dict[str, Any] | None = None) -> dict[str, Any]:
+    tier_report = tier_report or review.get("tier_report")
     items = review.get("items", [])
     approved, rejected, pending = _counts(items)
     status = review.get("status", "in_progress")
-    can_finalize = status == "in_progress" and pending == 0 and len(items) > 0
-    can_export = status in ("approved", "partial", "rejected")
+    can_finalize = (
+        status == "in_progress"
+        and pending == 0
+        and len(items) > 0
+        and not _s3_blocks_finalize(items, tier_report)
+    )
+    can_export = status in ("approved", "partial", "rejected") and not _s3_blocks_finalize(items, tier_report)
     can_return = status == "in_progress" and rejected > 0
+    s3_blocked = _s3_blocks_finalize(items, tier_report)
 
     return {
         "scenario_id": scenario_id,
@@ -157,6 +209,7 @@ def review_to_response(scenario_id: int, review: dict[str, Any]) -> dict[str, An
         "reviewer_name": review.get("reviewer_name", ""),
         "started_at": review.get("started_at"),
         "finalized_at": review.get("finalized_at"),
+        "version_label": review.get("version_label"),
         "items": items,
         "approved_count": approved,
         "rejected_count": rejected,
@@ -164,6 +217,7 @@ def review_to_response(scenario_id: int, review: dict[str, Any]) -> dict[str, An
         "can_finalize": can_finalize,
         "can_export": can_export,
         "can_return_to_business": can_return,
+        "s3_finalize_blocked": s3_blocked,
     }
 
 

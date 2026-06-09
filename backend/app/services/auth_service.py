@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.security import create_access_token, get_password_hash, verify_password
-from app.core.roles import ROLE_BUSINESS
+from app.core.roles import ROLE_BUSINESS, ROLE_LEGAL
 from app.models.user import User
 from app.schemas.auth import UserRegister
 from app.services.audit import write_audit_log
@@ -29,12 +29,13 @@ def register_user(db: Session, payload: UserRegister) -> User:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="该邮箱已注册")
 
     now = datetime.now(timezone.utc)
+    role = ROLE_LEGAL if payload.role == "legal" else ROLE_BUSINESS
     user = User(
         email=payload.email.lower(),
         full_name=payload.full_name,
         organization=payload.organization,
         hashed_password=get_password_hash(payload.password),
-        role=ROLE_BUSINESS,
+        role=role,
         auth_provider="local",
         disclaimer_accepted=True,
         disclaimer_accepted_at=now,
@@ -43,7 +44,12 @@ def register_user(db: Session, payload: UserRegister) -> User:
     db.commit()
     db.refresh(user)
 
-    write_audit_log(db, user=user, action="user.register", detail="注册并完成免责条款确认")
+    write_audit_log(
+        db,
+        user=user,
+        action="user.register",
+        detail=f"注册（{role}）并完成免责条款确认",
+    )
     return user
 
 

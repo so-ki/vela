@@ -1,12 +1,12 @@
 {
   "pack": {
     "id": "brazil_new_energy",
-    "name": "巴西 · 投资协查",
-    "version": "2.5",
+    "name": "巴西 · 新能源设厂协查",
+    "version": "2.9",
     "region": "latin_america",
     "primary_country": "brazil",
-    "industry_focus": "新能源及相关投资",
-    "focus": "拉美首发法域 · 覆盖 FDI、绿地投资、研发中心及制造扩建"
+    "industry_focus": "新能源制造与投资（全国）",
+    "focus": "巴西全国 FDI · 绿地设厂 · 储能/光伏/电池/整车 · 联邦+州+市动态法源"
   },
   "material_intake_policy": {
     "philosophy": "upload_first",
@@ -109,6 +109,13 @@
       "name_pt": "Licenciamento e Segurança",
       "order": 5,
       "description": "建设许可、制造业登记、产品认证及 NR 安全生产要求"
+    },
+    "data_compliance": {
+      "id": "data_compliance",
+      "name": "数据合规",
+      "name_pt": "Proteção de Dados (LGPD/ANPD)",
+      "order": 6,
+      "description": "LGPD 合法性基础、DPO、跨境传输 SCCs、泄露通报及与 GDPR 差异"
     }
   },
   "ui_groups": [
@@ -133,7 +140,134 @@
     "foreign_investment": ["investment_structure", "investment_destination", "funding_source", "description"],
     "tax": ["description", "funding_source", "project_content_scale"],
     "environment": ["investment_destination", "project_content_scale", "description"],
-    "industry_access": ["investment_destination", "project_content_scale", "description"]
+    "industry_access": ["investment_destination", "project_content_scale", "description"],
+    "data_compliance": ["description", "project_content_scale", "known_risks"]
+  },
+  "dimension_elements": {
+    "labor": [
+      {
+        "id": "lab_workforce",
+        "label": "本地用工规模与雇佣计划",
+        "required": true,
+        "extract_hints": ["雇员", "员工", "用工", "岗位", "工人", "就业", "CLT", "450", "hiring"],
+        "maps_to_fields": ["description", "project_content_scale"],
+        "feeds_checklist": ["LAB-001", "LAB-002"]
+      },
+      {
+        "id": "lab_expat",
+        "label": "外籍/外派人员线索",
+        "required": false,
+        "extract_hints": ["外派", "派驻", "中方", "签证", "expatriate"],
+        "maps_to_fields": ["description", "known_risks"],
+        "feeds_checklist": ["LAB-004"]
+      }
+    ],
+    "foreign_investment": [
+      {
+        "id": "for_structure",
+        "label": "投资主体与股权结构",
+        "required": true,
+        "extract_hints": ["外资", "子公司", "100%", "全资", "合资", "FDI", "投资结构", "设立"],
+        "maps_to_fields": ["investment_structure", "description"],
+        "feeds_checklist": ["FOR-001", "FOR-002"]
+      },
+      {
+        "id": "for_destination",
+        "label": "投资目的地（国家/州/市）",
+        "required": true,
+        "extract_hints": ["巴西", "圣保罗", "坎皮纳斯", "州", "市", "Campinas"],
+        "maps_to_fields": ["investment_destination", "description"],
+        "feeds_checklist": ["FOR-001", "FOR-003"]
+      },
+      {
+        "id": "for_ma_cade",
+        "label": "并购/合资控制线索（CADE）",
+        "required": false,
+        "extract_hints": ["并购", "收购", "合并", "CADE", "合资", "控制", "股权"],
+        "maps_to_fields": ["investment_structure", "description"],
+        "feeds_checklist": ["FOR-005"]
+      }
+    ],
+    "tax": [
+      {
+        "id": "tax_activity",
+        "label": "在巴西经营活动与税域描述",
+        "required": true,
+        "extract_hints": ["税", "ICMS", "所得税", "经营", "进口", "关税", "激励"],
+        "maps_to_fields": ["description", "funding_source", "project_content_scale"],
+        "feeds_checklist": ["TAX-001", "TAX-002"]
+      },
+      {
+        "id": "tax_incentives",
+        "label": "税收激励诉求或线索",
+        "required": false,
+        "extract_hints": ["PADIS", "Pró-Informática", "Pró-Veículo", "ICMS", "激励", "减免", "InvestSP"],
+        "maps_to_fields": ["funding_source", "known_risks"],
+        "feeds_checklist": ["TAX-002", "IND-008"]
+      }
+    ],
+    "environment": [
+      {
+        "id": "env_site_scale",
+        "label": "项目地点与建设/产能规模",
+        "required": true,
+        "extract_hints": ["厂房", "平方米", "m²", "建设", "工厂", "制造", "坎皮纳斯", "圣保罗"],
+        "maps_to_fields": ["investment_destination", "project_content_scale", "facility_notes"],
+        "feeds_checklist": ["ENV-001"]
+      },
+      {
+        "id": "env_eia",
+        "label": "环评 / EIA / IBAMA 相关线索",
+        "required": false,
+        "extract_hints": ["环评", "EIA", "RIMA", "IBAMA", "环境", "排放", "许可"],
+        "maps_to_fields": ["description", "known_risks"],
+        "feeds_checklist": ["ENV-001", "ENV-004"]
+      },
+      {
+        "id": "env_waste",
+        "label": "固废/危废/回收线索",
+        "required": false,
+        "extract_hints": ["危废", "固废", "回收", "PNRS", "电池", "废弃物"],
+        "maps_to_fields": ["description", "project_content_scale"],
+        "feeds_checklist": ["ENV-002", "ENV-003"]
+      }
+    ],
+    "industry_access": [
+      {
+        "id": "ind_site",
+        "label": "用地、建设许可与厂房信息",
+        "required": true,
+        "extract_hints": ["厂房", "平方米", "m²", "建设", "开工", "Alvará", "许可"],
+        "maps_to_fields": ["investment_destination", "project_content_scale", "facility_notes"],
+        "feeds_checklist": ["IND-001"]
+      },
+      {
+        "id": "ind_operations",
+        "label": "制造/运营内容与产品类型",
+        "required": true,
+        "extract_hints": ["制造", "组装", "生产", "电池", "客车", "光伏", "储能", "INMETRO"],
+        "maps_to_fields": ["project_content_scale", "description"],
+        "feeds_checklist": ["IND-002", "IND-006"]
+      }
+    ],
+    "data_compliance": [
+      {
+        "id": "dat_processing",
+        "label": "个人数据处理活动线索",
+        "required": true,
+        "extract_hints": ["数据", "用户", "个人信息", "隐私", "LGPD", "云端", "APP", "客户信息", "data"],
+        "maps_to_fields": ["description", "project_content_scale"],
+        "feeds_checklist": ["DAT-001", "DAT-002"]
+      },
+      {
+        "id": "dat_cross_border",
+        "label": "跨境数据传输线索",
+        "required": false,
+        "extract_hints": ["跨境", "传输", "出境", "SCC", "总部", "云服务", "华为云", "AWS"],
+        "maps_to_fields": ["description", "known_risks", "funding_source"],
+        "feeds_checklist": ["DAT-002", "DAT-003"]
+      }
+    ]
   },
   "checklist_items": [
     {
@@ -221,7 +355,7 @@
       "id": "TAX-002",
       "dimension": "tax",
       "title": "圣保罗州 ICMS 及州激励",
-      "description": "核查州级 ICMS 及投资激励（如 PADIS、PRODEIC 等）的适用资格与合规义务。",
+      "description": "核查圣保罗州 ICMS 及州级投资激励（Pró-Informática、Pró-Veículo 等；注意 PRODEIC 属马托格罗索州，非圣保罗）。参阅 InvestSP 与 Sefaz-SP 官方优惠清单。",
       "priority": "high",
       "always_include": true,
       "triggers": ["圣保罗", "坎皮纳斯", "州", "ICMS", "巴西", "投资"]
@@ -248,10 +382,10 @@
       "id": "IND-001",
       "dimension": "industry_access",
       "title": "工业用地与建设许可（Alvará）",
-      "description": "若涉及新建厂房或改扩建，核查用地性质、建筑许可、消防及 ocupação 合规。",
+      "description": "若涉及新建厂房或改扩建，核查项目所在城市的用地规划（Zoneamento/Uso do Solo）、Alvará de Funcionamento 及消防 ocupação 合规（通过 city/state 参数 + 巴西 Connector 拉取市政指引）。",
       "priority": "high",
       "always_include": false,
-      "triggers": ["厂房", "平方米", "m²", "建设", "开工", "32,000", "20,000"]
+      "triggers": ["厂房", "平方米", "m²", "建设", "开工", "设厂", "工厂", "greenfield"]
     },
     {
       "id": "IND-002",
@@ -351,7 +485,7 @@
       "id": "IND-009",
       "dimension": "industry_access",
       "title": "储能系统并网与 ANEEL 规范",
-      "description": "工业级储能系统接入巴西电网的技术规范、并网许可及分布式发电登记义务。",
+      "description": "工业级储能系统接入巴西电网的技术规范、并网许可及分布式发电登记；参阅 ANEEL Outorgas 官方指引。",
       "priority": "medium",
       "always_include": false,
       "sub_sectors": ["energy_storage"],
@@ -360,8 +494,8 @@
     {
       "id": "IND-008",
       "dimension": "tax",
-      "title": "PADIS / PRODEIC 等新能源制造激励资格",
-      "description": "筛查信息技术/自动化（PADIS）、圣保罗州 PRODEIC 等联邦/州激励对客车、电池、光伏产线的适用条件与合规义务。",
+      "title": "PADIS / 圣保罗州 ICMS 制造激励资格",
+      "description": "筛查联邦 PADIS 及圣保罗州 ICMS 激励（Pró-Informática、Pró-Veículo 等）对客车、电池、光伏产线的适用条件；勿与马托格罗索 PRODEIC 混淆。",
       "priority": "high",
       "always_include": false,
       "sub_sectors": ["electric_bus", "battery_pack", "solar", "energy_storage"],
@@ -386,17 +520,53 @@
       "always_include": false,
       "sub_sectors": ["electric_bus", "battery_pack"],
       "triggers": ["制造", "组装", "电池", "客车", "生产", "450"]
+    },
+    {
+      "id": "DAT-001",
+      "dimension": "data_compliance",
+      "title": "LGPD 适用范围与合法性基础",
+      "description": "评估项目在巴西境内或面向巴西用户的数据处理是否触发 LGPD；确认十项合法性基础（含信用保护）及隐私告知义务。",
+      "priority": "high",
+      "always_include": false,
+      "triggers": ["数据", "用户", "隐私", "LGPD", "个人信息", "APP", "云端", "客户"]
+    },
+    {
+      "id": "DAT-002",
+      "dimension": "data_compliance",
+      "title": "DPO 任命与 ANPD 合规义务",
+      "description": "控制者是否须任命 DPO；评估处理记录、DPIA 及 ANPD 2024 配套规则（Res. 15/18/19）合规路径。",
+      "priority": "medium",
+      "always_include": false,
+      "triggers": ["DPO", "ANPD", "数据保护", "LGPD", "合规"]
+    },
+    {
+      "id": "DAT-003",
+      "dimension": "data_compliance",
+      "title": "跨境数据传输与 SCCs 过渡",
+      "description": "向境外传输个人数据须满足充分性、SCCs 或 BCRs；2025-08-23 前完成 ANPD 标准合同条款过渡安排。",
+      "priority": "high",
+      "always_include": false,
+      "triggers": ["跨境", "传输", "SCC", "出境", "总部", "云服务", "data transfer"]
     }
   ],
   "state_overlays": {
     "sao_paulo": {
       "name": "圣保罗州",
+      "extra_items": ["TAX-002"],
       "cities": {
         "campinas": {
           "name": "坎皮纳斯",
-          "extra_items": ["TAX-002", "IND-001"]
+          "extra_items": ["IND-001"]
         }
       }
+    },
+    "minas_gerais": {
+      "name": "米纳斯吉拉斯州",
+      "extra_items": ["TAX-002"]
+    },
+    "bahia": {
+      "name": "巴伊亚州",
+      "extra_items": ["TAX-002"]
     }
   }
 }

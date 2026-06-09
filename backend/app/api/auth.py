@@ -6,6 +6,7 @@ from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
@@ -99,3 +100,33 @@ def accept_disclaimer_endpoint(
 @router.get("/me", response_model=UserResponse)
 def me(current_user: User = Depends(get_authenticated_user)):
     return current_user
+
+
+@router.get("/preferences")
+def user_preferences(current_user: User = Depends(get_current_user)):
+    from app.services.user_preference_service import preference_summary
+
+    return preference_summary(current_user.id)
+
+
+class RetrievalPreferencesUpdate(BaseModel):
+    match_threshold: Optional[int] = Field(default=None, ge=50, le=95)
+    retrieval_top_k: Optional[int] = Field(default=None, ge=1, le=10)
+
+
+@router.put("/preferences/retrieval")
+def update_retrieval_preferences(
+    body: RetrievalPreferencesUpdate,
+    current_user: User = Depends(get_current_user),
+):
+    from app.services.user_preference_service import (
+        preference_summary,
+        record_match_threshold_choice,
+        record_retrieval_top_k_choice,
+    )
+
+    if body.match_threshold is not None:
+        record_match_threshold_choice(current_user.id, body.match_threshold)
+    if body.retrieval_top_k is not None:
+        record_retrieval_top_k_choice(current_user.id, body.retrieval_top_k)
+    return preference_summary(current_user.id)

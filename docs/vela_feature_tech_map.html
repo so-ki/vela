@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Vela · 功能与技术关系图</title>
+  <style>
+    :root {
+      --bg: #f0f4f8;
+      --primary: #1a3a5c;
+      --accent: #e67e22;
+      --feat: #1d4ed8;
+      --tech: #6d28d9;
+      --diff: #047857;
+      --text: #1e293b;
+      --muted: #64748b;
+      --line: #cbd5e1;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      padding: 40px 32px;
+      color: var(--text);
+    }
+    .canvas {
+      max-width: 1080px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 12px 48px rgba(26,58,92,.1);
+      overflow: hidden;
+    }
+    .top {
+      background: var(--primary);
+      color: #fff;
+      padding: 32px 40px 28px;
+      text-align: center;
+    }
+    .top h1 { font-size: 26px; font-weight: 700; }
+    .top p { margin-top: 10px; font-size: 15px; opacity: .9; line-height: 1.6; }
+    .hub {
+      margin: 28px auto 8px;
+      max-width: 520px;
+      text-align: center;
+      padding: 16px 24px;
+      border: 2px solid var(--primary);
+      border-radius: 12px;
+      background: #f8fafc;
+    }
+    .hub strong { font-size: 17px; color: var(--primary); }
+    .hub span { display: block; margin-top: 6px; font-size: 13px; color: var(--muted); }
+    .columns-head {
+      display: grid;
+      grid-template-columns: 200px 1fr 48px 1fr;
+      gap: 0;
+      padding: 20px 32px 8px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+    .col-feat { color: var(--feat); }
+    .col-tech { color: var(--tech); padding-left: 8px; }
+    .col-arrow { text-align: center; color: var(--muted); }
+    .rows { padding: 0 32px 24px; }
+    .row {
+      display: grid;
+      grid-template-columns: 200px 1fr 48px 1fr;
+      gap: 0;
+      align-items: stretch;
+      margin-bottom: 12px;
+    }
+    .feat-box {
+      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+      border: 1.5px solid #93c5fd;
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .feat-box strong { display: block; font-size: 15px; color: #1e3a8a; margin-bottom: 4px; }
+    .feat-box em { font-style: normal; font-size: 12px; color: var(--muted); line-height: 1.45; }
+    .arrow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      color: var(--accent);
+      font-weight: 700;
+    }
+    .tech-box {
+      background: linear-gradient(135deg, #f5f3ff 0%, #ede9fe 100%);
+      border: 1.5px solid #c4b5fd;
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .tech-box strong { display: block; font-size: 13px; color: #5b21b6; margin-bottom: 6px; }
+    .tech-box ul { list-style: none; font-size: 12px; color: #4c1d95; line-height: 1.55; }
+    .tech-box li::before { content: "▸ "; color: var(--tech); }
+    .diff-strip {
+      margin: 0 32px 28px;
+      padding: 18px 22px;
+      border-radius: 12px;
+      border-left: 5px solid var(--diff);
+      background: #ecfdf5;
+    }
+    .diff-strip h3 { font-size: 14px; color: var(--diff); margin-bottom: 10px; }
+    .diff-strip ul { padding-left: 18px; font-size: 13px; line-height: 1.65; color: #065f46; }
+    .foundation {
+      background: #f8fafc;
+      border-top: 1px solid var(--line);
+      padding: 20px 32px 28px;
+    }
+    .foundation h3 {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+    }
+    .chip {
+      font-size: 12px;
+      padding: 6px 14px;
+      border-radius: 999px;
+      background: #fff;
+      border: 1px solid var(--line);
+      color: var(--text);
+    }
+    .footnote {
+      text-align: center;
+      font-size: 11px;
+      color: var(--muted);
+      padding: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="canvas" id="diagram">
+    <header class="top">
+      <h1>Vela 出海法务台</h1>
+      <p>左边 = 法务/业务能用的功能 · 右边 = 支撑该功能的技术 · 箭头 = 一一对应</p>
+    </header>
+
+    <div class="hub">
+      <strong>核心定位：一个出海投资项目 = 一个法务工作台</strong>
+      <span>不是「查法条网站」，而是协查 + 合同 + 尽调 + 统摄 放在同一个项目里完成</span>
+    </div>
+
+    <div class="columns-head">
+      <div class="col-feat">产品功能</div>
+      <div class="col-feat">给用户解决什么</div>
+      <div class="col-arrow"></div>
+      <div class="col-tech">用什么技术实现</div>
+    </div>
+
+    <div class="rows">
+      <div class="row">
+        <div class="feat-box">
+          <strong>① 冷启动 Playbook</strong>
+          <em>新团队第一次用时，配好行业、语言、审查底线</em>
+        </div>
+        <div class="feat-box">
+          <em>避免每次从零开始；合同审查按「自家规矩」跑</em>
+        </div>
+        <div class="arrow">→</div>
+        <div class="tech-box">
+          <strong>实现方式</strong>
+          <ul>
+            <li>结构化访谈脚本（JSON 配置）</li>
+            <li>用户 Profile 持久化</li>
+            <li>docx/pdf 上传 + 文本解析填入规则</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="feat-box">
+          <strong>② 投资协查（核心）</strong>
+          <em>材料 → 清单 → 法条 → 简报 → 复核 → Word</em>
+        </div>
+        <div class="feat-box">
+          <em>把 weeks 手工查法、写清单，收成「一键草稿 + 法务签字」</em>
+        </div>
+        <div class="arrow">→</div>
+        <div class="tech-box">
+          <strong>实现方式</strong>
+          <ul>
+            <li>巴西场景规则包（JSON 规则引擎）</li>
+            <li>多源 RAG：Chroma 语料 + LexML 降级</li>
+            <li>匹配度门控 + S1/S2/S3 分级 + Grounding 校验</li>
+            <li>FastAPI 编排 · Vue 工作台 · Word 模板导出</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="feat-box">
+          <strong>③ 合同审查</strong>
+          <em>上传合同，标红/黄/绿风险点</em>
+        </div>
+        <div class="feat-box">
+          <em>投资和协查结论，能在合同条款上对得上</em>
+        </div>
+        <div class="arrow">→</div>
+        <div class="tech-box">
+          <strong>实现方式</strong>
+          <ul>
+            <li>Playbook house rules（冷启动注入）</li>
+            <li>条款切片 + 规则/关键词匹配</li>
+            <li>与同一 project_id 协查结果联动</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="feat-box">
+          <strong>④ 尽职调查</strong>
+          <em>上传 DD 包，提示缺什么、和协查是否矛盾</em>
+        </div>
+        <div class="feat-box">
+          <em>避免尽调清单和协查清单各说各话</em>
+        </div>
+        <div class="arrow">→</div>
+        <div class="tech-box">
+          <strong>实现方式</strong>
+          <ul>
+            <li>文档解析（pdf/docx）</li>
+            <li>核查项编码（LAB-001 等）交叉映射</li>
+            <li>规则化 issue 生成 + 项目 Hub 聚合</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="feat-box">
+          <strong>⑤ 项目统摄</strong>
+          <em>Analyst 汇总 · Red Team 挑矛盾</em>
+        </div>
+        <div class="feat-box">
+          <em>领导问「这个项目整体风险」，一页看清</em>
+        </div>
+        <div class="arrow">→</div>
+        <div class="tech-box">
+          <strong>实现方式</strong>
+          <ul>
+            <li>项目 Hub 统一读协查/合同/尽调 payload</li>
+            <li>轻量多 Agent（规则 MVP → 复赛 LLM 加深）</li>
+            <li>跨模块冲突检测与 issue 表</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="feat-box">
+          <strong>⑥ 法源维护 Agent</strong>
+          <em>法条变了，通知哪些项目要重看</em>
+        </div>
+        <div class="feat-box">
+          <em>解决「语料库不是实时法条」的信任问题</em>
+        </div>
+        <div class="arrow">→</div>
+        <div class="tech-box">
+          <strong>实现方式</strong>
+          <ul>
+            <li>本地语料 Diff + Reg Feed 源站扫描</li>
+            <li>LexML URN 批量回溯更新语料</li>
+            <li>订阅场景 checklist 编码 → 影响面分析</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="diff-strip">
+      <h3>★ 相对竞品，我们刻意做的差异化（功能 + 技术组合）</h3>
+      <ul>
+        <li><b>项目制</b>：北大法宝强在「查法条」；我们强在「一个投资项目走完全流程」</li>
+        <li><b>巴西垂直 + 可引用</b>：每条 AI 结论尽量绑语料片段/URN，低分拦 S3，不假装有依据</li>
+        <li><b>可签</b>：Gate A + 逐条复核 + 定稿后法条不 silently 变——给法务部敢用的失败安全</li>
+        <li><b>统摄 + 对抗</b>：不只生成正文，还用 Red Team 专门找材料/协查/合同之间的矛盾</li>
+      </ul>
+    </div>
+
+    <div class="foundation">
+      <h3>共用底座（所有功能都跑在上面）</h3>
+      <div class="chips">
+        <span class="chip">Vue 3 前端</span>
+        <span class="chip">FastAPI 后端</span>
+        <span class="chip">SQLite / PostgreSQL</span>
+        <span class="chip">Chroma 向量索引</span>
+        <span class="chip">brazil_legal_corpus 语料</span>
+        <span class="chip">Brazil Connector</span>
+        <span class="chip">通义 / DeepSeek（可选润色）</span>
+        <span class="chip">JWT 角色权限 · 审计日志</span>
+      </div>
+    </div>
+    <p class="footnote">浏览器打开本页全屏截图即可用于 PPT · 路径：vela-platform/docs/vela_feature_tech_map.html</p>
+  </div>
+</body>
+</html>

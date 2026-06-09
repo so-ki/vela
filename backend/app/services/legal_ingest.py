@@ -95,7 +95,7 @@ def ingest_corpus(force: bool = False) -> dict[str, Any]:
 def _doc_metadata(doc: dict[str, Any]) -> dict[str, Any]:
     return {
         "source": doc["source"],
-        "urn": doc["urn"],
+        "urn": doc.get("urn") or f"urn:vela:doc:{doc['id']}",
         "url": doc["url"],
         "title_pt": doc["title_pt"],
         "title_zh": doc.get("title_zh", ""),

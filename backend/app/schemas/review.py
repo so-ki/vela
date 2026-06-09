@@ -46,6 +46,8 @@ class ReviewItemResponse(BaseModel):
     external_counsel_required: bool = False
     legal_hits: List[ReviewLegalHitSummary] = Field(default_factory=list)
     reviewed_at: Optional[datetime] = None
+    carry_forward: bool = False
+    invalidated: bool = False
 
 
 class ReviewResponse(BaseModel):
@@ -61,3 +63,4 @@ class ReviewResponse(BaseModel):
     can_finalize: bool
     can_export: bool
     can_return_to_business: bool = False
+    version_label: Optional[str] = None

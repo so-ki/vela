@@ -13,6 +13,7 @@ const form = ref({
   password: '',
   full_name: '',
   organization: '',
+  role: 'legal' as 'legal' | 'business',
   accept_disclaimer: false,
 })
 const loading = ref(false)
@@ -40,6 +41,7 @@ async function handleSubmit() {
       password: form.value.password,
       full_name: form.value.full_name,
       organization: form.value.organization || undefined,
+      role: form.value.role,
       accept_disclaimer: true,
     })
     await auth.login(form.value.email, form.value.password)
@@ -56,8 +58,8 @@ async function handleSubmit() {
   <div class="auth-page">
     <div class="auth-card wide">
       <div class="auth-header">
-        <h1>注册企业法务账户</h1>
-        <p>注册即表示您已阅读并同意平台免责声明</p>
+        <h1>注册账户</h1>
+        <p>选择账户类型并完成注册；请先阅读下方条款并<strong>手动勾选</strong>同意后方可注册</p>
       </div>
 
       <div v-if="registrationClosed" class="disclaimer-preview">
@@ -68,14 +70,31 @@ async function handleSubmit() {
       </div>
 
       <form v-else @submit.prevent="handleSubmit" class="auth-form">
+        <fieldset class="role-choice">
+          <legend>账户类型</legend>
+          <label class="role-choice-option">
+            <input v-model="form.role" type="radio" value="legal" />
+            <span class="role-choice-body">
+              <strong>法务账户</strong>
+              <span class="muted">确认协查范围、Gate A、清单复核、定稿与导出</span>
+            </span>
+          </label>
+          <label class="role-choice-option">
+            <input v-model="form.role" type="radio" value="business" />
+            <span class="role-choice-body">
+              <strong>业务账户</strong>
+              <span class="muted">提交投资方案、核对抽取结果、补充材料</span>
+            </span>
+          </label>
+        </fieldset>
         <div class="form-row">
           <label>
             <span>姓名</span>
-            <input v-model="form.full_name" required placeholder="张法务" />
+            <input v-model="form.full_name" required />
           </label>
           <label>
             <span>所属企业</span>
-            <input v-model="form.organization" placeholder="可选" />
+            <input v-model="form.organization" />
           </label>
         </div>
         <label>
@@ -98,13 +117,13 @@ async function handleSubmit() {
         </div>
 
         <label class="checkbox-row">
-          <input type="checkbox" v-model="form.accept_disclaimer" />
+          <input type="checkbox" v-model="form.accept_disclaimer" required />
           <span>我已阅读并同意免责声明与数据使用条款</span>
         </label>
 
         <p class="error" v-if="error">{{ error }}</p>
 
-        <button type="submit" class="btn-primary full" :disabled="loading">
+        <button type="submit" class="btn-primary full" :disabled="loading || !form.accept_disclaimer">
           {{ loading ? '注册中…' : '注册并登录' }}
         </button>
       </form>

@@ -1,0 +1,129 @@
+{
+  "version": "1.2",
+  "title": "Vela 冷启动访谈",
+  "subtitle": "配置律所/团队协查偏好与输出模板，完成后将自动生成专属 Playbook",
+  "questions": [
+    {
+      "id": "org_name",
+      "prompt": "律所或法务团队名称",
+      "hint": "将写入协查底稿抬头与 Playbook 档案",
+      "type": "text",
+      "placeholder": "例如：星瀚杯演示法务部",
+      "required": true
+    },
+    {
+      "id": "primary_jurisdiction",
+      "prompt": "主要协查法域",
+      "hint": "决定默认规则包与法源检索范围",
+      "type": "choice",
+      "options": [
+        { "value": "brazil", "label": "巴西（联邦法 + 州法）", "hint": "默认场景，含 SP/MG/BA 等州法叠加" },
+        { "value": "latin_america_multi", "label": "拉美多国（巴西为主）", "hint": "巴西深度 + 墨/阿等区域提示" },
+        { "value": "china_brazil_cross", "label": "中巴跨境投资", "hint": "ODI/返程投资与双边合规交叉" }
+      ],
+      "default": "brazil",
+      "required": true
+    },
+    {
+      "id": "industry_focus",
+      "prompt": "重点行业（可多选）",
+      "hint": "用于优先匹配核查维度与 Playbook 模板",
+      "type": "multi_choice",
+      "options": [
+        { "value": "new_energy", "label": "新能源 / 储能设厂", "hint": "光伏、储能、绿电直连等" },
+        { "value": "manufacturing", "label": "先进制造 / 工业投资", "hint": "设厂、供应链、工业品出口" },
+        { "value": "mining", "label": "矿业 / 资源开发", "hint": "采矿权、环境与社会责任" },
+        { "value": "data_platform", "label": "数据平台 / 跨境数据", "hint": "LGPD、数据本地化、云服务" },
+        { "value": "consumer_retail", "label": "消费零售 / 电商", "hint": "渠道、品牌、消费者保护" },
+        { "value": "infrastructure", "label": "基础设施 / 公用事业", "hint": "特许权、PPP、公用事业监管" },
+        { "value": "agribusiness", "label": "农业 / 食品链", "hint": "土地、外资农业限制、出口" },
+        { "value": "financial_services", "label": "金融服务 / 支付", "hint": "牌照、外汇、反洗钱" },
+        { "value": "other", "label": "其他", "hint": "选择后在下方填写具体行业" }
+      ],
+      "other_field": {
+        "id": "industry_focus_other",
+        "trigger_value": "other",
+        "placeholder": "例如：生物医药、物流仓储、影视传媒…",
+        "label": "请说明其他行业"
+      },
+      "required": true,
+      "min_selections": 1
+    },
+    {
+      "id": "output_language",
+      "prompt": "简报输出语言偏好",
+      "hint": "影响自动生成的双语简报结构",
+      "type": "choice",
+      "options": [
+        { "value": "zh_pt_bilingual", "label": "中文 + 葡语双语", "hint": "推荐：便于内部汇报与当地律师协作" },
+        { "value": "zh_primary", "label": "中文为主", "hint": "葡语仅保留法条原文与关键术语" },
+        { "value": "pt_primary", "label": "葡语为主", "hint": "供巴西当地律师或监管机构沟通" }
+      ],
+      "default": "zh_pt_bilingual"
+    },
+    {
+      "id": "risk_tolerance",
+      "prompt": "门控严格度",
+      "hint": "影响匹配度阈值倾向与 S3 硬阻断灵敏度",
+      "type": "choice",
+      "options": [
+        { "value": "conservative", "label": "稳健型", "hint": "抬高匹配门槛，零命中高优项更易触发 S3" },
+        { "value": "balanced", "label": "均衡型", "hint": "平台默认平衡速度与合规" },
+        { "value": "expedited", "label": "提速型", "hint": "略放宽门控，适合初步筛查与时间紧项目" }
+      ],
+      "default": "conservative"
+    },
+    {
+      "id": "contract_house_rules",
+      "prompt": "合同审查底线（选填）",
+      "hint": "团队 house rules，将注入合同审查 Agent；可手写，也可上传既有清单/手册由系统解析填入",
+      "type": "textarea",
+      "placeholder": "例如：责任上限不超过合同额 100%；争议解决优先圣保罗仲裁；LGPD DPA 必备条款…",
+      "required": false,
+      "upload_field": {
+        "purpose": "contract_house_rules",
+        "label": "上传合同审查底线文件",
+        "hint": "支持 docx / pdf / txt / md，解析后自动填入上方文本框（可再编辑）",
+        "accept": ".docx,.pdf,.txt,.md",
+        "parse_into": "contract_house_rules",
+        "merge_mode": "append"
+      }
+    },
+    {
+      "id": "brief_template_style",
+      "prompt": "协查底稿风格",
+      "hint": "协查底稿 = 投资合规协查完成后导出的 Word/简报体例（章节顺序、表格样式、双语结构）。选平台预设或上传律所现行样例，导出时优先参考。",
+      "type": "choice",
+      "options": [
+        { "value": "law_firm_memo", "label": "律所备忘录体例", "hint": "背景—问题—分析—结论—建议" },
+        { "value": "in_house_checklist", "label": "企业内控清单体例", "hint": "表格化核查项 + 风险等级" },
+        { "value": "bilingual_executive", "label": "双语管理层摘要", "hint": "一页纸高管摘要 + 附录详表" },
+        { "value": "custom_sample", "label": "上传律所自有体例", "hint": "选择后请在下方向上传统考察底稿样例" }
+      ],
+      "default": "law_firm_memo",
+      "upload_field": {
+        "purpose": "brief_template_sample",
+        "label": "上传协查底稿样例（可选）",
+        "hint": "docx / pdf 等，系统归档并在导出 Word 时作为版式参考；选「上传律所自有体例」时建议必传",
+        "accept": ".docx,.pdf,.txt,.md",
+        "parse_into": null,
+        "required_when_answer": "custom_sample"
+      }
+    },
+    {
+      "id": "external_counsel_threshold",
+      "prompt": "哪些情况必须外聘当地律师？",
+      "hint": "写入 Playbook，供 Red Team 与冲突检测引用；可上传既有政策文件解析",
+      "type": "textarea",
+      "placeholder": "例如：环评 LP 未获、CADE 应报未报、S3 零命中高优先级项、州级 ICMS 激励未书面确认…",
+      "upload_field": {
+        "purpose": "external_counsel_triggers",
+        "label": "上传外聘律师触发政策文件",
+        "hint": "支持 docx / pdf / txt / md，解析后追加到上方文本",
+        "accept": ".docx,.pdf,.txt,.md",
+        "parse_into": "external_counsel_threshold",
+        "merge_mode": "append"
+      }
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>差异化能力</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: "PingFang SC","Microsoft YaHei",sans-serif; background:#eef2f6; padding:28px; }
+    .board { width:1180px; margin:0 auto; background:#fff; border-radius:14px; box-shadow:0 12px 40px rgba(26,58,92,.1); overflow:hidden; }
+    .hdr { background:linear-gradient(90deg,#1a3a5c,#2d5a87); color:#fff; padding:22px 32px; text-align:center; }
+    .hdr h1 { font-size:24px; font-weight:700; }
+    .hdr p { margin-top:6px; font-size:13px; opacity:.9; }
+    .hub { margin:20px 28px 16px; padding:14px 20px; text-align:center; border:2px solid #1a3a5c; border-radius:10px; background:#f8fafc; }
+    .hub strong { font-size:15px; color:#1a3a5c; }
+    .hub span { display:block; margin-top:4px; font-size:12px; color:#64748b; }
+    .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; padding:0 28px 24px; }
+    .card { border-radius:10px; padding:16px 14px; border:1.5px solid #e2e8f0; min-height:118px; }
+    .card:nth-child(1){background:#eff6ff;border-color:#93c5fd;}
+    .card:nth-child(2){background:#fff7ed;border-color:#fdba74;}
+    .card:nth-child(3){background:#ecfdf5;border-color:#6ee7b7;}
+    .card:nth-child(4){background:#f5f3ff;border-color:#c4b5fd;}
+    .card:nth-child(5){background:#fef2f2;border-color:#fca5a5;}
+    .card:nth-child(6){background:#f0fdf4;border-color:#86efac;}
+    .card:nth-child(7){background:#fdf4ff;border-color:#e9d5ff;}
+    .card:nth-child(8){background:#ecfeff;border-color:#67e8f9;}
+    .card:nth-child(9){background:#fffbeb;border-color:#fcd34d;}
+    .num { font-size:11px; font-weight:800; color:#1a3a5c; margin-bottom:6px; }
+    .card h2 { font-size:14px; color:#0f172a; margin-bottom:6px; }
+    .card p { font-size:11px; color:#475569; line-height:1.55; }
+    .foot { margin:0 28px 20px; padding:12px; background:#f1f5f9; border-radius:8px; font-size:11px; color:#64748b; text-align:center; }
+  </style>
+</head>
+<body>
+  <div class="board">
+    <header class="hdr">
+      <h1>差异化能力</h1>
+      <p>九大系统能力 · 构成可签、可学习、可统摄的出海法务工作台</p>
+    </header>
+    <div class="hub">
+      <strong>一个投资项目 = 一个法务工作台</strong>
+      <span>协查 · 合同 · 尽调 · 统摄 同一 project_id，不是分散的 AI 工具</span>
+    </div>
+    <div class="grid">
+      <div class="card">
+        <div class="num">01</div>
+        <h2>项目制工作台</h2>
+        <p>以投资项目为单元组织全部法务动作；清单、合同、尽调结论在同一上下文交叉验证。</p>
+      </div>
+      <div class="card">
+        <div class="num">02</div>
+        <h2>Playbook 冷启动</h2>
+        <p>访谈固化法域、行业、底线与底稿风格；上传 Word 解析 house rules，一次配置全程复用。</p>
+      </div>
+      <div class="card">
+        <div class="num">03</div>
+        <h2>可引用 · 可签</h2>
+        <p>法条绑 URN + Grounding 校验；S3 硬阻断；Gate A 与逐条复核通过后才 Word 定稿。</p>
+      </div>
+      <div class="card">
+        <div class="num">04</div>
+        <h2>Playbook 偏好闭环</h2>
+        <p>法务复核确认/驳回、阈值与法条数选择、Playbook 偏差记录 → 写入用户偏好 → 下次协查自动应用，越用越贴律所习惯。</p>
+      </div>
+      <div class="card">
+        <div class="num">05</div>
+        <h2>统摄 + Red Team</h2>
+        <p>Analyst 中性汇总全貌，Red Team 专挑材料/协查/合同/尽调矛盾；汇总与挑错分离。</p>
+      </div>
+      <div class="card">
+        <div class="num">06</div>
+        <h2>法源常新</h2>
+        <p>语料 Agent 监测 Diff + LexML 回溯；通知受影响项目；已定稿底稿不 silent 修改。</p>
+      </div>
+      <div class="card">
+        <div class="num">07</div>
+        <h2>增量协查</h2>
+        <p>业务补材料后只重算变更核查项，已通过条目沿用上一轮结论，节省复核成本。</p>
+      </div>
+      <div class="card">
+        <div class="num">08</div>
+        <h2>多源法条引证链</h2>
+        <p>语料索引 → LexML 实时 → 官方门户三级降级；查不到不编法条，只给可核对入口。</p>
+      </div>
+      <div class="card">
+        <div class="num">09</div>
+        <h2>跨模块冲突检测</h2>
+        <p>协查 S3、合同 RED、尽调缺项汇入统一 issue 表，标注严重度与建议动作。</p>
+      </div>
+    </div>
+    <div class="foot">交付：双语 Word · 四类 issue 表 · 审计日志 · Playbook 偏好可导出复盘</div>
+  </div>
+</body>
+</html>

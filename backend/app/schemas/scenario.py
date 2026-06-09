@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.document import ExtractedFact
 
@@ -103,6 +103,8 @@ class BusinessSubmitRequest(BaseModel):
 class ScopeConfirmRequest(BaseModel):
     compliance_dimensions: List[str] = Field(min_length=1)
     polish: bool = False
+    match_threshold: int = Field(default=70, ge=50, le=95, description="条目匹配度门控阈值")
+    retrieval_top_k: int = Field(default=3, ge=1, le=10, description="每条核查题绑定的法条数量")
 
 
 class ArchivedMaterialFile(BaseModel):
@@ -226,6 +228,12 @@ class MaterialFeedbackItem(BaseModel):
     dimensions: List[str] = Field(default_factory=list)
 
 
+class MaterialElementFeedbackItem(BaseModel):
+    element_id: str
+    label: str
+    dimensions: List[str] = Field(default_factory=list)
+
+
 class MaterialFeedback(BaseModel):
     return_kind: str = "materials"
     is_returned: bool = False
@@ -234,9 +242,13 @@ class MaterialFeedback(BaseModel):
     return_note: Optional[str] = None
     selected_dimensions: List[str] = Field(default_factory=list)
     missing_fields: List[str] = Field(default_factory=list)
+    missing_elements: List[str] = Field(default_factory=list)
     missing_by_dimension: dict[str, List[str]] = Field(default_factory=dict)
+    missing_elements_by_dimension: dict[str, List[str]] = Field(default_factory=dict)
     field_labels: dict[str, str] = Field(default_factory=dict)
+    element_labels: dict[str, str] = Field(default_factory=dict)
     items: List[MaterialFeedbackItem] = Field(default_factory=list)
+    element_items: List[MaterialElementFeedbackItem] = Field(default_factory=list)
 
 
 class MaterialReviewPreviewRequest(BaseModel):
@@ -245,8 +257,15 @@ class MaterialReviewPreviewRequest(BaseModel):
 
 class MaterialReturnRequest(BaseModel):
     compliance_dimensions: List[str] = Field(min_length=1)
-    missing_fields: List[str] = Field(min_length=1)
+    missing_fields: List[str] = Field(default_factory=list)
+    missing_elements: List[str] = Field(default_factory=list)
     note: Optional[str] = None
+
+    @model_validator(mode="after")
+    def require_missing_targets(self) -> MaterialReturnRequest:
+        if not self.missing_fields and not self.missing_elements:
+            raise ValueError("请至少指定一项需补充的构成要件或字段")
+        return self
 
 
 class ChecklistResponse(BaseModel):
@@ -300,6 +319,15 @@ class ScenarioResponse(BaseModel):
     can_revise: bool = False
     revision_round: int = 0
     document_extract: Optional[DocumentExtractSnapshot] = None
+    investigation_adequacy: Optional[dict] = None
+    gate_a_allows_review: bool = True
+    can_return_materials: bool = False
+    incremental_regen: Optional[dict] = None
+    conflict_flags: List[dict] = Field(default_factory=list)
+    investigation_settings: Optional[dict] = None
+    grounding_report: Optional[dict] = None
+    verification_report: Optional[dict] = None
+    playbook_deviations: List[dict] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 
