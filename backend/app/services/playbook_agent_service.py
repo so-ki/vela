@@ -14,16 +14,17 @@ def generate_playbook_draft(
     user_id: Optional[int] = None,
     pack_id: str | None = None,
     include_playbook_suggestions: bool = False,
+    extra_checklist_codes: set[str] | None = None,
 ) -> dict[str, Any]:
     """Rules engine draft + profile overlay (no manual JSON editing per run)."""
     profile = profile_for_generation(user_id)
-    extra_codes: set[str] | None = None
+    extra_codes: set[str] = set(extra_checklist_codes or [])
     if include_playbook_suggestions and profile.get("completed"):
-        extra_codes = set(profile.get("suggested_checklist_codes") or [])
+        extra_codes |= set(profile.get("suggested_checklist_codes") or [])
     checklist = generate_checklist(
         scenario,
         pack_id,
-        extra_codes_from_playbook=extra_codes,
+        extra_codes_from_playbook=extra_codes or None,
     )
 
     hints = playbook_scope_hints(user_id)

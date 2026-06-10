@@ -185,6 +185,20 @@ def aggregate_investigation_adequacy(
         )
         tier_report = tiered.get("tier_summary") or {}
 
+    missing_count = sum(
+        1
+        for dim in dimension_blocks
+        for el in dim.get("elements") or []
+        if el.get("status") == "missing"
+    )
+    at_risk_count = sum(
+        1
+        for dim in dimension_blocks
+        for el in dim.get("elements") or []
+        if el.get("status") == "at_risk"
+    )
+    zero_hits = (checklist_payload.get("retrieval_meta") or {}).get("zero_hit_items") or []
+
     return {
         "mode": "investigation_aggregate",
         "compliance_dimensions": compliance_dimensions,
@@ -196,6 +210,13 @@ def aggregate_investigation_adequacy(
         "element_labels": element_labels,
         "dimensions": dimension_blocks,
         "tier_report": tier_report,
+        "gap_summary": {
+            "missing_count": missing_count,
+            "at_risk_count": at_risk_count,
+            "s2_count": int(tier_report.get("S2") or 0),
+            "s3_count": int(tier_report.get("S3") or 0),
+            "zero_hit_count": len(zero_hits),
+        },
         "brief_summary": {
             "passed_count": int(brief.get("passed_count") or 0),
             "blocked_count": int(brief.get("blocked_count") or 0),

@@ -1,0 +1,102 @@
+{
+  "version": "1.0",
+  "description": "材料范围 House Rules · 协查 Gate A 预检 · 不修改 tier",
+  "rules": [
+    {
+      "id": "missing_destination",
+      "label": "设厂/厂房但缺投资目的地",
+      "severity": "medium",
+      "detect_patterns": ["设厂", "厂房", "新建", "建设工厂", "greenfield", "fábrica", "factory"],
+      "must_not": [],
+      "must_have": [],
+      "exceptions": [],
+      "guidance": "材料描述建设/厂房规模但未明确国家/州/城市，请业务补充 investment_destination 或城市信息。",
+      "dimension": "foreign_investment",
+      "feeds_checklist": ["FOR-001"]
+    },
+    {
+      "id": "env_claim_vs_new_build",
+      "label": "宣称无需环评但含新建/扩建线索",
+      "severity": "medium",
+      "detect_patterns": ["无需环评", "不需要环评", "无须环评", "sem licença ambiental", "no EIA required"],
+      "must_not": [],
+      "must_have": [],
+      "exceptions": [],
+      "guidance": "材料同时出现「无需环评」与新建/扩建/面积/产能线索，存在事实冲突，须法务核实。",
+      "dimension": "environment",
+      "feeds_checklist": ["ENV-001"]
+    },
+    {
+      "id": "missing_scale_manufacturing",
+      "label": "制造/组装但缺规模说明",
+      "severity": "low",
+      "detect_patterns": ["制造", "组装", "生产", "manufactur", "assembly", "montagem"],
+      "must_not": [],
+      "must_have": ["m²", "平方米", "产能", "MW", "GWh", "capacidade", "capacity", "投资规模", "雇员"],
+      "exceptions": [],
+      "guidance": "提及制造/组装但未说明产能、面积或投资规模，建议补充 facility_notes / capacity_notes。",
+      "dimension": "industry_access",
+      "feeds_checklist": []
+    },
+    {
+      "id": "lgpd_dimension_hint",
+      "label": "数据/用户线索缺 LGPD 维度",
+      "severity": "low",
+      "detect_patterns": ["数据", "用户", "personal data", "dados pessoais", "LGPD", "隐私", "云端", "SaaS"],
+      "must_not": [],
+      "must_have": [],
+      "exceptions": ["LGPD", "data_compliance", "proteção de dados"],
+      "guidance": "材料涉及数据处理/用户，建议纳入 data_compliance 维度并核查 DAT-001/DAT-002。",
+      "dimension": "data_compliance",
+      "feeds_checklist": ["DAT-001", "DAT-002"]
+    },
+    {
+      "id": "joint_venture_acquisition",
+      "label": "合资/收购结构线索",
+      "severity": "low",
+      "detect_patterns": ["合资", "收购", "并购", "joint venture", "aquisição", "CADE", "controle societário"],
+      "must_not": [],
+      "must_have": [],
+      "exceptions": [],
+      "guidance": "涉及合资或收购，建议核查 FOR-005 及反垄断/外资准入要件。",
+      "dimension": "foreign_investment",
+      "feeds_checklist": ["FOR-005"]
+    },
+    {
+      "id": "missing_funding_source",
+      "label": "大额投资缺资金来源",
+      "severity": "low",
+      "detect_patterns": ["亿美元", "million", "milhão", "投资总额", "capital social"],
+      "must_not": [],
+      "must_have": ["自有", "贷款", "发债", "fund", "financiamento", "资金来源", "capital próprio"],
+      "exceptions": [],
+      "guidance": "材料提及投资规模但未说明资金来源，建议补充 funding_source。",
+      "dimension": "foreign_investment",
+      "feeds_checklist": []
+    },
+    {
+      "id": "labor_headcount_vague",
+      "label": "用工规模表述模糊",
+      "severity": "low",
+      "detect_patterns": ["大量", "若干", "数百", "many employees", "vários empregados"],
+      "must_not": [],
+      "must_have": [],
+      "exceptions": [],
+      "guidance": "雇员规模未量化，建议提供 employee_count 或分阶段用工计划。",
+      "dimension": "labor",
+      "feeds_checklist": ["LAB-001"]
+    },
+    {
+      "id": "tax_incentive_claim",
+      "label": "税收激励主张缺依据",
+      "severity": "medium",
+      "detect_patterns": ["免税", "tax free", "isento", "PADIS", "激励", "incentivo fiscal"],
+      "must_not": [],
+      "must_have": [],
+      "exceptions": ["待确认", "subject to", "depende de"],
+      "guidance": "材料主张税收激励/免税，须补充适用制度与前提，避免未核实结论。",
+      "dimension": "tax",
+      "feeds_checklist": ["TAX-001"]
+    }
+  ]
+}

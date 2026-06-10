@@ -96,6 +96,7 @@ def _attach_legal_and_brief(
         sections_with_legal=sections,
         polish=polish,
         threshold=match_threshold,
+        user_id=user_id,
     )
     payload = {**payload, "brief": brief}
     payload = attach_quality_reports(
@@ -137,6 +138,7 @@ def run_generate_investigation_pack(
     match_threshold: int = 70,
     retrieval_top_k: Optional[int] = None,
     include_playbook_suggestions: bool = False,
+    selected_issue_codes: Optional[list[str]] = None,
 ) -> InvestigationScenario:
     """法务：选定协查维度并一次生成清单、法源检索、匹配度与简报，进入统一复核。"""
     if scenario.status != "pending_scope":
@@ -159,11 +161,13 @@ def run_generate_investigation_pack(
 
     base = scenario_to_create_request(scenario)
     request = base.model_copy(update={"compliance_dimensions": resolved_dimensions})
+    extra_codes = set(selected_issue_codes or [])
     regenerate_scenario_checklist(
         db,
         scenario,
         request,
         include_playbook_suggestions=include_playbook_suggestions,
+        extra_checklist_codes=extra_codes or None,
     )
 
     checklist_payload = scenario.checklist.payload if scenario.checklist else {}
@@ -207,6 +211,25 @@ def run_generate_investigation_pack(
         )
         adequacy = aggregate_investigation_adequacy(scenario, checklist_payload, resolved_dimensions)
         checklist_payload["investigation_adequacy"] = adequacy
+
+        from app.services.gap_explanation_service import run_gap_explanations
+        from app.services.red_team_service import run_investigation_red_team
+
+        gap_result = run_gap_explanations(scenario, checklist_payload, user_id=user.id)
+        checklist_payload["gap_explanations"] = gap_result
+        material_summary = _expansion_context(scenario)
+        red_result = run_investigation_red_team(
+            checklist_payload,
+            material_summary=material_summary,
+            user_id=user.id,
+        )
+        checklist_payload["red_team"] = red_result
+        steps = list(checklist_payload.get("agent_steps") or [])
+        if gap_result.get("agent_step"):
+            steps.append(gap_result["agent_step"])
+        if red_result.get("agent_step"):
+            steps.append(red_result["agent_step"])
+        checklist_payload["agent_steps"] = steps
         checklist_payload.pop("review", None)
 
     material_review = dict(material_review_old)
@@ -553,6 +576,10 @@ def run_revise_and_resubmit(
 
     if investigation_draft_history:
         materials_payload["investigation_draft_history"] = investigation_draft_history
+
+    from app.services.pending_scope_enrichment import enrich_pending_scope_payload
+
+    materials_payload = enrich_pending_scope_payload(scenario, materials_payload, user_id=user.id)
 
     if not scenario.checklist:
         raise ValueError("场景缺少核查清单")

@@ -5,7 +5,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import auth, legal, onboarding, projects, scenarios, system
+from app.api import auth, legal, llm_settings, onboarding, projects, scenarios, system
 from app.core.config import get_settings
 from app.core.database import init_db
 from app.services.legal_ingest import ingest_corpus
@@ -80,6 +80,7 @@ def create_app() -> FastAPI:
     app.include_router(legal.router, prefix="/api/v1")
     app.include_router(scenarios.router, prefix="/api/v1")
     app.include_router(system.router, prefix="/api/v1")
+    app.include_router(llm_settings.router, prefix="/api/v1")
 
     return app
 

@@ -128,6 +128,11 @@ onMounted(async () => {
         </div>
       </header>
 
+      <div v-if="extract?.extraction_warning || extract?.scan_or_empty" class="conflict-banner red-flag-banner">
+        <strong>抽取警告</strong>
+        <p>{{ extract?.extraction_warning || '扫描版或空文档，无法全文 grounding，请上传可搜索 PDF 或 Word' }}</p>
+      </div>
+
       <section v-if="hasMultiFileExtract" class="form-section per-file-review-block">
         <h2>各文件抽取结果</h2>
         <PerFileExtractSection

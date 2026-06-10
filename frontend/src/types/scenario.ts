@@ -233,6 +233,60 @@ export interface Scenario {
   playbook_deviations?: PlaybookDeviation[]
   grounding_report?: GroundingReport | null
   verification_report?: VerificationReport | null
+  material_scope_findings?: MaterialScopeFinding[]
+  issue_suggestions?: IssueSuggestion[]
+  gap_explanations?: GapExplanations | null
+  red_team?: RedTeamResult | null
+  unverified_facts?: UnverifiedFact[]
+  agent_steps?: AgentStep[]
+}
+
+export interface MaterialScopeFinding {
+  rule_id: string
+  label: string
+  risk: string
+  risk_label?: string
+  guidance?: string
+  feeds_checklist?: string[]
+}
+
+export interface IssueSuggestion {
+  code: string
+  title: string
+  confidence: string
+  fact_anchor: string
+  rationale?: string
+}
+
+export interface GapExplanations {
+  items?: Array<{
+    code: string
+    questions_zh?: string[]
+    questions_pt?: string[]
+    material_gaps?: string[]
+    suggested_documents?: string[]
+  }>
+}
+
+export interface RedTeamResult {
+  challenges?: Array<{
+    code: string
+    questions: Array<{ question: string; severity: string }>
+    red_team_note?: string
+  }>
+}
+
+export interface UnverifiedFact {
+  field?: string
+  snippet?: string
+  score?: number
+  status?: string
+}
+
+export interface AgentStep {
+  step: string
+  status: string
+  count?: number
 }
 
 export interface GroundingReport {
@@ -325,6 +379,13 @@ export interface InvestigationAdequacy {
   element_labels: Record<string, string>
   dimensions: InvestigationAdequacyDimension[]
   tier_report?: TierReport
+  gap_summary?: {
+    missing_count: number
+    at_risk_count: number
+    s2_count: number
+    s3_count: number
+    zero_hit_count: number
+  }
   brief_summary: {
     passed_count: number
     blocked_count: number

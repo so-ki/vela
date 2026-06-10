@@ -87,10 +87,20 @@ async function returnMaterials() {
 <template>
   <section class="panel investigation-adequacy-section">
     <div class="investigation-adequacy-head">
-      <h2>① 范围与构成要件（协查包聚合视图）</h2>
+      <h2>① 范围与构成要件（缺口优先）</h2>
       <p class="muted">
-        以下由<strong>条目级 RAG + 匹配度 + 材料预检</strong>聚合而成，与下方清单复核同源；发现材料事实不足时可随时打回业务。
+        主视图突出<strong> missing / at_risk 构成要件</strong>；法条命中默认折叠，S1 索引项不占主视觉。
       </p>
+      <div v-if="adequacy.gap_summary" class="gap-summary-panel panel">
+        <h3>协查缺口摘要</h3>
+        <div class="adequacy-stats">
+          <span class="badge rejected">missing {{ adequacy.gap_summary.missing_count }}</span>
+          <span class="badge warn">at_risk {{ adequacy.gap_summary.at_risk_count }}</span>
+          <span class="badge warn">S2 {{ adequacy.gap_summary.s2_count }}</span>
+          <span class="badge rejected">S3 {{ adequacy.gap_summary.s3_count }}</span>
+          <span class="badge muted-badge">zero_hit {{ adequacy.gap_summary.zero_hit_count }}</span>
+        </div>
+      </div>
       <div class="adequacy-stats">
         <span class="badge ok">简报通过 {{ adequacy.brief_summary.passed_count }} 条</span>
         <span class="badge rejected">门控未过 {{ adequacy.brief_summary.blocked_count }} 条</span>

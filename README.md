@@ -8,6 +8,19 @@
 
 **复赛演示：** 只走 [`docs/DEMO_GOLDEN_PATH.md`](docs/DEMO_GOLDEN_PATH.md) 一条线；门控说明见 [`docs/match_tier_and_gate.md`](docs/match_tier_and_gate.md)。
 
+### P1 LLM + Harness（复赛）
+
+| 能力 | 说明 |
+|------|------|
+| **Gate A 缺口优先** | 协查缺口摘要、材料 House Rules、法条默认折叠 |
+| **B1 议题识别** | LLM 建议核查项 + grounding 护栏，法务勾选后并入清单 |
+| **B2 材料 Playbook** | `material_house_rules.json` 纯规则预检 |
+| **B3/B4** | 缺口说明 / S2 Red Team（不改 tier） |
+| **AI 设置栏** | 工作台 → **AI 设置**：Provider、Base URL、Model、API Key、测试连接 |
+| **Golden Path** | 无 LLM Key 时规则回退，E2E `15/15` |
+
+详见 [`docs/P1_LLM_HARNESS.md`](docs/P1_LLM_HARNESS.md)。
+
 ---
 
 ## 技术栈

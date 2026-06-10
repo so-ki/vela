@@ -479,6 +479,7 @@ def confirm_scenario_scope(
             match_threshold=body.match_threshold,
             retrieval_top_k=body.retrieval_top_k,
             include_playbook_suggestions=body.include_playbook_suggestions,
+            selected_issue_codes=body.selected_issue_codes,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -504,6 +505,7 @@ def generate_investigation_pack(
             match_threshold=body.match_threshold,
             retrieval_top_k=body.retrieval_top_k,
             include_playbook_suggestions=body.include_playbook_suggestions,
+            selected_issue_codes=body.selected_issue_codes,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -530,6 +532,16 @@ def preview_material_review(
             dims = list(body.compliance_dimensions or [])
         result = assess_material_completeness(scenario, dims or list(scenario.compliance_dimensions or []))
         result["playbook_suggestions"] = playbook_scope_hints(current_user.id)
+        payload = scenario.checklist.payload if scenario.checklist else {}
+        from app.services.pending_scope_enrichment import enrich_pending_scope_payload
+
+        enriched = enrich_pending_scope_payload(scenario, dict(payload), user_id=current_user.id)
+        result["material_scope_findings"] = enriched.get("material_scope_findings") or []
+        result["issue_suggestions"] = enriched.get("issue_suggestions") or []
+        result["unverified_facts"] = enriched.get("unverified_facts") or []
+        doc = enriched.get("document_extract") or {}
+        result["document_conflicts"] = doc.get("conflicts") or []
+        result["conflict_flags"] = enriched.get("conflict_flags") or []
         if not body.compliance_dimensions and result["playbook_suggestions"].get("default_compliance_dimensions"):
             result["suggested_compliance_dimensions"] = result["playbook_suggestions"][
                 "default_compliance_dimensions"

@@ -136,6 +136,13 @@ def create_scenario_materials_only(
         total_items=0,
     )
     db.add(checklist)
+    db.flush()
+
+    from app.services.pending_scope_enrichment import enrich_pending_scope_payload
+
+    scenario.checklist = checklist
+    checklist_payload = enrich_pending_scope_payload(scenario, checklist_payload, user_id=user.id)
+    checklist.payload = checklist_payload
     db.commit()
 
     loaded = (
@@ -351,6 +358,7 @@ def regenerate_scenario_checklist(
     payload: ScenarioCreateRequest,
     *,
     include_playbook_suggestions: bool = False,
+    extra_checklist_codes: set[str] | None = None,
 ) -> dict:
     """在同一 scenario 上重新生成清单（保留 revision_history 由调用方处理）。"""
     _apply_payload_to_scenario(scenario, payload)
@@ -360,6 +368,7 @@ def regenerate_scenario_checklist(
         user_id=scenario.user_id,
         pack_id=pack_id,
         include_playbook_suggestions=include_playbook_suggestions,
+        extra_checklist_codes=extra_checklist_codes,
     )
     checklist_data = ensure_project_hub(checklist_data)
 
@@ -475,6 +484,12 @@ def scenario_to_response(scenario: InvestigationScenario) -> ScenarioResponse:
         grounding_report=payload.get("grounding_report"),
         verification_report=payload.get("verification_report"),
         playbook_deviations=list(payload.get("playbook_deviations") or []),
+        material_scope_findings=list(payload.get("material_scope_findings") or []),
+        issue_suggestions=list(payload.get("issue_suggestions") or []),
+        gap_explanations=payload.get("gap_explanations"),
+        red_team=payload.get("red_team"),
+        unverified_facts=list(payload.get("unverified_facts") or []),
+        agent_steps=list(payload.get("agent_steps") or []),
     )
 
 

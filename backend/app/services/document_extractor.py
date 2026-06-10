@@ -21,15 +21,23 @@ ALLOWED_SUFFIXES = {".txt", ".md", ".docx", ".pdf"}
 VALID_DIMENSIONS = ["labor", "foreign_investment", "tax", "environment", "industry_access"]
 
 DIMENSION_KEYWORDS: dict[str, list[str]] = {
-    "labor": ["雇员", "员工", "用工", "CLT", "工会", "外派", "岗位"],
-    "foreign_investment": ["外资", "子公司", "100%", "全资", "合资", "CNPJ", "投资结构", "并购", "CADE"],
-    "tax": ["税", "ICMS", "关税", "激励", "PADIS", "进口设备"],
-    "environment": ["环评", "EIA", "IBAMA", "环境", "排放", "危废", "PNRS", "RIMA"],
-    "industry_access": ["许可", "厂房", "认证", "电池", "客车", "光伏", "储能", "设厂", "制造", "Alvará", "INMETRO"],
+    "labor": ["雇员", "员工", "用工", "CLT", "工会", "外派", "岗位", "emprego", "employees", "workforce"],
+    "foreign_investment": [
+        "外资", "子公司", "100%", "全资", "合资", "CNPJ", "投资结构", "并购", "CADE",
+        "FDI", "foreign investment", "investimento estrangeiro", "joint venture",
+    ],
+    "tax": ["税", "ICMS", "关税", "激励", "PADIS", "进口设备", "tax", "fiscal", "imposto"],
+    "environment": ["环评", "EIA", "IBAMA", "环境", "排放", "危废", "PNRS", "RIMA", "ambiental", "EIA", "environmental"],
+    "industry_access": [
+        "许可", "厂房", "认证", "电池", "客车", "光伏", "储能", "设厂", "制造", "Alvará", "INMETRO",
+        "manufacturing", "licença", "industrial",
+    ],
 }
 
 EXTRACT_SYSTEM = """你是 Vela 出海法务平台的文档事实抽取助手。
-任务：从用户上传的中文巴西投资方案材料中，抽取可填入「协查材料核对表」的事实。
+任务：从用户上传的投资方案材料中抽取可填入「协查材料核对表」的事实。
+材料可能是中文、葡萄牙语或英文（巴西 FDI 场景）；请识别多语言表述并统一填入中文字段值。
+
 核对表对应企业境外投资方案中业务侧应确认的项目事实（非法律结论；不限于设厂场景）。
 
 核对表字段（须尽量全部填满，格式简洁、可直接展示）：
@@ -123,12 +131,12 @@ def _read_pdf_text(content: bytes) -> str:
 
     text = "\n".join(parts).strip()
     if not text:
-        raise ValueError("PDF 未读取到有效文本，请确认非扫描件图片或使用 Word/文本格式")
+        return ""
 
     if page_count > 0:
         avg_chars = len(text) / page_count
         if avg_chars < 80:
-            raise ValueError("疑似扫描 PDF，请上传 Word 或可复制 PDF")
+            return ""
 
     return text
 
@@ -942,34 +950,19 @@ def extract_facts_rule_based(text: str) -> dict[str, Any]:
     return _finalize_extract_result(result, text)
 
 
-def extract_facts_llm(text: str) -> tuple[dict[str, Any] | None, str | None]:
-    cfg = get_llm_config()
-    if not cfg or not get_settings().llm_polish_enabled:
+def extract_facts_llm(text: str, user_id: Optional[int] = None) -> tuple[dict[str, Any] | None, str | None]:
+    from app.services.llm_client import chat_completion_json, is_llm_enabled
+
+    if not is_llm_enabled(user_id):
         return None, "未配置 LLM，使用规则抽取"
 
     clipped = text[:6000]
-    prompt = f"请从以下方案材料抽取事实并返回 JSON：\n\n{clipped}"
+    prompt = f"请从以下方案材料抽取事实并返回 JSON（支持中文/葡语/英文原文）：\n\n{clipped}"
 
+    parsed, err = chat_completion_json(user_id, "extract", EXTRACT_SYSTEM, prompt, timeout=60.0)
+    if err or not parsed:
+        return None, err or "LLM 抽取失败"
     try:
-        url = f"{cfg['base_url']}/chat/completions"
-        body = {
-            "model": cfg["model"],
-            "messages": [
-                {"role": "system", "content": EXTRACT_SYSTEM},
-                {"role": "user", "content": prompt},
-            ],
-            "temperature": 0.1,
-            "response_format": {"type": "json_object"},
-        }
-        with httpx.Client(timeout=60.0) as client:
-            resp = client.post(
-                url,
-                headers={"Authorization": f"Bearer {cfg['api_key']}", "Content-Type": "application/json"},
-                json=body,
-            )
-            resp.raise_for_status()
-            raw = resp.json()["choices"][0]["message"]["content"]
-        parsed = _extract_json(raw)
         dims = [d for d in parsed.get("compliance_dimensions", []) if d in VALID_DIMENSIONS]
         if not dims:
             dims = _guess_dimensions(text)
@@ -1056,10 +1049,40 @@ def _merge_rule_and_llm(
     return merged
 
 
+def _scan_or_empty_warning(text: str) -> tuple[bool, str | None]:
+    if len(text) < 50:
+        return True, "文档内容过短或无法提取文本，请上传可搜索 PDF 或 Word"
+    letters = sum(1 for c in text if c.isalpha())
+    if letters < 20:
+        return True, "扫描版 PDF，无法全文 grounding，请上传可搜索 PDF 或 Word"
+    return False, None
+
+
 def extract_facts_from_document(filename: str, content: bytes) -> dict[str, Any]:
-    text = read_upload_text(filename, content)
-    if len(text) < 20:
-        raise ValueError("文档内容过短，请上传包含完整项目说明的材料")
+    try:
+        text = read_upload_text(filename, content)
+    except ValueError as exc:
+        return {
+            "filename": filename,
+            "mode": "failed",
+            "scan_or_empty": True,
+            "extraction_warning": str(exc),
+            "compliance_dimensions": list(VALID_DIMENSIONS),
+            "facts": [],
+            "disclaimer": "抽取失败，请人工填写或更换文件格式。",
+        }
+
+    scan_flag, warning = _scan_or_empty_warning(text)
+    if scan_flag:
+        return {
+            "filename": filename,
+            "mode": "failed",
+            "scan_or_empty": True,
+            "extraction_warning": warning,
+            "compliance_dimensions": _guess_dimensions(text or filename),
+            "facts": [],
+            "disclaimer": "扫描版或空文档无法自动抽取，请上传可搜索 PDF 或 Word。",
+        }
 
     # Stage A: rule-based extraction first
     rule_result = extract_facts_rule_based(text)

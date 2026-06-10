@@ -25,6 +25,20 @@ def _default_prefs(user_id: int) -> dict[str, Any]:
         "reject_counts": {},
         "approve_counts": {},
         "preferred_dimensions": [],
+        "llm_settings": {
+            "enabled": None,
+            "provider": "",
+            "base_url": "",
+            "api_key": "",
+            "default_model": "",
+            "task_models": {
+                "extract": "",
+                "issue_id": "",
+                "gap": "",
+                "red_team": "",
+                "polish": "",
+            },
+        },
         "events": [],
         "updated_at": None,
     }
@@ -195,3 +209,48 @@ def record_contract_finding_decision(
         adj[rule_id] = min(5, adj.get(rule_id, 0) + 1)
     prefs["contract_rule_adjustments"] = adj
     return save_user_preferences(user_id, prefs)
+
+
+def get_user_llm_settings(user_id: Optional[int]) -> dict[str, Any]:
+    if not user_id:
+        return {}
+    prefs = load_user_preferences(user_id)
+    return dict(prefs.get("llm_settings") or {})
+
+
+def get_llm_settings_response(user_id: int) -> dict[str, Any]:
+    from app.services.llm_client import PROVIDER_DEFAULTS, mask_api_key_for_response
+
+    cfg = get_user_llm_settings(user_id)
+    key = cfg.get("api_key") or ""
+    return {
+        "enabled": cfg.get("enabled"),
+        "provider": cfg.get("provider") or "qwen",
+        "base_url": cfg.get("base_url") or "",
+        "api_key_masked": mask_api_key_for_response(key) if key else "",
+        "has_api_key": bool(key),
+        "default_model": cfg.get("default_model") or "",
+        "task_models": dict(cfg.get("task_models") or {}),
+        "provider_defaults": PROVIDER_DEFAULTS,
+    }
+
+
+def update_user_llm_settings(user_id: int, updates: dict[str, Any]) -> dict[str, Any]:
+    prefs = load_user_preferences(user_id)
+    current = dict(prefs.get("llm_settings") or _default_prefs(user_id)["llm_settings"])
+
+    for key in ("enabled", "provider", "base_url", "default_model"):
+        if key in updates and updates[key] is not None:
+            current[key] = updates[key]
+
+    if "api_key" in updates and updates["api_key"]:
+        current["api_key"] = str(updates["api_key"]).strip()
+
+    if "task_models" in updates and isinstance(updates["task_models"], dict):
+        task_models = dict(current.get("task_models") or {})
+        task_models.update(updates["task_models"])
+        current["task_models"] = task_models
+
+    prefs["llm_settings"] = current
+    save_user_preferences(user_id, prefs)
+    return get_llm_settings_response(user_id)

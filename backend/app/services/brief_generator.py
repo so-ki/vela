@@ -159,6 +159,7 @@ def generate_brief(
     sections_with_legal: Optional[list[dict[str, Any]]] = None,
     threshold: int = DEFAULT_THRESHOLD,
     polish: bool = False,
+    user_id: Optional[int] = None,
 ) -> dict[str, Any]:
     sections = sections_with_legal or checklist_payload.get("sections_with_legal") or []
     if not sections:
@@ -185,6 +186,10 @@ def generate_brief(
                 "requires_review": requires_review,
                 "block_reason": block_reason,
                 "tier": item.get("tier", "S1" if gate_status == "passed" else "S2"),
+                "display_tier": item.get("tier", "S1" if gate_status == "passed" else "S2"),
+                "collapse_legal_hits": item.get("tier") == "S1"
+                and gate_status == "passed"
+                and score >= threshold,
                 "tier_label": item.get("tier_label", ""),
                 "hard_block": bool(item.get("hard_block")),
                 "risk_zh": _risk_text_zh(item, best, gate_status, block_reason),
@@ -238,11 +243,10 @@ def generate_brief(
     }
 
     if polish:
-        from app.core.config import get_settings
-        from app.services.llm_client import polish_brief
+        from app.services.llm_client import is_llm_enabled, polish_brief
 
-        if get_settings().llm_polish_enabled:
-            brief, err = polish_brief(brief)
+        if is_llm_enabled(user_id):
+            brief, err = polish_brief(brief, user_id=user_id)
             if err and brief.get("mode") == "template":
                 brief["llm_polish_skipped"] = err
 

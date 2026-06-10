@@ -14,15 +14,35 @@ const emit = defineEmits<{
 }>()
 
 const selected = ref<string[]>([])
+const selectedIssueCodes = ref<string[]>([])
 const matchThreshold = ref(70)
 const retrievalTopK = ref(3)
 const submitting = ref(false)
 const error = ref<string | null>(null)
 const dimensionsLocked = ref(false)
+const legalHitsExpanded = ref<Record<string, boolean>>({})
 
 let generateTimer: ReturnType<typeof setTimeout> | null = null
 
 const archivedFiles = computed(() => props.scenario.document_extract?.archived_files ?? [])
+const materialFindings = computed(() => props.scenario.material_scope_findings ?? [])
+const issueSuggestions = computed(() => props.scenario.issue_suggestions ?? [])
+const unverifiedFacts = computed(() => props.scenario.unverified_facts ?? [])
+const docConflicts = computed(() => props.scenario.document_extract?.field_conflicts ?? [])
+
+const gapSummary = computed(() => {
+  const adequacy = props.scenario.investigation_adequacy
+  if (adequacy?.gap_summary) return adequacy.gap_summary
+  const missing = materialFindings.value.filter((f) => f.risk === 'RED').length
+  const yellow = materialFindings.value.filter((f) => f.risk === 'YELLOW').length
+  return {
+    missing_count: missing,
+    at_risk_count: yellow,
+    s2_count: 0,
+    s3_count: 0,
+    zero_hit_count: 0,
+  }
+})
 
 async function downloadArchivedFile(storedName: string, filename: string) {
   await downloadScenarioMaterialFile(props.scenario.id, storedName, filename)
@@ -39,6 +59,20 @@ function toggleDimension(id: string) {
   if (set.has(id)) set.delete(id)
   else set.add(id)
   selected.value = [...set]
+}
+
+function toggleIssueCode(code: string) {
+  const set = new Set(selectedIssueCodes.value)
+  if (set.has(code)) set.delete(code)
+  else set.add(code)
+  selectedIssueCodes.value = [...set]
+}
+
+function initIssueSelections() {
+  const codes = issueSuggestions.value
+    .filter((s) => s.confidence === 'high' || s.confidence === 'medium' || s.confidence === 'low')
+    .map((s) => s.code)
+  selectedIssueCodes.value = [...new Set(codes)]
 }
 
 function scheduleGenerate() {
@@ -61,6 +95,7 @@ watch(selected, (dims) => {
 onMounted(async () => {
   matchThreshold.value = props.scenario.investigation_settings?.match_threshold ?? 70
   retrievalTopK.value = props.scenario.investigation_settings?.retrieval_top_k ?? 3
+  initIssueSelections()
   try {
     const prefs = await fetchUserPreferences()
     if (prefs.match_threshold != null && !props.scenario.investigation_settings?.match_threshold) {
@@ -79,6 +114,11 @@ onMounted(async () => {
   }
 })
 
+watch(
+  () => props.scenario.issue_suggestions,
+  () => initIssueSelections(),
+)
+
 onBeforeUnmount(() => {
   if (generateTimer) clearTimeout(generateTimer)
 })
@@ -95,6 +135,7 @@ async function generatePack() {
       false,
       matchThreshold.value,
       retrievalTopK.value,
+      selectedIssueCodes.value,
     )
     emit('investigationGenerated', updated)
   } catch (e: unknown) {
@@ -109,6 +150,10 @@ async function generatePack() {
     submitting.value = false
   }
 }
+
+function toggleLegalHits(code: string) {
+  legalHitsExpanded.value = { ...legalHitsExpanded.value, [code]: !legalHitsExpanded.value[code] }
+}
 </script>
 
 <template>
@@ -116,8 +161,75 @@ async function generatePack() {
     <div class="review-gate-head">
       <h2>① 选定协查范围</h2>
       <p class="muted">
-        勾选合规维度后，系统将<strong>自动生成协查包</strong>（清单 · 多源 RAG · 匹配度 · 简报）；生成完成后在本页下方查看构成要件聚合与清单复核。材料是否齐备，以生成后的 Gate A 聚合视图为准。
+        先看<strong>协查缺口摘要</strong>与材料 Playbook 命中，可选采纳 LLM 建议议题，再勾选维度生成协查包。
       </p>
+    </div>
+
+    <div v-if="scenario.document_extract?.extraction_warning" class="conflict-banner red-flag-banner">
+      <strong>抽取警告</strong>
+      <p>{{ scenario.document_extract.extraction_warning }}</p>
+    </div>
+
+    <div class="gap-summary-panel panel" v-if="materialFindings.length || issueSuggestions.length">
+      <h3>协查缺口摘要（Gate A 预览）</h3>
+      <div class="gap-summary-stats">
+        <span class="badge warn">材料 Playbook {{ materialFindings.length }} 项</span>
+        <span class="badge pri-medium">LLM 建议 {{ issueSuggestions.length }} 项</span>
+        <span v-if="unverifiedFacts.length" class="badge err">未验证抽取 {{ unverifiedFacts.length }}</span>
+        <span v-if="docConflicts.length" class="badge warn">多文件冲突 {{ docConflicts.length }}</span>
+      </div>
+    </div>
+
+    <div v-if="materialFindings.length" class="material-findings panel">
+      <h3>材料 House Rules 命中</h3>
+      <ul class="finding-card-list">
+        <li v-for="f in materialFindings" :key="f.rule_id" class="finding-card" :class="f.risk?.toLowerCase()">
+          <strong>{{ f.label }}</strong>
+          <span class="badge" :class="f.risk === 'RED' ? 'err' : 'warn'">{{ f.risk_label || f.risk }}</span>
+          <p class="muted">{{ f.guidance }}</p>
+          <p v-if="f.feeds_checklist?.length" class="muted">
+            建议对照 checklist：{{ f.feeds_checklist.join('、') }}
+          </p>
+        </li>
+      </ul>
+    </div>
+
+    <div v-if="issueSuggestions.length" class="issue-suggestions panel">
+      <h3>LLM 建议增加的核查项</h3>
+      <p class="muted">默认预选；法务可取消勾选。须 grounding 通过才会出现。</p>
+      <ul class="issue-suggestion-list">
+        <li v-for="s in issueSuggestions" :key="s.code">
+          <label>
+            <input
+              type="checkbox"
+              :checked="selectedIssueCodes.includes(s.code)"
+              @change="toggleIssueCode(s.code)"
+            />
+            <strong>{{ s.code }}</strong> {{ s.title }}
+            <span class="badge pri-medium">{{ s.confidence }}</span>
+          </label>
+          <p class="muted snippet">锚点：{{ s.fact_anchor }}</p>
+        </li>
+      </ul>
+    </div>
+
+    <div v-if="docConflicts.length" class="conflict-banner panel">
+      <strong>材料冲突</strong>
+      <ul>
+        <li v-for="c in docConflicts" :key="c.field">
+          {{ c.field }}：{{ c.values?.map((v: { value: string }) => v.value).join(' / ') }}
+        </li>
+      </ul>
+    </div>
+
+    <div v-if="unverifiedFacts.length" class="unverified-facts panel">
+      <strong>未验证抽取</strong>
+      <ul>
+        <li v-for="(u, idx) in unverifiedFacts" :key="idx">
+          {{ u.field }} · {{ u.snippet }}
+          <span v-if="u.score != null" class="muted">score {{ u.score }}</span>
+        </li>
+      </ul>
     </div>
 
     <div class="review-gate-split">
@@ -148,9 +260,6 @@ async function generatePack() {
             step="5"
             :disabled="dimensionsLocked"
           />
-          <p class="muted threshold-hint">
-            低于该分数的 RAG 命中将标注「需法务复核」；阈值越高，门控越严。
-          </p>
         </div>
         <div class="threshold-control panel" :class="{ disabled: dimensionsLocked }">
           <label for="retrieval-top-k">
@@ -166,9 +275,6 @@ async function generatePack() {
             step="1"
             :disabled="dimensionsLocked"
           />
-          <p class="muted threshold-hint">
-            默认 3 条；调高可展示更多依据，但复核与 grounding 工作量会增加。
-          </p>
         </div>
         <div class="dimension-grid dimension-grid-sidebar">
           <label
@@ -208,13 +314,15 @@ async function generatePack() {
         <div v-if="selected.length" class="auto-generate-status panel">
           <div v-if="submitting" class="gate-generating-banner">
             <strong>协查包生成中…</strong>
-            <p class="muted">正在执行：核查项定位 → 核查清单 → 多源 RAG → 匹配度 → 简报草稿</p>
           </div>
           <div v-else-if="error" class="gate-error-banner">
             <p class="error">{{ error }}</p>
             <button type="button" class="btn-primary sm" @click="generatePack">重试生成</button>
           </div>
-          <p v-else class="muted">已选定 {{ selected.length }} 个维度，即将自动生成协查包…</p>
+          <p v-else class="muted">
+            已选定 {{ selected.length }} 个维度
+            <span v-if="selectedIssueCodes.length">· 含 {{ selectedIssueCodes.length }} 条 LLM 建议议题</span>
+          </p>
         </div>
         <div v-else class="auto-generate-status panel">
           <p class="muted">请至少勾选一个合规维度。</p>
@@ -223,9 +331,42 @@ async function generatePack() {
     </div>
 
     <div class="material-gate-footer">
+      <RouterLink to="/" class="btn-secondary link-btn sm">工作台 · AI 设置</RouterLink>
       <RouterLink :to="`/scenarios/${scenario.id}/extract`" class="btn-secondary link-btn sm">
         查看 AI 抽取表
       </RouterLink>
     </div>
   </section>
 </template>
+
+<style scoped>
+.gap-summary-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.finding-card-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.finding-card {
+  border: 1px solid var(--border-muted, #ddd);
+  border-radius: 8px;
+  padding: 0.75rem;
+}
+.issue-suggestion-list {
+  list-style: none;
+  padding: 0;
+}
+.issue-suggestion-list li {
+  margin-bottom: 0.5rem;
+}
+.snippet {
+  font-size: 0.85rem;
+  margin-left: 1.5rem;
+}
+</style>

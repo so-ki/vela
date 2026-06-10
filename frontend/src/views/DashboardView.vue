@@ -20,6 +20,7 @@ import {
   unarchiveScenario,
 } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
+import LlmSettingsPanel from '@/components/LlmSettingsPanel.vue'
 import type { ScenarioSummary, RulesCatalog } from '@/types/scenario'
 import type { SystemStatus } from '@/types'
 
@@ -98,6 +99,7 @@ const corpusPanelOpen = ref(false)
 const demoPanelOpen = ref(false)
 const dimensionsPanelOpen = ref(false)
 const systemPanelOpen = ref(false)
+const aiSettingsPanelOpen = ref(false)
 const allScenariosPanelOpen = ref(true)
 const recycleBinPanelOpen = ref(false)
 const scenarioGroupOpen = ref<Record<string, boolean>>({
@@ -837,6 +839,28 @@ async function removeLegalScenario(s: ScenarioSummary) {
           <RouterLink to="/legal/corpus" class="btn-secondary link-btn full">按维度维护法源语料</RouterLink>
         </div>
         <p class="muted panel-footnote">调整核查项定义须更新规则库 JSON；语料维护页可按维度筛选并绑定 checklist 编号。</p>
+        </div>
+      </section>
+
+      <section
+        class="panel workbench-panel collapsible-workbench"
+        :class="{ 'is-open': aiSettingsPanelOpen }"
+        v-if="auth.user"
+      >
+        <button
+          type="button"
+          class="workbench-panel-toggle"
+          :aria-expanded="aiSettingsPanelOpen"
+          @click="aiSettingsPanelOpen = !aiSettingsPanelOpen"
+        >
+          <span class="collapse-chevron sm" aria-hidden="true" />
+          <div class="workbench-panel-toggle-main">
+            <h2>AI 设置</h2>
+            <span class="badge pri-medium">模型与 API</span>
+          </div>
+        </button>
+        <div v-show="aiSettingsPanelOpen" class="workbench-panel-body">
+          <LlmSettingsPanel />
         </div>
       </section>
 

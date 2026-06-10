@@ -138,14 +138,53 @@ export async function generateInvestigationPack(
   polish = false,
   matchThreshold = 70,
   retrievalTopK = 3,
+  selectedIssueCodes: string[] = [],
 ) {
   const { data } = await api.post(`/scenarios/${scenarioId}/generate-investigation`, {
     compliance_dimensions: complianceDimensions,
     polish,
     match_threshold: matchThreshold,
     retrieval_top_k: retrievalTopK,
+    selected_issue_codes: selectedIssueCodes,
   })
   return data
+}
+
+export interface LlmSettings {
+  enabled: boolean | null
+  provider: string
+  base_url: string
+  api_key_masked: string
+  has_api_key: boolean
+  default_model: string
+  task_models: {
+    extract: string
+    issue_id: string
+    gap: string
+    red_team: string
+    polish: string
+  }
+  provider_defaults: Record<string, { base_url?: string; default_model?: string }>
+}
+
+export async function fetchLlmSettings(): Promise<LlmSettings> {
+  const { data } = await api.get('/llm/settings')
+  return data
+}
+
+export async function patchLlmSettings(payload: Record<string, unknown>): Promise<LlmSettings> {
+  const { data } = await api.patch('/llm/settings', payload)
+  return data
+}
+
+export async function testLlmConnection(payload: {
+  provider: string
+  base_url?: string
+  api_key?: string
+  model?: string
+}) {
+  const { data } = await api.post('/llm/test', payload)
+  return data as { ok: boolean; latency_ms?: number; model?: string; error?: string }
 }
 
 /** @deprecated 使用 generateInvestigationPack */

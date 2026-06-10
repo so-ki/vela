@@ -136,7 +136,49 @@ def hub_summary(payload: dict[str, Any], scenario: InvestigationScenario) -> dic
             "contracts": f"/projects/{scenario.id}?tab=contracts",
             "diligence": f"/projects/{scenario.id}?tab=diligence",
         },
+        "contract_investigation_links": _contract_investigation_links(payload, scenario),
     }
+
+
+def _contract_investigation_links(payload: dict[str, Any], scenario: InvestigationScenario) -> list[dict[str, Any]]:
+    ensure_project_hub(payload)
+    links: list[dict[str, Any]] = list(payload.get("project_hub", {}).get("cross_links") or [])
+    contracts = payload.get("project_hub", {}).get("modules", {}).get("contracts") or {}
+    summary_items: list[dict[str, Any]] = []
+    for doc in contracts.get("documents") or []:
+        analysis = doc.get("analysis") or {}
+        if doc.get("status") != "analyzed":
+            continue
+        findings = doc.get("findings") or []
+        red = sum(1 for f in findings if f.get("risk") == "RED")
+        yellow = sum(1 for f in findings if f.get("risk") == "YELLOW")
+        suggested_codes: list[str] = []
+        for f in findings:
+            for rule in f.get("matched_rules") or []:
+                if rule.get("id") == "lgpd_dpa":
+                    suggested_codes.extend(["DAT-001", "DAT-002"])
+            inv = f.get("investigation_link")
+            if inv:
+                suggested_codes.extend(["data_compliance"])
+        tier_report = (payload.get("tier_report") or {})
+        s3_codes = tier_report.get("s3_codes") or []
+        summary_items.append(
+            {
+                "contract_id": doc.get("id"),
+                "filename": doc.get("filename"),
+                "red_count": red,
+                "yellow_count": yellow,
+                "suggested_checklist_codes": sorted(set(suggested_codes)),
+                "s3_cross_check": bool(s3_codes),
+                "banner": (
+                    "协查硬阻断项需与合同条款交叉核对"
+                    if s3_codes
+                    else None
+                ),
+                "analyzed_at": analysis.get("analyzed_at"),
+            }
+        )
+    return summary_items or links
 
 
 def link_contract_to_investigation(payload: dict[str, Any], contract_id: str, note: str) -> None:

@@ -621,6 +621,33 @@ function openFullBrief(code: string) {
         @materials-returned="onMaterialsReturned"
       />
 
+      <section v-if="scenario.gap_explanations?.items?.length" class="panel gap-explanations-section">
+        <h2>缺口说明 / 待办问题（只读）</h2>
+        <ul>
+          <li v-for="item in scenario.gap_explanations.items" :key="item.code">
+            <strong>{{ item.code }}</strong>
+            <ul>
+              <li v-for="(q, i) in item.questions_zh || []" :key="i">{{ q }}</li>
+            </ul>
+          </li>
+        </ul>
+      </section>
+
+      <section v-if="scenario.red_team?.challenges?.length" class="panel red-team-section">
+        <h2>Red Team 质疑（S2 · 只读）</h2>
+        <ul>
+          <li v-for="ch in scenario.red_team.challenges" :key="ch.code">
+            <strong>{{ ch.code }}</strong>
+            <ul>
+              <li v-for="(q, i) in ch.questions" :key="i">
+                [{{ q.severity }}] {{ q.question }}
+              </li>
+            </ul>
+            <p v-if="ch.red_team_note" class="muted">{{ ch.red_team_note }}</p>
+          </li>
+        </ul>
+      </section>
+
       <section
         v-if="showInvestigationAdequacy && (scenario.grounding_report || scenario.verification_report)"
         class="panel quality-reports-section"

@@ -109,6 +109,10 @@ class ScopeConfirmRequest(BaseModel):
         default=False,
         description="显式为 true 时，将 Playbook 建议核查项并入清单（不修改规则 JSON）",
     )
+    selected_issue_codes: List[str] = Field(
+        default_factory=list,
+        description="Gate A 勾选的 LLM 建议议题 code，并入清单 extra_codes",
+    )
 
 
 class ArchivedMaterialFile(BaseModel):
@@ -332,6 +336,12 @@ class ScenarioResponse(BaseModel):
     grounding_report: Optional[dict] = None
     verification_report: Optional[dict] = None
     playbook_deviations: List[dict] = Field(default_factory=list)
+    material_scope_findings: List[dict] = Field(default_factory=list)
+    issue_suggestions: List[dict] = Field(default_factory=list)
+    gap_explanations: Optional[dict] = None
+    red_team: Optional[dict] = None
+    unverified_facts: List[dict] = Field(default_factory=list)
+    agent_steps: List[dict] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
 
@@ -357,5 +367,4 @@ class ScenarioSummary(BaseModel):
     legal_deleted: bool = False
     legal_deleted_at: Optional[datetime] = None
     has_document_extract: bool = False
-
     model_config = {"from_attributes": True}
