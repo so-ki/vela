@@ -122,7 +122,7 @@ const passedItems = computed(() =>
 </script>
 
 <template>
-  <div class="brief-page">
+  <div class="brief-page page-stack">
     <div v-if="loading" class="muted">加载中…</div>
     <div v-else-if="error && !brief" class="error banner-error">{{ error }}</div>
     <template v-else-if="brief && scenario">
@@ -275,6 +275,13 @@ const passedItems = computed(() =>
                 <span class="source-badge">{{ cite.source_label }}</span>
                 <span>{{ cite.title_zh || cite.title_pt }}</span>
                 <span class="muted">（{{ cite.match_score }}）</span>
+                <span
+                  v-if="cite.citation_status"
+                  class="badge"
+                  :class="cite.citation_status === 'corpus_verified' ? 'ok' : 'warn'"
+                >
+                  {{ cite.citation_status === 'corpus_verified' ? '已验' : '待核对' }}
+                </span>
                 <a :href="cite.url" target="_blank" rel="noopener" class="hit-link">溯源 ↗</a>
               </div>
             </div>

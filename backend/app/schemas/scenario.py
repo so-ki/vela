@@ -101,10 +101,14 @@ class BusinessSubmitRequest(BaseModel):
 
 
 class ScopeConfirmRequest(BaseModel):
-    compliance_dimensions: List[str] = Field(min_length=1)
+    compliance_dimensions: List[str] = Field(default_factory=list)
     polish: bool = False
     match_threshold: int = Field(default=70, ge=50, le=95, description="条目匹配度门控阈值")
     retrieval_top_k: int = Field(default=3, ge=1, le=10, description="每条核查题绑定的法条数量")
+    include_playbook_suggestions: bool = Field(
+        default=False,
+        description="显式为 true 时，将 Playbook 建议核查项并入清单（不修改规则 JSON）",
+    )
 
 
 class ArchivedMaterialFile(BaseModel):
@@ -252,7 +256,7 @@ class MaterialFeedback(BaseModel):
 
 
 class MaterialReviewPreviewRequest(BaseModel):
-    compliance_dimensions: List[str] = Field(min_length=1)
+    compliance_dimensions: List[str] = Field(default_factory=list)
 
 
 class MaterialReturnRequest(BaseModel):

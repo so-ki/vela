@@ -1,0 +1,84 @@
+[
+  {
+    "source_id": "ibama-noticias",
+    "title": "IBAMA 环保法规与新闻",
+    "url": "https://www.gov.br/ibama/pt-br/assuntos/noticias",
+    "summary": "源站不可达：The read operation timed out",
+    "affected_checklist_codes": [
+      "ENV-001",
+      "ENV-004"
+    ],
+    "reason": "reg_feed_scan",
+    "status": "pending_review",
+    "queued_at": "2026-06-10T10:49:19.021401+00:00"
+  },
+  {
+    "source_id": "trabalho-govbr",
+    "title": "劳动与就业部 gov.br",
+    "url": "https://www.gov.br/trabalho-e-emprego/pt-br",
+    "summary": "源站不可达：The read operation timed out",
+    "affected_checklist_codes": [
+      "LAB-001",
+      "LAB-002",
+      "LAB-003"
+    ],
+    "reason": "reg_feed_scan",
+    "status": "pending_review",
+    "queued_at": "2026-06-10T10:49:19.021380+00:00"
+  },
+  {
+    "source_id": "lexml-portal",
+    "title": "LexML Brasil 联邦立法索引",
+    "url": "https://www.lexml.gov.br/",
+    "summary": "源站不可达：EOF occurred in violation of protocol (_ssl.c:1129)",
+    "affected_checklist_codes": [],
+    "reason": "reg_feed_scan",
+    "status": "pending_review",
+    "queued_at": "2026-06-10T06:48:37.771137+00:00"
+  },
+  {
+    "source_id": "sefaz-sp-beneficios",
+    "title": "Sefaz-SP ICMS 优惠法令清单",
+    "url": "https://portal.fazenda.sp.gov.br/acessoinformacao/Paginas/Beneficios-Fiscais.aspx",
+    "summary": "源站不可达：404",
+    "affected_checklist_codes": [
+      "TAX-002"
+    ],
+    "reason": "reg_feed_scan",
+    "status": "pending_review",
+    "queued_at": "2026-06-10T06:48:37.771135+00:00"
+  },
+  {
+    "source_id": "investsp-incentivos",
+    "title": "InvestSP 圣保罗州税收激励",
+    "url": "https://www.investe.sp.gov.br/por-que-sao-paulo/incentivos-fiscais/",
+    "summary": "源站不可达：404",
+    "affected_checklist_codes": [
+      "TAX-002",
+      "IND-008"
+    ],
+    "reason": "reg_feed_scan",
+    "status": "pending_review",
+    "queued_at": "2026-06-10T06:48:37.771132+00:00"
+  },
+  {
+    "source_id": "stf-portal",
+    "title": "STF 联邦最高法院",
+    "url": "http://www.stf.jus.br/",
+    "summary": "源站不可达：403",
+    "affected_checklist_codes": [],
+    "reason": "reg_feed_scan",
+    "status": "pending_review",
+    "queued_at": "2026-06-10T06:48:37.771129+00:00"
+  },
+  {
+    "source_id": "planalto-legislacao",
+    "title": "Planalto 总统府立法",
+    "url": "http://www4.planalto.gov.br/legislacao/",
+    "summary": "源站不可达：timed out",
+    "affected_checklist_codes": [],
+    "reason": "reg_feed_scan",
+    "status": "pending_review",
+    "queued_at": "2026-06-10T06:48:37.771106+00:00"
+  }
+]

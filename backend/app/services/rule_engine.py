@@ -209,7 +209,12 @@ def _item_matches_sub_sectors(item: dict[str, Any], detected_sub_sector_ids: set
     return bool(set(item_sectors) & detected_sub_sector_ids)
 
 
-def generate_checklist(scenario: ScenarioInput, pack_id: str | None = None) -> dict[str, Any]:
+def generate_checklist(
+    scenario: ScenarioInput,
+    pack_id: str | None = None,
+    *,
+    extra_codes_from_playbook: set[str] | None = None,
+) -> dict[str, Any]:
     resolved = resolve_pack_id(pack_id or scenario.rules_pack_id, scenario.country)
     rules = load_rules(resolved)
     corpus = _normalize_text(
@@ -292,6 +297,25 @@ def generate_checklist(scenario: ScenarioInput, pack_id: str | None = None) -> d
                 "rationale": f"{loc_label} 地域叠加必查项。",
             }
             scored_items.append(extra)
+
+    if extra_codes_from_playbook:
+        existing_ids = {i["id"] for i in scored_items}
+        for code in extra_codes_from_playbook:
+            if code in existing_ids or code not in item_by_id:
+                continue
+            item = item_by_id[code]
+            if item["dimension"] not in selected:
+                continue
+            scored_items.append(
+                {
+                    **item,
+                    "relevance_score": 4,
+                    "matched_triggers": [],
+                    "rationale": "Playbook 建议关注项（法务显式纳入）。",
+                    "playbook_suggested": True,
+                }
+            )
+            existing_ids.add(code)
 
     scored_items.sort(
         key=lambda x: (

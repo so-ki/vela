@@ -151,7 +151,7 @@ vela-platform/
 
 ### Step 3 — 法源 RAG（增强）
 
-- [x] 精选法源库 **70 条**（LexML / Planalto / STF / gov.br / 案例索引）
+- [x] 精选法源库 **70+ 条**（LexML / Planalto / STF / gov.br / 案例索引；扩库走人工审核队列）
 - [x] 清单条目自动检索 Top-3 法条片段 + LexML 溯源链接
 - [x] 匹配度评分，低于 70 分标记「需法务复核」
 - [x] 中英葡关键词联合打分（跨语种检索增强）
@@ -298,7 +298,7 @@ vela-platform/
 |----|------|------|
 | 协查法域 | **巴西 · 投资协查 v2.9**（触发式清单 + 5 子赛道） | 单法域做深后再开新 JSON 规则包 |
 | 法域 | 巴西单国 · 圣保罗/坎皮纳斯 | 拉美多法域扩展 |
-| 法源库 | **70 条**精选语料（v1.7 已清洗 HTML）+ 可选 Chroma | 语料扩容、监测自动抓取 |
+| 法源库 | **70+ 条**精选语料（v1.9 已清洗 HTML）+ 可选 Chroma | `backend/scripts/propose_corpus_entry.py` + `data/corpus_pending_review.json` 人工审核 |
 | 核查项定位 | 规则引擎 + 子赛道关键词 + 可选 LLM | 全 LLM 解析模式 |
 | 法规监测 | 手动扫描 + 提醒列表 | 自动爬虫 + 订阅推送 |
 | 导出 | Word 法学院意见书 + PDF legacy 底稿 | 律所 `.docx` 样张加载、PDF 与 Word 统一 |

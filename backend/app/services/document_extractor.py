@@ -10,6 +10,7 @@ from pypdf import PdfReader
 
 from app.core.config import get_settings
 from app.services.intent_parser import _extract_json
+from app.services.grounding_utils import verify_snippet_in_source
 from app.services.llm_client import get_llm_config
 
 MAX_BYTES = 200 * 1024 * 1024
@@ -113,6 +114,7 @@ def _read_pdf_text(content: bytes) -> str:
     except Exception as exc:
         raise ValueError("无法解析 PDF 文件，请确认文件未损坏") from exc
 
+    page_count = len(reader.pages)
     parts: list[str] = []
     for page in reader.pages:
         page_text = page.extract_text()
@@ -122,6 +124,12 @@ def _read_pdf_text(content: bytes) -> str:
     text = "\n".join(parts).strip()
     if not text:
         raise ValueError("PDF 未读取到有效文本，请确认非扫描件图片或使用 Word/文本格式")
+
+    if page_count > 0:
+        avg_chars = len(text) / page_count
+        if avg_chars < 80:
+            raise ValueError("疑似扫描 PDF，请上传 Word 或可复制 PDF")
+
     return text
 
 
@@ -532,6 +540,20 @@ def _extract_narrative_description(text: str, project_name: Optional[str] = None
     return _normalize_description(None, text, project_name)
 
 
+def _apply_fact_grounding(facts: list[dict[str, Any]], full_text: str) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for fact in facts:
+        if not isinstance(fact, dict):
+            continue
+        item = dict(fact)
+        snippet = str(item.get("source_snippet") or item.get("value") or "")
+        check = verify_snippet_in_source(snippet, full_text)
+        item["verification_status"] = "verified" if check["grounded"] else "unverified"
+        item["grounding_score"] = check["grounding_score"]
+        out.append(item)
+    return out
+
+
 def _finalize_extract_result(result: dict[str, Any], text: str) -> dict[str, Any]:
     project_name = _normalize_project_name(result.get("project_name"), text)
     result["project_name"] = project_name
@@ -575,7 +597,7 @@ def _finalize_extract_result(result: dict[str, Any], text: str) -> dict[str, Any
     facility_notes = result.get("facility_notes")
     if facility_notes:
         _append_fact(facts, "facility_notes", facility_notes, facility_notes[:80])
-    result["facts"] = facts[:24]
+    result["facts"] = _apply_fact_grounding(facts[:24], text)
     return result
 
 
@@ -982,21 +1004,74 @@ def extract_facts_llm(text: str) -> tuple[dict[str, Any] | None, str | None]:
         return None, str(exc)[:200]
 
 
+EXTRACT_FIELD_KEYS = (
+    "project_name",
+    "investment_destination",
+    "investment_structure",
+    "funding_source",
+    "project_content_scale",
+    "description",
+    "employee_count",
+    "capacity_notes",
+    "facility_notes",
+    "known_risks",
+    "board_date",
+    "start_date",
+    "production_date",
+    "compliance_dimensions",
+)
+
+
+def _merge_rule_and_llm(
+    rule_result: dict[str, Any],
+    llm_result: dict[str, Any] | None,
+) -> dict[str, Any]:
+    """Stage B: LLM fills only fields empty after rule-based extraction."""
+    merged = dict(rule_result)
+    if not llm_result:
+        return merged
+
+    for key in EXTRACT_FIELD_KEYS:
+        if key == "compliance_dimensions":
+            rule_dims = list(merged.get("compliance_dimensions") or [])
+            llm_dims = [d for d in (llm_result.get("compliance_dimensions") or []) if d in VALID_DIMENSIONS]
+            if llm_dims and not rule_dims:
+                merged["compliance_dimensions"] = llm_dims
+            continue
+        current = merged.get(key)
+        if current not in (None, "", []):
+            continue
+        candidate = llm_result.get(key)
+        if candidate not in (None, "", []):
+            merged[key] = candidate
+
+    rule_facts = list(merged.get("facts") or [])
+    llm_facts = list(llm_result.get("facts") or [])
+    covered = {f.get("field") for f in rule_facts if isinstance(f, dict)}
+    for fact in llm_facts:
+        if isinstance(fact, dict) and fact.get("field") not in covered:
+            rule_facts.append(fact)
+    merged["facts"] = rule_facts[:24]
+    merged["mode"] = "rules+llm" if llm_result else merged.get("mode", "rules")
+    return merged
+
+
 def extract_facts_from_document(filename: str, content: bytes) -> dict[str, Any]:
     text = read_upload_text(filename, content)
     if len(text) < 20:
         raise ValueError("文档内容过短，请上传包含完整项目说明的材料")
 
-    llm_result, llm_err = extract_facts_llm(text)
-    if llm_result and llm_result.get("description"):
-        if llm_err:
-            llm_result["llm_skipped"] = llm_err
-        return llm_result
-
+    # Stage A: rule-based extraction first
     rule_result = extract_facts_rule_based(text)
+
+    # Stage B: LLM fills gaps only
+    llm_result, llm_err = extract_facts_llm(text)
+    merged = _merge_rule_and_llm(rule_result, llm_result)
     if llm_err:
-        rule_result["llm_skipped"] = llm_err
-    return rule_result
+        merged["llm_skipped"] = llm_err
+
+    # Stage C: normalize + snippet grounding
+    return _finalize_extract_result(merged, text)
 
 
 def _normalize_text(value: Any) -> str:

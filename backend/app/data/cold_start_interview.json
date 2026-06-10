@@ -1,7 +1,7 @@
 {
   "version": "1.2",
-  "title": "Vela 冷启动访谈",
-  "subtitle": "配置律所/团队协查偏好与输出模板，完成后将自动生成专属 Playbook",
+  "title": "首次使用 · 冷启动访谈",
+  "subtitle": "配置律所 Playbook 与合同模板偏好，后续协查/合同/尽调将按您的模板生成",
   "questions": [
     {
       "id": "org_name",
@@ -98,13 +98,13 @@
         { "value": "law_firm_memo", "label": "律所备忘录体例", "hint": "背景—问题—分析—结论—建议" },
         { "value": "in_house_checklist", "label": "企业内控清单体例", "hint": "表格化核查项 + 风险等级" },
         { "value": "bilingual_executive", "label": "双语管理层摘要", "hint": "一页纸高管摘要 + 附录详表" },
-        { "value": "custom_sample", "label": "上传律所自有体例", "hint": "选择后请在下方向上传统考察底稿样例" }
+        { "value": "custom_sample", "label": "上传律所自有体例", "hint": "选择后可在下方上传协查底稿样例" }
       ],
       "default": "law_firm_memo",
       "upload_field": {
         "purpose": "brief_template_sample",
-        "label": "上传协查底稿样例（可选）",
-        "hint": "docx / pdf 等，系统归档并在导出 Word 时作为版式参考；选「上传律所自有体例」时建议必传",
+        "label": "上传协查底稿样例",
+        "hint": "支持 docx / pdf 等，系统归档并在导出 Word 时作为版式参考",
         "accept": ".docx,.pdf,.txt,.md",
         "parse_into": null,
         "required_when_answer": "custom_sample"

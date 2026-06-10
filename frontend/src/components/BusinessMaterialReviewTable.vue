@@ -692,8 +692,12 @@ const sectionNavItems = computed(() => {
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(fact, idx) in facts" :key="idx">
-              <th scope="row">{{ factLabel(fact.field) }}</th>
+            <tr v-for="(fact, idx) in facts" :key="idx" :class="{ 'fact-unverified': fact.verification_status === 'unverified' }">
+              <th scope="row">
+                {{ factLabel(fact.field) }}
+                <span v-if="fact.verification_status === 'unverified'" class="badge warn sm">待核对</span>
+                <span v-else-if="fact.verification_status === 'verified'" class="badge ok sm">已验</span>
+              </th>
               <td>{{ fact.value }}</td>
               <td v-if="facts.some((f) => f.source_filename)" class="muted">{{ fact.source_filename || '—' }}</td>
               <td class="muted">{{ fact.source_snippet || '—' }}</td>

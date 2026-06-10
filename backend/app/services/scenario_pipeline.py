@@ -33,7 +33,8 @@ from app.services.material_review_service import (
     build_material_return_record,
 )
 from app.services.material_file_storage import save_scenario_material_files
-from app.services.rule_engine import generate_checklist, get_material_field_labels
+from app.services.cold_start_service import playbook_scope_hints, resolve_compliance_dimensions
+from app.services.rule_engine import get_material_field_labels
 from app.services.scenario_service import (
     _materials_only_payload,
     attach_document_extract_to_payload,
@@ -135,10 +136,17 @@ def run_generate_investigation_pack(
     polish: bool = False,
     match_threshold: int = 70,
     retrieval_top_k: Optional[int] = None,
+    include_playbook_suggestions: bool = False,
 ) -> InvestigationScenario:
     """法务：选定协查维度并一次生成清单、法源检索、匹配度与简报，进入统一复核。"""
     if scenario.status != "pending_scope":
         raise ValueError("当前状态不可生成协查包，请确认项目处于待生成协查阶段")
+
+    resolved_dimensions = resolve_compliance_dimensions(compliance_dimensions, user_id=user.id)
+    if not resolved_dimensions:
+        resolved_dimensions = list(scenario.compliance_dimensions or [])
+    if not resolved_dimensions:
+        raise ValueError("请至少选择一个协查维度，或完成 Playbook 冷启动以使用默认维度")
 
     old_payload = copy.deepcopy(scenario.checklist.payload if scenario.checklist else {})
     document_extract = old_payload.get("document_extract")
@@ -150,8 +158,13 @@ def run_generate_investigation_pack(
     previous_pack = draft_history[-1] if use_incremental else None
 
     base = scenario_to_create_request(scenario)
-    request = base.model_copy(update={"compliance_dimensions": compliance_dimensions})
-    regenerate_scenario_checklist(db, scenario, request)
+    request = base.model_copy(update={"compliance_dimensions": resolved_dimensions})
+    regenerate_scenario_checklist(
+        db,
+        scenario,
+        request,
+        include_playbook_suggestions=include_playbook_suggestions,
+    )
 
     checklist_payload = scenario.checklist.payload if scenario.checklist else {}
     if document_extract:
@@ -168,7 +181,7 @@ def run_generate_investigation_pack(
             scenario,
             checklist_payload,
             previous_pack,
-            compliance_dimensions=compliance_dimensions,
+            compliance_dimensions=resolved_dimensions,
             baseline_snapshot=material_review_old["return_baseline_snapshot"],
             returned_missing_elements=list(material_review_old.get("returned_missing_elements") or []),
             polish=polish,
@@ -192,14 +205,14 @@ def run_generate_investigation_pack(
             retrieval_top_k=retrieval_top_k,
             user_id=user.id,
         )
-        adequacy = aggregate_investigation_adequacy(scenario, checklist_payload, compliance_dimensions)
+        adequacy = aggregate_investigation_adequacy(scenario, checklist_payload, resolved_dimensions)
         checklist_payload["investigation_adequacy"] = adequacy
         checklist_payload.pop("review", None)
 
     material_review = dict(material_review_old)
     material_review.update(
         {
-            "selected_dimensions": compliance_dimensions,
+            "selected_dimensions": resolved_dimensions,
             "status": "investigation_generated",
             "match_threshold": match_threshold,
             "retrieval_top_k": (checklist_payload.get("investigation_settings") or {}).get("retrieval_top_k")
@@ -225,9 +238,9 @@ def run_generate_investigation_pack(
     record_match_threshold_choice(user.id, match_threshold)
     effective_top_k = int((checklist_payload.get("investigation_settings") or {}).get("retrieval_top_k") or retrieval_top_k or 3)
     record_retrieval_top_k_choice(user.id, effective_top_k)
-    record_dimension_selection(user.id, compliance_dimensions)
+    record_dimension_selection(user.id, resolved_dimensions)
     scenario.status = "pending_legal_review"
-    scenario.compliance_dimensions = compliance_dimensions
+    scenario.compliance_dimensions = resolved_dimensions
     scenario.checklist.payload = copy.deepcopy(checklist_payload)
     flag_modified(scenario.checklist, "payload")
     db.commit()
@@ -253,7 +266,7 @@ def run_generate_investigation_pack(
         resource_id=str(scenario.id),
         detail=(
             f"法务生成协查包：{scenario.project_name}；"
-            f"维度 {', '.join(compliance_dimensions)}；"
+            f"维度 {', '.join(resolved_dimensions)}；"
             f"通过 {brief.get('passed_count', 0)} 条，需复核 {brief.get('blocked_count', 0)} 条"
             f"{mode_note}"
         ),

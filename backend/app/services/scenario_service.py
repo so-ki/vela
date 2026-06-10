@@ -349,6 +349,8 @@ def regenerate_scenario_checklist(
     db: Session,
     scenario: InvestigationScenario,
     payload: ScenarioCreateRequest,
+    *,
+    include_playbook_suggestions: bool = False,
 ) -> dict:
     """在同一 scenario 上重新生成清单（保留 revision_history 由调用方处理）。"""
     _apply_payload_to_scenario(scenario, payload)
@@ -357,6 +359,7 @@ def regenerate_scenario_checklist(
         _payload_from_request(payload),
         user_id=scenario.user_id,
         pack_id=pack_id,
+        include_playbook_suggestions=include_playbook_suggestions,
     )
     checklist_data = ensure_project_hub(checklist_data)
 

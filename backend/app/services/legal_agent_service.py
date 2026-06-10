@@ -54,8 +54,9 @@ def run_investigation_agent(
     enriched = retrieval["sections"]
 
     grounding = verify_sections_grounding(enriched)
+    grounded_sections = grounding.get("sections") or enriched
     tiered = classify_sections(
-        enriched,
+        grounded_sections,
         base_threshold=effective_threshold,
         grounding_report=grounding,
         user_threshold_adjustments=prefs.get("code_adjustments"),

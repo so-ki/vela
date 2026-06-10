@@ -80,7 +80,7 @@ onMounted(async () => {
 </script>
 
 <template>
-  <div class="progress-page">
+  <div class="progress-page page-stack">
     <div v-if="loading" class="muted">加载中…</div>
     <div v-else-if="error" class="error banner-error">{{ error }}</div>
     <template v-else-if="scenario">

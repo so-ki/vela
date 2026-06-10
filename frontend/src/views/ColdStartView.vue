@@ -173,6 +173,15 @@ function uploadRequired(q: InterviewQuestion | undefined) {
   return answers.value[q!.id] === uf.required_when_answer
 }
 
+function showUploadField(q: InterviewQuestion | undefined) {
+  const uf = q?.upload_field
+  if (!uf) return false
+  if (uf.required_when_answer) {
+    return answers.value[q!.id] === uf.required_when_answer
+  }
+  return true
+}
+
 function validateCurrent(): string | null {
   if (!current.value) return '题目加载失败'
   const qid = current.value.id
@@ -304,8 +313,8 @@ async function nextStep() {
 <template>
   <div class="cold-start-page">
     <header class="cold-start-hero">
-      <div class="hero-badge">Vela 出海法务 · 冷启动</div>
-      <h1>{{ script.title || '冷启动访谈' }}</h1>
+      <div class="hero-badge">首次配置</div>
+      <h1>{{ script.title || '首次使用 · 冷启动访谈' }}</h1>
       <p class="hero-sub">{{ script.subtitle }}</p>
     </header>
 
@@ -405,7 +414,7 @@ async function nextStep() {
         />
 
         <div
-          v-if="current.upload_field"
+          v-if="showUploadField(current)"
           class="upload-block"
           :class="{ required: uploadRequired(current) }"
         >

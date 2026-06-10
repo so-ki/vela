@@ -187,7 +187,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="material-review-page">
+  <div class="material-review-page page-stack">
     <header class="page-header material-review-page-head">
       <div>
         <p class="eyebrow dark">业务协查 · 材料核对</p>

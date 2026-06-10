@@ -13,6 +13,35 @@ INTERVIEW_PATH = Path(__file__).resolve().parents[1] / "data" / "cold_start_inte
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 PROFILES_DIR = DATA_DIR / "playbook_profiles"
 TEMPLATES_DIR = DATA_DIR / "playbook_templates"
+
+# Playbook profile → default scope (does NOT modify rules JSON)
+INDUSTRY_FOCUS_DEFAULT_DIMENSIONS: dict[str, list[str]] = {
+    "new_energy": ["labor", "foreign_investment", "tax", "environment", "industry_access"],
+    "mining": ["foreign_investment", "tax", "environment", "industry_access"],
+    "cross_border_ecommerce": ["foreign_investment", "tax", "industry_access", "data_compliance"],
+}
+
+INDUSTRY_FOCUS_SUGGESTED_CODES: dict[str, list[str]] = {
+    "new_energy": [
+        "LAB-001",
+        "LAB-002",
+        "FOR-001",
+        "FOR-002",
+        "FOR-003",
+        "TAX-001",
+        "TAX-002",
+        "ENV-001",
+        "ENV-004",
+        "IND-001",
+        "IND-002",
+    ],
+    "mining": ["FOR-001", "FOR-002", "ENV-001", "TAX-001", "IND-001"],
+    "cross_border_ecommerce": ["FOR-001", "TAX-001", "TAX-004", "IND-002", "DAT-001"],
+}
+
+VALID_SCOPE_DIMENSIONS = frozenset(
+    {"labor", "foreign_investment", "tax", "environment", "industry_access", "data_compliance"}
+)
 SESSIONS_DIR = DATA_DIR / "interview_sessions"
 
 
@@ -35,6 +64,69 @@ def _profile_path(user_id: int) -> Path:
 
 def _session_path(session_id: str) -> Path:
     return SESSIONS_DIR / f"{session_id}.json"
+
+
+def _resolve_industry_focus_keys(industry_focus: list[str]) -> list[str]:
+    keys: list[str] = []
+    for item in industry_focus:
+        raw = str(item).strip()
+        if raw.startswith("other:"):
+            continue
+        if raw in INDUSTRY_FOCUS_DEFAULT_DIMENSIONS:
+            keys.append(raw)
+    return keys or ["new_energy"]
+
+
+def default_compliance_dimensions_for_profile(industry_focus: list[str]) -> list[str]:
+    dims: list[str] = []
+    for key in _resolve_industry_focus_keys(industry_focus):
+        for dim in INDUSTRY_FOCUS_DEFAULT_DIMENSIONS.get(key, []):
+            if dim in VALID_SCOPE_DIMENSIONS and dim not in dims:
+                dims.append(dim)
+    return dims or list(INDUSTRY_FOCUS_DEFAULT_DIMENSIONS["new_energy"])
+
+
+def suggested_checklist_codes_for_profile(industry_focus: list[str]) -> list[str]:
+    codes: list[str] = []
+    for key in _resolve_industry_focus_keys(industry_focus):
+        for code in INDUSTRY_FOCUS_SUGGESTED_CODES.get(key, []):
+            if code not in codes:
+                codes.append(code)
+    return codes
+
+
+def playbook_scope_hints(user_id: Optional[int]) -> dict[str, Any]:
+    profile = profile_for_generation(user_id)
+    if not profile.get("completed"):
+        return {
+            "default_compliance_dimensions": [],
+            "suggested_checklist_codes": [],
+            "playbook_completed": False,
+        }
+    return {
+        "default_compliance_dimensions": list(
+            profile.get("default_compliance_dimensions")
+            or default_compliance_dimensions_for_profile(profile.get("industry_focus") or ["new_energy"])
+        ),
+        "suggested_checklist_codes": list(
+            profile.get("suggested_checklist_codes")
+            or suggested_checklist_codes_for_profile(profile.get("industry_focus") or ["new_energy"])
+        ),
+        "playbook_completed": True,
+        "risk_tolerance": profile.get("risk_tolerance"),
+    }
+
+
+def resolve_compliance_dimensions(
+    selected: list[str] | None,
+    *,
+    user_id: Optional[int] = None,
+) -> list[str]:
+    """Use explicit selection, else Playbook defaults, else empty (caller may fall back to all)."""
+    if selected:
+        return [d for d in selected if d in VALID_SCOPE_DIMENSIONS]
+    hints = playbook_scope_hints(user_id)
+    return list(hints.get("default_compliance_dimensions") or [])
 
 
 def get_playbook_profile(user_id: int) -> dict[str, Any]:
@@ -258,6 +350,8 @@ def complete_interview(session_id: str, user_id: int) -> dict[str, Any]:
         "org_name": answers.get("org_name", ""),
         "primary_jurisdiction": answers.get("primary_jurisdiction", "brazil"),
         "industry_focus": industry_focus,
+        "default_compliance_dimensions": default_compliance_dimensions_for_profile(industry_focus),
+        "suggested_checklist_codes": suggested_checklist_codes_for_profile(industry_focus),
         "output_language": answers.get("output_language", "zh_pt_bilingual"),
         "risk_tolerance": risk,
         "match_threshold_adjustment": threshold_adj,

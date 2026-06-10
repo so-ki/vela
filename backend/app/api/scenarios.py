@@ -52,6 +52,7 @@ from app.services.playbook_deviation_service import (
     record_deviation,
 )
 from app.services.user_preference_service import record_review_decision
+from app.services.cold_start_service import playbook_scope_hints, resolve_compliance_dimensions
 from app.services.material_review_service import assess_material_completeness
 from app.services.material_file_storage import resolve_archived_file_path
 from app.services.rule_engine import get_demo_scenario_template, get_mining_demo_scenario_template, get_rules_catalog, load_rules
@@ -331,27 +332,8 @@ def delete_scenario(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_legal_user),
 ):
-    """法务将已定稿协查案例移入回收站（可恢复）。"""
+    """法务将协查案例移入回收站（软删除，可恢复）。"""
     scenario = _load_accessible_scenario(db, scenario_id, current_user)
-    payload = scenario.checklist.payload if scenario.checklist else {}
-    meta = scenario_summary_meta(scenario.status, payload)
-    progress = meta["progress_status"]
-
-    if progress in ("submitted", "in_review"):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="待法务复核或复核中的项目不可移入回收站",
-        )
-    if progress == "needs_revision":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="待业务补充的项目不可移入回收站，请等待业务重提或继续跟进",
-        )
-    if progress != "finalized":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="仅已定稿项目可移入回收站；历史半成品请确认无进行中的复核后再联系管理员清理",
-        )
     if scenario.legal_deleted_at is not None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -366,7 +348,7 @@ def delete_scenario(
         action="scenario.delete",
         resource_type="scenario",
         resource_id=str(scenario_id),
-        detail=f"法务移入回收站：{scenario.project_name}",
+        detail=f"法务删除（移入回收站）：{scenario.project_name}",
     )
     return {"ok": True, "id": scenario_id}
 
@@ -496,6 +478,7 @@ def confirm_scenario_scope(
             polish=body.polish,
             match_threshold=body.match_threshold,
             retrieval_top_k=body.retrieval_top_k,
+            include_playbook_suggestions=body.include_playbook_suggestions,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -520,6 +503,7 @@ def generate_investigation_pack(
             polish=body.polish,
             match_threshold=body.match_threshold,
             retrieval_top_k=body.retrieval_top_k,
+            include_playbook_suggestions=body.include_playbook_suggestions,
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
@@ -541,7 +525,16 @@ def preview_material_review(
             detail="仅待生成协查包的项目可预览材料预检",
         )
     try:
-        return assess_material_completeness(scenario, body.compliance_dimensions)
+        dims = resolve_compliance_dimensions(body.compliance_dimensions, user_id=current_user.id)
+        if not dims:
+            dims = list(body.compliance_dimensions or [])
+        result = assess_material_completeness(scenario, dims or list(scenario.compliance_dimensions or []))
+        result["playbook_suggestions"] = playbook_scope_hints(current_user.id)
+        if not body.compliance_dimensions and result["playbook_suggestions"].get("default_compliance_dimensions"):
+            result["suggested_compliance_dimensions"] = result["playbook_suggestions"][
+                "default_compliance_dimensions"
+            ]
+        return result
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 

@@ -2,53 +2,66 @@
 
 from __future__ import annotations
 
-import re
 from typing import Any
 
+from app.services.corpus_text_cleaner import text_for_retrieval
+from app.services.grounding_utils import (
+    GROUNDED_THRESHOLD,
+    GROUNDED_THRESHOLD_HIGH,
+    normalize_text,
+    verify_snippet_in_source,
+)
 from app.services.legal_ingest import load_corpus
 
 
-def _normalize(text: str) -> str:
-    return re.sub(r"\s+", " ", (text or "").strip().lower())
-
-
-def _overlap_ratio(needle: str, haystack: str) -> float:
-    if not needle or not haystack:
-        return 0.0
-    if needle in haystack:
-        return 1.0
-    n_words = set(needle.split())
-    h_words = set(haystack.split())
-    if not n_words:
-        return 0.0
-    return len(n_words & h_words) / len(n_words)
-
-
-def verify_hit_grounding(hit: dict[str, Any], doc: dict[str, Any] | None) -> dict[str, Any]:
-    excerpt = _normalize(hit.get("excerpt_pt") or hit.get("text_pt") or "")
-    source = _normalize((doc or {}).get("text_pt") or "")
+def verify_hit_grounding(
+    hit: dict[str, Any],
+    doc: dict[str, Any] | None,
+    *,
+    priority: str = "medium",
+) -> dict[str, Any]:
+    excerpt_raw = hit.get("excerpt_pt") or hit.get("text_pt") or hit.get("excerpt_zh") or ""
     if not doc:
         return {
             "hit_id": hit.get("id"),
             "grounded": False,
             "grounding_score": 0.0,
+            "citation_status": "ungrounded",
             "reason": "语料条目不存在",
         }
-    if not excerpt:
-        return {
-            "hit_id": hit.get("id"),
-            "grounded": False,
-            "grounding_score": 0.0,
-            "reason": "摘录为空",
-        }
-    ratio = _overlap_ratio(excerpt[:400], source)
-    grounded = ratio >= 0.55 or excerpt[:80] in source
+
+    source = (doc.get("text_pt_clean") or doc.get("text_pt") or text_for_retrieval(doc) or "")
+    threshold = GROUNDED_THRESHOLD_HIGH if priority == "high" else GROUNDED_THRESHOLD
+    check = verify_snippet_in_source(
+        excerpt_raw,
+        source,
+        grounded_threshold=threshold,
+    )
+
     return {
         "hit_id": hit.get("id"),
-        "grounded": grounded,
-        "grounding_score": round(ratio, 3),
-        "reason": None if grounded else "摘录与语料原文匹配度不足，须法务核对",
+        "grounded": check["grounded"],
+        "grounding_score": check["grounding_score"],
+        "citation_status": check["citation_status"],
+        "reason": check["reason"],
     }
+
+
+def apply_hit_grounding(
+    hit: dict[str, Any],
+    doc: dict[str, Any] | None,
+    *,
+    priority: str = "medium",
+) -> dict[str, Any]:
+    """Return hit dict with grounding_score and citation_status attached."""
+    check = verify_hit_grounding(hit, doc, priority=priority)
+    out = dict(hit)
+    out["grounding_score"] = check["grounding_score"]
+    out["grounded"] = check["grounded"]
+    out["citation_status"] = check["citation_status"]
+    if check.get("reason"):
+        out["grounding_note"] = check["reason"]
+    return out
 
 
 def verify_sections_grounding(sections: list[dict[str, Any]]) -> dict[str, Any]:
@@ -58,13 +71,21 @@ def verify_sections_grounding(sections: list[dict[str, Any]]) -> dict[str, Any]:
     total_hits = 0
     grounded_hits = 0
 
+    enriched_sections: list[dict[str, Any]] = []
+
     for section in sections:
+        items_out: list[dict[str, Any]] = []
         for item in section.get("items", []):
             code = item.get("code")
+            priority = item.get("priority", "medium")
             hit_checks: list[dict[str, Any]] = []
+            hits_out: list[dict[str, Any]] = []
             for hit in item.get("legal_hits") or []:
                 total_hits += 1
-                check = verify_hit_grounding(hit, by_id.get(hit.get("id", "")))
+                doc = by_id.get(hit.get("id", ""))
+                enriched = apply_hit_grounding(hit, doc, priority=priority)
+                hits_out.append(enriched)
+                check = verify_hit_grounding(hit, doc, priority=priority)
                 if check["grounded"]:
                     grounded_hits += 1
                 hit_checks.append(check)
@@ -77,9 +98,12 @@ def verify_sections_grounding(sections: list[dict[str, Any]]) -> dict[str, Any]:
                         "all_grounded": all(h["grounded"] for h in hit_checks),
                     }
                 )
+            items_out.append({**item, "legal_hits": hits_out})
+        enriched_sections.append({**section, "items": items_out})
 
     ungrounded_codes = [r["code"] for r in item_results if not r["all_grounded"]]
     return {
+        "sections": enriched_sections,
         "total_hits": total_hits,
         "grounded_hits": grounded_hits,
         "grounding_rate": round(grounded_hits / total_hits, 3) if total_hits else 1.0,

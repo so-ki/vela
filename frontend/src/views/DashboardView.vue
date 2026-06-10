@@ -60,7 +60,7 @@ const playbookDeviations = ref<{
     export_hint?: string
   }
 } | null>(null)
-const rulesPackLoopOpen = ref(true)
+const rulesPackLoopOpen = ref(false)
 const scanningLegal = ref(false)
 const runningCorpusAgent = ref(false)
 const corpusAgent = ref<{
@@ -86,6 +86,7 @@ const corpusAgent = ref<{
 const scenarios = ref<ScenarioSummary[]>([])
 const rulesCatalog = ref<RulesCatalog | null>(null)
 const onboardingComplete = ref(true)
+const onboardingChecked = ref(false)
 const loading = ref(true)
 const creatingSample = ref(false)
 const sampleError = ref<string | null>(null)
@@ -100,13 +101,13 @@ const systemPanelOpen = ref(false)
 const allScenariosPanelOpen = ref(true)
 const recycleBinPanelOpen = ref(false)
 const scenarioGroupOpen = ref<Record<string, boolean>>({
-  submitted: false,
+  submitted: true,
   in_review: false,
   needs_revision: false,
   completed: false,
 })
 const businessScenarioGroupOpen = ref<Record<string, boolean>>({
-  needs_revision: false,
+  needs_revision: true,
   in_progress: false,
   completed: false,
 })
@@ -363,7 +364,13 @@ onMounted(async () => {
     }
     const results = await Promise.all(tasks)
     status.value = results[0] as SystemStatus
-    onboardingComplete.value = (results[2] as { completed?: boolean })?.completed !== false
+    const onboardingStatus = results[2] as { completed?: boolean }
+    onboardingComplete.value = onboardingStatus?.completed !== false
+    onboardingChecked.value = true
+    if (!onboardingComplete.value) {
+      await router.replace({ name: 'cold-start' })
+      return
+    }
     if (auth.isLegal) {
       legalStatus.value = (results[3] as typeof legalStatus.value) ?? null
       legalMonitor.value = (results[4] as typeof legalMonitor.value) ?? null
@@ -494,16 +501,30 @@ async function restoreLegalScenario(s: ScenarioSummary) {
   }
 }
 
-async function removeCompletedScenario(s: ScenarioSummary) {
-  if (!isLegalScenarioCompleted(s)) return
-  if (!window.confirm(`确定将「${s.project_name}」移入回收站？\n\n移入后将从列表隐藏，可在下方「回收站」随时恢复。`)) return
+async function removeLegalScenario(s: ScenarioSummary) {
+  const statusText =
+    legalProgressLabel[s.progress_status || 'processing'] || s.progress_status || '未知'
+  if (
+    !window.confirm(
+      `确定删除「${s.project_name}」？\n\n当前状态：${statusText}\n删除后从列表隐藏，可在下方「回收站」恢复。`,
+    )
+  ) {
+    return
+  }
   deletingId.value = s.id
   sampleError.value = null
   try {
     await deleteScenario(s.id)
     await loadScenarios()
-  } catch {
-    sampleError.value = '移入回收站失败，请确认该项目已定稿且不在复核中'
+  } catch (e: unknown) {
+    if (typeof e === 'object' && e !== null && 'response' in e) {
+      const detail = (e as { response?: { data?: { detail?: string } } }).response?.data?.detail
+      if (typeof detail === 'string') {
+        sampleError.value = detail
+        return
+      }
+    }
+    sampleError.value = '删除失败，请稍后重试'
   } finally {
     deletingId.value = null
   }
@@ -511,7 +532,9 @@ async function removeCompletedScenario(s: ScenarioSummary) {
 </script>
 
 <template>
-  <div class="dashboard" :class="{ 'legal-workbench-order': auth.isLegal, 'business-workbench': auth.isBusiness }">
+  <div class="dashboard page-stack" :class="{ 'legal-workbench-order': auth.isLegal, 'business-workbench': auth.isBusiness }">
+    <div v-if="!onboardingChecked || !onboardingComplete" class="muted">加载中…</div>
+    <template v-else>
     <section class="hero-card">
       <div>
         <p class="eyebrow">工作台</p>
@@ -535,15 +558,6 @@ async function removeCompletedScenario(s: ScenarioSummary) {
       </div>
     </section>
 
-    <section v-if="!onboardingComplete" class="panel workbench-panel onboarding-banner">
-      <h2>首次使用 · 冷启动访谈</h2>
-      <p class="muted">
-        配置律所 Playbook 与合同模板偏好（借鉴 Claude for Legal），后续协查/合同/尽调将按您的模板生成。
-      </p>
-      <RouterLink to="/onboarding" class="btn-primary link-btn">开始冷启动（约 3 分钟）</RouterLink>
-    </section>
-
-    <!-- 业务：提交入口（全宽，与下方进度/回收站对齐） -->
     <section
       class="panel workbench-panel collapsible-workbench business-submit-panel"
       :class="{ 'is-open': submitPanelOpen }"
@@ -576,7 +590,7 @@ async function removeCompletedScenario(s: ScenarioSummary) {
       </div>
     </section>
 
-    <div class="grid-2 legal-workbench-grid" v-if="auth.isLegal">
+    <div class="legal-workbench-grid" v-if="auth.isLegal">
       <!-- 法务：法源语料维护 -->
       <section
         class="panel workbench-panel collapsible-workbench"
@@ -931,19 +945,19 @@ async function removeCompletedScenario(s: ScenarioSummary) {
                 <li v-for="s in group.items" :key="s.id">
                   <div>
                     <strong>{{ s.project_name }}</strong>
-                    <span class="muted">
-                      <template v-if="s.submitter_name">{{ s.submitter_name }} · </template>
+                    <div class="scenario-row-meta muted">
+                      <template v-if="s.submitter_name">{{ s.submitter_name }}</template>
                       <span class="badge" :class="legalProgressBadgeClass(s)">
                         {{ legalProgressLabel[s.progress_status || 'processing'] || s.progress_status }}
                       </span>
                       <span class="badge" :class="'pri-' + (s.review_priority || 'low')">
                         {{ priorityLabel[s.review_priority || 'low'] }}
                       </span>
-                      <span class="muted" v-if="s.blocked_count && (group.id === 'submitted' || group.id === 'in_review')">
-                        · {{ s.blocked_count }} 条需关注
+                      <span v-if="s.blocked_count && (group.id === 'submitted' || group.id === 'in_review')">
+                        {{ s.blocked_count }} 条需关注
                       </span>
-                      · {{ s.total_items }} 条 · {{ new Date(s.created_at).toLocaleDateString('zh-CN') }}
-                    </span>
+                      <span>{{ s.total_items }} 条 · {{ new Date(s.created_at).toLocaleDateString('zh-CN') }}</span>
+                    </div>
                   </div>
                   <div class="scenario-actions">
                     <RouterLink :to="scenarioLinks(s).hub" class="btn-primary link-btn sm">项目中心</RouterLink>
@@ -970,14 +984,13 @@ async function removeCompletedScenario(s: ScenarioSummary) {
                       复核
                     </RouterLink>
                     <button
-                      v-if="group.id === 'completed'"
                       type="button"
-                      class="btn-secondary sm dismiss-btn"
+                      class="btn-secondary sm btn-danger-text"
                       :disabled="deletingId === s.id"
-                      title="移入回收站，可随时恢复"
-                      @click="removeCompletedScenario(s)"
+                      title="从列表删除，可在回收站恢复"
+                      @click="removeLegalScenario(s)"
                     >
-                      {{ deletingId === s.id ? '处理中…' : '移入回收站' }}
+                      {{ deletingId === s.id ? '删除中…' : '删除' }}
                     </button>
                   </div>
                 </li>
@@ -1020,12 +1033,12 @@ async function removeCompletedScenario(s: ScenarioSummary) {
                 <li v-for="s in group.items" :key="s.id">
                   <div>
                     <strong>{{ s.project_name }}</strong>
-                    <span class="muted">
+                    <div class="scenario-row-meta muted">
                       <span class="badge" :class="businessProgressBadgeClass(s, group.id)">
                         {{ businessProgressText(s) }}
                       </span>
-                      · {{ new Date(s.created_at).toLocaleDateString('zh-CN') }}
-                    </span>
+                      <span>{{ new Date(s.created_at).toLocaleDateString('zh-CN') }}</span>
+                    </div>
                   </div>
                   <div class="scenario-actions">
                     <RouterLink :to="scenarioLinks(s).hub" class="btn-primary link-btn sm">项目中心</RouterLink>
@@ -1117,5 +1130,6 @@ async function removeCompletedScenario(s: ScenarioSummary) {
         </ul>
       </div>
     </section>
+    </template>
   </div>
 </template>

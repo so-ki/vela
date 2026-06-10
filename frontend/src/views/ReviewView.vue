@@ -60,9 +60,12 @@ function initReviewCollapseState(sections: ReviewSectionGroup[]) {
   if (!sections.length) return
   const nextSection: Record<string, boolean> = { ...sectionOpen.value }
   const nextItem: Record<string, boolean> = { ...itemOpen.value }
+  let openedSection = false
   for (const section of sections) {
     if (!(section.dimension_id in nextSection)) {
-      nextSection[section.dimension_id] = false
+      const hasPending = section.items.some((item) => item.decision === 'pending')
+      nextSection[section.dimension_id] = hasPending && !openedSection
+      if (hasPending && !openedSection) openedSection = true
     }
     for (const item of section.items) {
       if (!(item.code in nextItem)) {
@@ -512,7 +515,7 @@ function openFullBrief(code: string) {
 </script>
 
 <template>
-  <div class="review-page">
+  <div class="review-page page-stack">
     <div v-if="loading" class="muted">加载中…</div>
     <div v-else-if="error && !scenario" class="error banner-error">{{ error }}</div>
     <template v-else-if="scenario">
@@ -539,60 +542,64 @@ function openFullBrief(code: string) {
           </template>
         </div>
         <div class="header-actions" v-if="auth.isLegal">
-          <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
-          <template v-if="showChecklistReview && review">
-            <button type="button" class="btn-secondary" @click="goBrief">查看简报</button>
+          <div class="header-actions-primary">
+            <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
+            <template v-if="showChecklistReview && review">
+              <button type="button" class="btn-secondary" @click="goBrief">查看简报</button>
+              <button
+                v-if="!isLocked"
+                type="button"
+                class="btn-secondary"
+                :disabled="saving === 'all'"
+                @click="runApproveAll"
+              >
+                全部确认
+              </button>
+              <button
+                v-if="!isLocked && review.can_return_to_business"
+                type="button"
+                class="btn-secondary reject"
+                :disabled="returning"
+                @click="runReturnToBusiness"
+              >
+                {{ returning ? '退回中…' : '退回业务补充' }}
+              </button>
+              <button
+                type="button"
+                class="btn-primary"
+                :disabled="!review.can_finalize || finalizing || isLocked"
+                @click="runFinalize"
+              >
+                {{ finalizing ? '定稿中…' : '提交复核定稿' }}
+              </button>
+            </template>
+          </div>
+          <div v-if="showChecklistReview && review?.can_export" class="header-actions-secondary">
             <button
-              v-if="!isLocked"
               type="button"
-              class="btn-secondary"
-              :disabled="saving === 'all'"
-              @click="runApproveAll"
-            >
-              全部确认
-            </button>
-            <button
-              v-if="!isLocked && review.can_return_to_business"
-              type="button"
-              class="btn-secondary reject"
-              :disabled="returning"
-              @click="runReturnToBusiness"
-            >
-              {{ returning ? '退回中…' : '退回业务补充' }}
-            </button>
-            <button
-              type="button"
-              class="btn-primary"
-              :disabled="!review.can_finalize || finalizing || isLocked"
-              @click="runFinalize"
-            >
-              {{ finalizing ? '定稿中…' : '提交复核定稿' }}
-            </button>
-            <button
-              type="button"
-              class="btn-secondary"
-              :disabled="!review.can_export || exporting"
+              class="btn-secondary sm"
+              :disabled="exporting"
               @click="runExport"
             >
               {{ exporting ? '导出中…' : `导出 Word · ${exportDocxLabel}` }}
             </button>
             <button
               type="button"
-              class="btn-secondary"
-              :disabled="!review.can_export || exportingPdf"
+              class="btn-secondary sm"
+              :disabled="exportingPdf"
               @click="runExportPdf"
             >
               {{ exportingPdf ? '导出中…' : '导出 PDF' }}
             </button>
             <button
               type="button"
-              class="btn-secondary"
-              :disabled="!review.can_export || exportingAudit"
+              class="btn-secondary sm"
+              :disabled="exportingAudit"
               @click="runExportAudit"
             >
               {{ exportingAudit ? '导出中…' : '导出审计包 JSON' }}
             </button>
-          </template>
+          </div>
         </div>
       </header>
 
@@ -670,34 +677,33 @@ function openFullBrief(code: string) {
 
       <p class="error banner-error" v-if="error">{{ error }}</p>
 
-      <div class="review-filters panel">
-        <button
-          v-for="f in [
-            { id: 'all', label: '全部' },
-            { id: 'pending', label: '待处理' },
-            { id: 'gate', label: '门控未过线' },
-            { id: 'external', label: '需外聘律所' },
-          ]"
-          :key="f.id"
-          type="button"
-          class="btn-secondary sm"
-          :class="{ active: reviewFilter === f.id }"
-          @click="reviewFilter = f.id as typeof reviewFilter"
-        >
-          {{ f.label }}
-        </button>
-      </div>
-
-      <div class="collapse-toolbar panel" v-if="reviewSections.length">
-        <span class="muted">
+      <div class="review-toolbar panel" v-if="reviewSections.length">
+        <div class="review-toolbar-filters">
+          <button
+            v-for="f in [
+              { id: 'all', label: '全部' },
+              { id: 'pending', label: '待处理' },
+              { id: 'gate', label: '门控未过线' },
+              { id: 'external', label: '需外聘律所' },
+            ]"
+            :key="f.id"
+            type="button"
+            class="btn-secondary sm"
+            :class="{ active: reviewFilter === f.id }"
+            @click="reviewFilter = f.id as typeof reviewFilter"
+          >
+            {{ f.label }}
+          </button>
+        </div>
+        <span class="review-toolbar-meta">
           共 {{ reviewSections.length }} 个合规维度 · 已展开 {{ openSectionCount }} 个 ·
           {{ filteredItems.length }} 条核查项 · 已展开 {{ openReviewItemCount }} 条
         </span>
-        <div class="collapse-toolbar-actions">
-          <button type="button" class="btn-text" @click="setAllSections(true)">展开全部维度</button>
-          <button type="button" class="btn-text" @click="setAllSections(false)">折叠全部维度</button>
-          <button type="button" class="btn-text" @click="setAllReviewItems(true)">展开全部条目</button>
-          <button type="button" class="btn-text" @click="setAllReviewItems(false)">折叠全部条目</button>
+        <div class="review-toolbar-actions">
+          <button type="button" class="toolbar-btn" @click="setAllSections(true)">展开全部维度</button>
+          <button type="button" class="toolbar-btn" @click="setAllSections(false)">折叠全部维度</button>
+          <button type="button" class="toolbar-btn" @click="setAllReviewItems(true)">展开全部条目</button>
+          <button type="button" class="toolbar-btn" @click="setAllReviewItems(false)">折叠全部条目</button>
         </div>
       </div>
 
@@ -805,6 +811,14 @@ function openFullBrief(code: string) {
                       >
                         <span class="source-badge">{{ cite.source_label }}</span>
                         <span>{{ cite.title_zh || cite.title_pt }}</span>
+                        <span
+                          v-if="cite.citation_status"
+                          class="badge"
+                          :class="cite.citation_status === 'corpus_verified' ? 'ok' : 'warn'"
+                        >
+                          {{ cite.citation_status === 'corpus_verified' ? '已验' : cite.citation_status === 'weak_grounding' ? '弱引证' : '待核对' }}
+                          <template v-if="cite.grounding_score"> · {{ Math.round(cite.grounding_score * 100) }}%</template>
+                        </span>
                         <a :href="cite.url" target="_blank" rel="noopener" class="hit-link">溯源 ↗</a>
                       </div>
                     </div>
@@ -822,6 +836,13 @@ function openFullBrief(code: string) {
                           <span class="source-badge">{{ hit.source_label }}</span>
                           <span class="badge" :class="hit.requires_review ? 'pri-medium' : 'ok'">
                             匹配度 {{ hit.match_score }}
+                          </span>
+                          <span
+                            v-if="hit.citation_status"
+                            class="badge"
+                            :class="hit.citation_status === 'corpus_verified' ? 'ok' : 'warn'"
+                          >
+                            {{ hit.citation_status === 'corpus_verified' ? 'grounding 已验' : '待核对' }}
                           </span>
                         </div>
                         <strong>{{ hit.title_zh || hit.title_pt }}</strong>

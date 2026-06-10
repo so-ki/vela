@@ -773,7 +773,7 @@ function shouldHighlightField(fieldPrefix: string): boolean {
 </script>
 
 <template>
-  <div class="scenario-page">
+  <div class="scenario-page page-stack">
     <header class="page-header">
       <div>
         <p class="eyebrow dark">{{ editMode ? '业务协查 · 补充材料' : auth.isBusiness ? '业务协查' : 'Step 2 · 规则库' }}</p>

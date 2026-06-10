@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import { RouterLink, RouterView } from 'vue-router'
+import { computed } from 'vue'
+import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import DisclaimerModal from '@/components/DisclaimerModal.vue'
 
 const auth = useAuthStore()
+const route = useRoute()
+
+const wideLayout = computed(() =>
+  ['review', 'checklist', 'brief', 'project-hub', 'material-review', 'legal-corpus'].includes(String(route.name)),
+)
 </script>
 
 <template>
@@ -28,7 +34,7 @@ const auth = useAuthStore()
       </div>
     </header>
 
-    <main class="main-content">
+    <main class="main-content" :class="{ 'main-content--wide': wideLayout }">
       <RouterView />
     </main>
 

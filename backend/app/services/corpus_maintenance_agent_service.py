@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Optional
 
 from sqlalchemy.orm import Session
@@ -23,6 +25,47 @@ from app.services.reg_feed_service import scan_reg_feed
 
 AGENT_INTERVAL_HOURS = 6
 MAX_LEXML_SYNC_PER_RUN = 12
+PENDING_REVIEW_PATH = Path(__file__).resolve().parents[1] / "data" / "corpus_pending_review.json"
+
+
+def _load_pending_review() -> list[dict[str, Any]]:
+    if not PENDING_REVIEW_PATH.exists():
+        return []
+    with open(PENDING_REVIEW_PATH, encoding="utf-8") as f:
+        data = json.load(f)
+    return list(data) if isinstance(data, list) else []
+
+
+def _save_pending_review(items: list[dict[str, Any]]) -> None:
+    PENDING_REVIEW_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(PENDING_REVIEW_PATH, "w", encoding="utf-8") as f:
+        json.dump(items[:200], f, ensure_ascii=False, indent=2)
+        f.write("\n")
+
+
+def enqueue_pending_corpus_review(entries: list[dict[str, Any]]) -> int:
+    """Append reg-feed / diff hints to human review queue — never auto-merge corpus."""
+    if not entries:
+        return 0
+    existing = _load_pending_review()
+    seen = {(e.get("source_id"), e.get("url"), e.get("title")) for e in existing}
+    added = 0
+    for entry in entries:
+        key = (entry.get("source_id"), entry.get("url"), entry.get("title"))
+        if key in seen:
+            continue
+        existing.insert(
+            0,
+            {
+                **entry,
+                "status": "pending_review",
+                "queued_at": _utcnow_iso(),
+            },
+        )
+        seen.add(key)
+        added += 1
+    _save_pending_review(existing)
+    return added
 
 
 def _utcnow_iso() -> str:
@@ -206,6 +249,32 @@ def run_corpus_maintenance_agent(
     prev_snapshot = dict(state.get("doc_snapshot") or {})
 
     feed = scan_reg_feed()
+    pending_entries: list[dict[str, Any]] = []
+    for item in feed.get("feed_items") or []:
+        if item.get("level") in ("high", "medium") or not item.get("reachable", True):
+            pending_entries.append(
+                {
+                    "source_id": item.get("source_id"),
+                    "title": item.get("title"),
+                    "url": item.get("url"),
+                    "summary": item.get("summary"),
+                    "affected_checklist_codes": item.get("affected_checklist_codes") or [],
+                    "reason": "reg_feed_scan",
+                }
+            )
+    for doc in (feed.get("policy_diff") or {}).get("changed_documents") or []:
+        pending_entries.append(
+            {
+                "source_id": "local-corpus",
+                "title": doc.get("title_pt") or doc.get("id"),
+                "url": doc.get("url"),
+                "doc_id": doc.get("id"),
+                "checklist_codes": doc.get("checklist_codes") or [],
+                "reason": "corpus_diff",
+            }
+        )
+    queued = enqueue_pending_corpus_review(pending_entries)
+
     lexml_updates: list[dict[str, Any]] = []
     if sync_lexml:
         lexml_updates = _batch_lexml_sync()
@@ -294,6 +363,7 @@ def run_corpus_maintenance_agent(
         "notifications": notifications[:10],
         "reindex": reindex_result,
         "feed": feed,
+        "pending_review_queued": queued,
     }
 
 

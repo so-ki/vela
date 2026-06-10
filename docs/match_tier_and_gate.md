@@ -91,3 +91,15 @@ cd backend && pytest tests/test_rules_pack_loop.py tests/test_contract_structure
 ```
 
 演示账号：`biz@demo.vela` / `legal@demo.vela`，密码 `Demo1234!`
+
+## 8. 预设规则包 vs Playbook Profile
+
+| 层级 | 存储 | 决定什么 | 运行时是否自动改 JSON |
+|------|------|----------|------------------------|
+| **规则包** `brazil_new_energy.json` | `backend/app/rules/` | 核查项模板、triggers、维度、Gate A 字段 | **否** — 唯一权威来源 |
+| **Playbook Profile** | `data/playbook_profiles/` | 默认协查维度、建议关注编号、阈值偏好、底稿风格 | **否** — 只影响预填与建议 |
+
+- 冷启动完成后写入 `default_compliance_dimensions`、`suggested_checklist_codes`（只读建议）。
+- 法务确认范围时：未选维度 → 预填 Playbook 默认维度；API 返回 `playbook_suggestions.checklist_codes` 供前端展示。
+- `include_playbook_suggestions=true` 时，才将建议编号 **并入清单**（仍不写入规则 JSON）。
+- 规则包闭环（驳回统计 → `rules_pack_loop_service`）仅 **建议** 修改 triggers，需人工审批后改 JSON。

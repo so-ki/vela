@@ -168,7 +168,7 @@ async function goToBrief() {
 </script>
 
 <template>
-  <div class="checklist-page" :class="{ 'with-review-return': auth.isLegal && route.query.from === 'review' }">
+  <div class="checklist-page page-stack" :class="{ 'with-review-return': auth.isLegal && route.query.from === 'review' }">
     <div v-if="loading" class="muted">加载中…</div>
     <div v-else-if="error && !displaySections.length" class="error banner-error">{{ error }}</div>
     <template v-else-if="scenario && checklist">
