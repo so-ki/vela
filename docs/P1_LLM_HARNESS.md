@@ -87,7 +87,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/v1/llm/status
 curl -X POST -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/v1/llm/test
 ```
 
-`available: false` 时演示仍可走 Golden Path 规则模式 + 一键样本。
+`available: false` 时仍走同一条业务知情 → 法务确认 → 快照冻结 Golden Path，并使用规则模板模式；不存在一键样本绕过入口。
 
 ---
 

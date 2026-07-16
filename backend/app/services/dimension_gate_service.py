@@ -14,7 +14,7 @@ from app.services.material_review_service import (
     _serialize_field_value,
     is_material_field_empty,
 )
-from app.services.rule_engine import get_material_field_labels
+from app.services.rule_engine import get_material_field_labels, get_material_field_labels_from_rules
 from app.services.rules_registry import load_rules as load_rules_pack
 
 
@@ -144,8 +144,9 @@ def _law_preview_for_dimension(
     elements: list[dict[str, Any]],
     *,
     top_k: int = 3,
+    corpus_data: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    corpus_data = load_corpus()
+    corpus_data = corpus_data if corpus_data is not None else load_corpus()
     codes: set[str] = set()
     query_parts: list[str] = [dimension_id]
     for el in elements:
@@ -193,12 +194,15 @@ def _law_preview_for_dimension(
 def assess_gate_a_preview(
     scenario: InvestigationScenario,
     compliance_dimensions: list[str],
+    *,
+    rules_data: dict[str, Any] | None = None,
+    corpus_data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if not compliance_dimensions:
         raise ValueError("请至少选择一个合规审查维度")
 
     pack_id = _scenario_pack_id(scenario)
-    rules = load_rules_pack(pack_id)
+    rules = rules_data if rules_data is not None else load_rules_pack(pack_id)
     dim_elements_cfg = rules.get("dimension_elements") or {}
     dim_meta = rules.get("dimensions") or {}
     field_defs = {item["key"]: item for item in rules.get("material_fields", []) if item.get("key")}
@@ -247,7 +251,9 @@ def assess_gate_a_preview(
                 "dimension_name_pt": meta.get("name_pt", ""),
                 "is_complete": filled_required >= required_count if required_count else True,
                 "elements": evaluated,
-                "law_preview": _law_preview_for_dimension(dim_id, evaluated),
+                "law_preview": _law_preview_for_dimension(
+                    dim_id, evaluated, corpus_data=corpus_data
+                ),
             }
         )
 
@@ -257,7 +263,11 @@ def assess_gate_a_preview(
         for el in dim_elements_cfg.get(dim_id) or []
     }
 
-    field_labels = get_material_field_labels(pack_id)
+    field_labels = (
+        get_material_field_labels_from_rules(rules)
+        if rules_data is not None
+        else get_material_field_labels(pack_id)
+    )
     required_fields = sorted(
         {
             fk

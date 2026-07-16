@@ -29,15 +29,16 @@ chmod +x scripts/start.sh
 
 | 项目 | 值 |
 |------|-----|
-| 演示账号 | `legal@demo.vela`（法务）/ `biz@demo.vela`（业务） |
+| 本地演示账号 | `legal@demo.vela`（法务）/ `biz@demo.vela`（业务）；由 `scripts/start.sh` 创建，生产默认不存在 |
 | 演示密码 | `Demo1234!` |
+
+business demo 应直接进入业务工作台且不显示 Legal Playbook；legal demo 已预置 `demo-legal-playbook-v1.0.0`，应直接进入法务工作台。真实新 legal 用户仍须完成 onboarding。
 
 ## 首次配置
 
 ```bash
 cd backend
-cp .env.example .env
-# 如需 LLM 润色，编辑 .env 填入 QWEN_API_KEY 或 DEEPSEEK_API_KEY
+# 发布包不包含任何 .env*；如需 LLM，使用本地环境变量注入 QWEN_API_KEY 或 DEEPSEEK_API_KEY
 python3 -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
@@ -46,15 +47,18 @@ python scripts/seed_demo_user.py
 
 ## 推荐测试路径
 
-### 法务角色（legal@demo.vela）
-
-1. 登录 → 工作台 **「一键生成完整样本」**
-2. 法务复核 → 全部确认 → 定稿 → **导出 Word / PDF**
-
 ### 业务 / 法务分角色流程
 
-1. **业务**（`biz@demo.vela`）登录 → 提交协查场景 → 清单 → 双语简报 → **提交法务复核**
-2. **法务**（`legal@demo.vela`）登录 → 工作台「待处理任务」→ 复核 → 定稿 → 导出
+当前唯一正式能力包是 `brazil_new_energy_greenfield`（巴西 · 新能源制造 · 绿地设厂）；测试 fixture 不代表法律能力，也不应出现在生产 Registry 或发布包。
+
+测试生成物只验证协查流程与可溯源底稿；AI 输出须经法务逐条复核，不构成正式法律意见。
+
+1. **业务**（`biz@demo.vela`）登录 → 上传 allowlist 演示材料 `scripts/fixtures/sample_storage_project.txt` → 查看当前 Capability Pack → 勾选知情 → 提交材料，状态应为 `pending_scope`，且尚无清单/简报。
+2. **法务**（`legal@demo.vela`）登录 → 查看场景卡、适配结论与材料缺口 → 选择维度 → 点击 **确认范围并生成**。
+3. 确认快照已冻结，随后查看已经持久化的清单、RAG 与双语简报；刷新页面不得重新生成。
+4. 法务初始化复核 → 逐条确认/驳回 → 定稿 → 导出。
+
+旧 `/scenarios` 直接生成、`generate-and-submit` 和 `demo/sample` 必须返回 `410 Gone`；POST retrieve/brief 不得启动生成。
 
 ### 通用
 
@@ -67,7 +71,7 @@ chmod +x scripts/verify_e2e.sh
 ./scripts/verify_e2e.sh
 ```
 
-覆盖：巴西投资协查 v2.9、BYD 24 条清单、子赛道差异化、法务驳回→业务可见、方案上传抽取、矿产 501。
+覆盖：业务知情、法务原子确认、快照/attempt 幂等、Capability Pack 制品绑定、RAG/brief 只读、法务驳回→业务可见及旧入口 410。
 
 语料清洗后若需重建向量索引：`curl -X POST http://127.0.0.1:8000/api/v1/legal/index?force=true`（需法务登录 token）。
 

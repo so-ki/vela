@@ -41,6 +41,17 @@ const providerOptions = [
   { id: 'openai_compatible', label: 'OpenAI 兼容' },
 ]
 
+const taskModelFields: Array<{
+  key: keyof LlmSettings['task_models']
+  label: string
+}> = [
+  { key: 'extract', label: '材料抽取' },
+  { key: 'issue_id', label: '议题识别' },
+  { key: 'gap', label: '缺口说明' },
+  { key: 'red_team', label: 'Red Team' },
+  { key: 'polish', label: '简报润色' },
+]
+
 const defaultBaseUrl = computed(() => {
   const defs = settings.value.provider_defaults?.[settings.value.provider]
   return defs?.base_url || ''
@@ -154,15 +165,9 @@ async function runTest() {
       <details class="task-models-details">
         <summary>按任务选模型（高级，留空则用默认 model）</summary>
         <div class="task-models-grid">
-          <label v-for="(label, key) in {
-            extract: '材料抽取',
-            issue_id: '议题识别',
-            gap: '缺口说明',
-            red_team: 'Red Team',
-            polish: '简报润色',
-          }" :key="key">
-            {{ label }}
-            <input v-model="settings.task_models[key as keyof typeof settings.task_models]" type="text" />
+          <label v-for="field in taskModelFields" :key="field.key">
+            {{ field.label }}
+            <input v-model="settings.task_models[field.key]" type="text" />
           </label>
         </div>
       </details>

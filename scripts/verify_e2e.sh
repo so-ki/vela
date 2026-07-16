@@ -50,23 +50,61 @@ auth_header() {
   echo "Authorization: Bearer $1"
 }
 
+verify_demo_identity() {
+  local token=$1
+  local expected_email=$2
+  local expected_role=$3
+  local expected_required=$4
+  local me onboarding
+  me=$(curl_t "$CURL_MAX" "$API/auth/me" -H "$(auth_header "$token")") || return 1
+  onboarding=$(curl_t "$CURL_MAX" "$API/onboarding/status" -H "$(auth_header "$token")") || return 1
+  echo "$me" | python3 -c "
+import json, sys
+d=json.load(sys.stdin)
+assert d.get('email')==sys.argv[1], d
+assert d.get('role')==sys.argv[2], d
+assert d.get('is_active') is True, d
+assert d.get('disclaimer_accepted') is True, d
+" "$expected_email" "$expected_role" || return 1
+  echo "$onboarding" | python3 -c "
+import json, sys
+d=json.load(sys.stdin)
+assert d.get('completed') is True, d
+assert d.get('required') is (sys.argv[1]=='true'), d
+assert d.get('role')==sys.argv[2], d
+" "$expected_required" "$expected_role"
+}
+
 log "1. Health"
 curl_t "$CURL_HEALTH_MAX" "$API/health" >/dev/null && ok "health" || bad "health"
 
-log "2. Rules catalog (Brazil investment pack v2.9)"
-PACK=$(curl_t "$CURL_MAX" "$API/rules/catalog" -H "$(auth_header "$(login legal@demo.vela)")")
+log "1b. Demo auth, roles, disclaimer and onboarding"
+TOKEN=$(login legal@demo.vela)
+BIZ=$(login biz@demo.vela)
+verify_demo_identity "$TOKEN" legal@demo.vela legal true \
+  && ok "legal demo ready" || bad "legal demo auth/onboarding"
+verify_demo_identity "$BIZ" biz@demo.vela business false \
+  && ok "business demo ready (Playbook not required)" || bad "business demo auth/onboarding"
+
+log "2. Capability Pack catalog (Brazil greenfield v1.0.0)"
+PACK=$(curl_t "$CURL_MAX" "$API/capability-packs/catalog" -H "$(auth_header "$TOKEN")")
 echo "$PACK" | python3 -c "
 import sys, json
 d=json.load(sys.stdin)
 assert d.get('pack',{}).get('id')=='brazil_new_energy', d
 assert d.get('rules_pack_id')=='brazil_new_energy', d
-assert d.get('scene_defaults',{}).get('country')=='brazil', d
+cap=d.get('capability_pack') or {}
+assert cap.get('pack_id')=='brazil_new_energy_greenfield', d
+assert cap.get('version')=='1.0.0', cap
+assert cap.get('status')=='active', cap
+assert len(cap.get('pack_hash',''))==64, cap
+assert d.get('scene_defaults',{}).get('country')=='BR', d
 assert len(d.get('dimensions', [])) == 6, d.get('dimensions')
-print('pack:', d['pack'].get('name'), 'dims:', len(d['dimensions']))
+print('pack:', cap.get('display_name'), 'dims:', len(d['dimensions']))
 " && ok "catalog pack" || bad "catalog pack"
 
 log "2b. Rules classification tree"
-CLASS=$(curl_t "$CURL_MAX" "$API/rules/classification" -H "$(auth_header "$(login legal@demo.vela)")")
+CLASS=$(curl_t "$CURL_MAX" "$API/rules/classification" -H "$(auth_header "$TOKEN")")
 echo "$CLASS" | python3 -c "
 import sys, json
 d=json.load(sys.stdin)
@@ -76,43 +114,52 @@ assert d['regions'][0]['countries'][0]['default_pack_id']=='brazil_new_energy', 
 print('regions:', len(d['regions']), 'packs:', len(d['packs']))
 " && ok "classification" || bad "classification"
 
-log "3. BYD checklist item count"
-TOKEN=$(login legal@demo.vela)
-SC=$(curl_t_post "$CURL_MAX" "$API/scenarios/demo/byd-campinas" -H "$(auth_header "$TOKEN")")
-SID=$(echo "$SC" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+log "3. Formal BYD checklist item count"
+FORMAL_PAYLOAD=$(curl_t "$CURL_MAX" "$API/rules/demo-template" -H "$(auth_header "$BIZ")" | python3 -c "
+import sys,json
+d=json.load(sys.stdin)
+d.pop('compliance_dimensions', None)
+d['scope_acknowledged']=True
+d['scope_notice_version']='scope-notice-v1'
+print(json.dumps(d, ensure_ascii=False))
+")
+SUB=$(curl_t_post "$CURL_MAX" "$API/scenarios/submit-materials" -H "$(auth_header "$BIZ")" \
+  -F "payload=$FORMAL_PAYLOAD" \
+  -F 'files=@scripts/fixtures/sample_storage_project.txt')
+SUB_ID=$(echo "$SUB" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+PROPOSAL_HASH=$(echo "$SUB" | python3 -c "import sys,json; print(json.load(sys.stdin)['scenario_scope']['proposed']['proposal_hash'])")
+SC=$(curl_t_post "$CURL_MAX" "$API/scenarios/$SUB_ID/confirm-scope" -H "$(auth_header "$TOKEN")" -H 'Content-Type: application/json' \
+  -d "{\"compliance_dimensions\":[\"labor\",\"foreign_investment\",\"tax\",\"environment\",\"industry_access\"],\"expected_proposal_hash\":\"$PROPOSAL_HASH\",\"fit_decision\":\"accept_warning\",\"polish\":false}")
 TOTAL=$(echo "$SC" | python3 -c "import sys,json; c=json.load(sys.stdin).get('checklist'); print(c['total_items'] if c else 0)")
 if [ "$TOTAL" -ge 20 ]; then ok "BYD items=$TOTAL"; else bad "BYD items=$TOTAL (expected >=20)"; fi
 
-log "4. Solar-only scenario (shorter checklist)"
-SOLAR=$(curl_t_post "$CURL_MAX" "$API/scenarios" -H "$(auth_header "$TOKEN")" -H 'Content-Type: application/json' -d '{
-  "project_name": "坎皮纳斯光伏组件厂（验收）",
-  "country": "brazil", "state": "sao_paulo", "city": "campinas",
-  "industry": "new_energy", "action_type": "greenfield_plant",
-  "investment_structure": "100% 外资",
-  "description": "计划在坎皮纳斯建设太阳能电池板组件工厂，年产光伏组件 500MW，不涉及客车或动力电池生产。",
-  "employee_count": 80,
-  "compliance_dimensions": ["labor","foreign_investment","tax","environment","industry_access"]
-}')
-SOLAR_TOTAL=$(echo "$SOLAR" | python3 -c "import sys,json; print(json.load(sys.stdin)['checklist']['total_items'])")
-if [ "$SOLAR_TOTAL" -lt "$TOTAL" ]; then ok "solar-only=$SOLAR_TOTAL < byd=$TOTAL"; else bad "solar-only=$SOLAR_TOTAL not shorter than byd=$TOTAL"; fi
+log "4. Legacy direct checklist creation is blocked"
+DIRECT_CODE=$(curl -s --max-time "$CURL_MAX" -o /dev/null -w '%{http_code}' -X POST "$API/scenarios" -H "$(auth_header "$TOKEN")" -H 'Content-Type: application/json' -d '{"project_name":"legacy","description":"这是足够长的旧入口测试描述","compliance_dimensions":["labor"]}')
+[ "$DIRECT_CODE" = "410" ] && ok "direct create blocked" || bad "direct create status=$DIRECT_CODE"
 
 log "5. Business submit materials + legal confirm scope + reject feedback"
-BIZ=$(login biz@demo.vela)
-SUB=$(curl_t_post "$CURL_MAX" "$API/scenarios/demo/submit-materials" -H "$(auth_header "$BIZ")")
-SUB_ID=$(echo "$SUB" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
 echo "$SUB" | python3 -c "
 import sys, json
 d=json.load(sys.stdin)
 assert d.get('status')=='pending_scope', d
+proposal=(d.get('scenario_scope') or {}).get('proposed') or {}
+assert proposal.get('pack_id')=='brazil_new_energy_greenfield', proposal
+assert proposal.get('pack_version')=='1.0.0', proposal
+assert len(proposal.get('pack_hash',''))==64, proposal
 print('status:', d['status'])
 " && ok "business submit materials" || bad "business submit materials"
 LEGAL=$(login legal@demo.vela)
-SCOPE=$(curl_t_post "$CURL_MAX" "$API/scenarios/$SUB_ID/confirm-scope" \
-  -H "$(auth_header "$LEGAL")" -H 'Content-Type: application/json' \
-  -d '{"compliance_dimensions":["labor","foreign_investment","tax","environment","industry_access"],"polish":false}')
+SCOPE="$SC"
 echo "$SCOPE" | python3 -c "
 import sys, json
 d=json.load(sys.stdin)
+snapshot=(d.get('scenario_scope') or {}).get('snapshot') or {}
+assert snapshot.get('capability_pack_id')=='brazil_new_energy_greenfield', snapshot
+assert snapshot.get('capability_pack_version')=='1.0.0', snapshot
+assert snapshot.get('rules_artifact_id')=='brazil_new_energy', snapshot
+assert snapshot.get('corpus_artifact_id')=='brazil_legal_corpus', snapshot
+assert snapshot.get('retrieval_config'), snapshot
+assert snapshot.get('output_profile'), snapshot
 assert d.get('status')=='pending_legal_review', d
 assert d.get('checklist',{}).get('total_items',0)>=20, d
 print('items:', d['checklist']['total_items'])
@@ -145,7 +192,7 @@ import sys, json
 d=json.load(sys.stdin)
 assert d.get('employee_count')==120, d
 assert '储能' in (d.get('description') or ''), d
-assert d.get('mode') in ('rules','llm'), d
+assert d.get('mode') in ('rules','llm','rules+llm'), d
 print('mode:', d['mode'], 'employees:', d['employee_count'])
 " && ok "document extract" || bad "document extract"
 
@@ -160,7 +207,7 @@ import sys, json
 d=json.load(sys.stdin)
 assert d.get('employee_count')==450, d
 assert '坎皮纳斯' in (d.get('project_name') or d.get('description') or ''), d
-assert d.get('mode') in ('rules','llm'), d
+assert d.get('mode') in ('rules','llm','rules+llm'), d
 print('mode:', d['mode'], 'employees:', d['employee_count'])
 " && ok "document extract pdf" || bad "document extract pdf"
 else
@@ -181,18 +228,9 @@ assert d['merged'].get('filename'), d
 print('batch files:', len(d['files']), 'merged:', d['merged']['filename'][:40])
 " && ok "batch document extract" || bad "batch document extract"
 
-log "8. Storage-only checklist shorter than BYD"
-STOR=$(curl_t_post "$CURL_MAX" "$API/scenarios" -H "$(auth_header "$TOKEN")" -H 'Content-Type: application/json' -d '{
-  "project_name": "坎皮纳斯储能系统组装厂",
-  "country": "brazil", "state": "sao_paulo", "city": "campinas",
-  "industry": "new_energy", "action_type": "greenfield_plant",
-  "investment_structure": "100% 外资",
-  "description": "计划在坎皮纳斯建设工业级储能系统组装工厂，不涉及电动客车制造。约120名本地雇员，首年200MWh产能，厂房12000平方米。",
-  "employee_count": 120,
-  "compliance_dimensions": ["labor","foreign_investment","tax","environment","industry_access"]
-}')
-STOR_TOTAL=$(echo "$STOR" | python3 -c "import sys,json; print(json.load(sys.stdin)['checklist']['total_items'])")
-if [ "$STOR_TOTAL" -lt "$TOTAL" ]; then ok "storage-only=$STOR_TOTAL < byd=$TOTAL"; else bad "storage=$STOR_TOTAL"; fi
+log "8. Legacy generate-and-submit is blocked"
+GEN_CODE=$(curl -s --max-time "$CURL_MAX" -o /dev/null -w '%{http_code}' -X POST "$API/scenarios/generate-and-submit" -H "$(auth_header "$TOKEN")" -H 'Content-Type: application/json' -d '{"project_name":"legacy","description":"这是足够长的旧入口测试描述","compliance_dimensions":["labor"]}')
+[ "$GEN_CODE" = "410" ] && ok "generate-and-submit blocked" || bad "generate-and-submit status=$GEN_CODE"
 
 log "9. Return to business + revise resubmit"
 curl_t_post "$CURL_MAX" "$API/scenarios/$SUB_ID/review/return-to-business" \

@@ -42,7 +42,10 @@ def _load_scenario(db: Session, project_id: int, user: User) -> InvestigationSce
     scenario = (
         db.query(InvestigationScenario)
         .options(joinedload(InvestigationScenario.checklist))
-        .filter(InvestigationScenario.id == project_id)
+        .filter(
+            InvestigationScenario.id == project_id,
+            InvestigationScenario.is_demo.is_(False),
+        )
         .first()
     )
     if not scenario or not scenario.checklist:
@@ -121,7 +124,15 @@ def analyze_project_contract(
     scenario = _load_scenario(db, project_id, current_user)
     payload = scenario.checklist.payload
     try:
-        result = analyze_contract(payload, scenario, doc_id=doc_id, user_id=current_user.id)
+        result = analyze_contract(
+            payload,
+            scenario,
+            doc_id=doc_id,
+            user_id=current_user.id,
+            owner_email=current_user.email,
+            owner_auth_provider=current_user.auth_provider,
+            owner_external_subject=current_user.external_subject,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     _save_payload(db, scenario, payload)

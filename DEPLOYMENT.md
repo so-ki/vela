@@ -13,11 +13,13 @@ Chroma / 法源语料 ← 持久卷 backend_data
 
 ```bash
 cd vela-platform
-cp .env.production.example .env.prod
-# 编辑 .env.prod：SECRET_KEY、POSTGRES_PASSWORD、PUBLIC_URL、SSO 等
+# 从密钥管理系统或安全终端创建权限为 600 的 .env.prod。
+# 至少填写 SECRET_KEY、POSTGRES_PASSWORD、PUBLIC_URL；不要提交或打包该文件。
 
 docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 ```
+
+`SECRET_KEY` 和 `POSTGRES_PASSWORD` 都没有生产默认值。生产入口会拒绝少于 32 字符的 `SECRET_KEY`、少于 16 字符或常见默认值的 `POSTGRES_PASSWORD`；数据库密码会先进行 URL 编码，因此可安全使用 `@`、`%`、`:`、`/` 等特殊字符。生产镜像默认 `SEED_DEMO_USERS=false`，不会创建固定密码演示账号。
 
 访问：`http://localhost:8080`（或 `PUBLIC_URL` 配置的域名）
 
@@ -25,9 +27,11 @@ docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 
 | 变量 | 说明 |
 |------|------|
-| `SECRET_KEY` | JWT 签名密钥，生产必改 |
+| `SECRET_KEY` | JWT 签名密钥，生产必改且至少 32 字符 |
+| `POSTGRES_PASSWORD` | PostgreSQL 密码，至少 16 字符并避免常见默认值；入口会安全 URL 编码 |
 | `PUBLIC_URL` | 对外 URL，用于 CORS / SSO 回调 / 前端跳转 |
 | `ALLOW_OPEN_REGISTRATION` | 生产建议 `false` |
+| `SEED_DEMO_USERS` | 默认且生产必须保持 `false`；仅隔离、可销毁的 smoke 环境可显式设为 `true` |
 | `SSO_ENABLED` + OIDC 四元组 | 企业单点登录 |
 | `EXPORT_TEMPLATE` | `law_school`（法学院意见书）或 `legacy` |
 | `EXPORT_ORG_*` | Word 意见书抬头、致/自 等 |
@@ -42,7 +46,7 @@ docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
 SSO_ENABLED=true
 SSO_ISSUER_URL=https://your-idp/realms/vela
 SSO_CLIENT_ID=vela-platform
-SSO_CLIENT_SECRET=...
+SSO_CLIENT_SECRET=<由密钥管理系统注入>
 SSO_REDIRECT_URI=https://vela.example.com/api/v1/auth/sso/callback
 ALLOW_PASSWORD_LOGIN=false   # 可选：仅 SSO 登录
 ```
@@ -97,11 +101,32 @@ chmod +x scripts/prod_smoke.sh
 ./scripts/prod_smoke.sh
 ```
 
+该脚本拒绝传入现有 env 文件，自建权限 `600` 的临时配置，并使用唯一 Compose project name；它只为该一次性 smoke 栈显式设置 `SEED_DEMO_USERS=true`，退出时仅删除自己创建的容器、卷与临时配置。不要把 smoke 环境暴露到公网，也不要把该开关复制到正式环境。Docker 不可用时脚本返回非零并报告 `PENDING`，不计为通过。
+
+## 构建与发布边界
+
+构建前先检查四个 Dockerfile 的实际 COPY 候选。检查只报告违规文件路径和检测器名称，不输出任何疑似密钥内容：
+
+```bash
+./scripts/check_release_boundaries.sh
+```
+
+对外提交 ZIP 必须使用 allowlist 构建器，禁止直接压缩工作区：
+
+```bash
+./scripts/build_submission_package.sh /tmp/vela-capability-pack-mvp.zip
+./scripts/check_release_boundaries.sh /tmp/vela-capability-pack-mvp.zip
+```
+
+构建器在临时 ZIP 上完成路径、manifest hash 与 secret 扫描后才发布最终文件。ZIP 不包含任何 `.env*`、本地数据库/Chroma/用户材料、虚拟环境、`node_modules`、旧 `frontend/dist`、测试 fixture 或 fishbone 原有文件。
+
 ## Word 导出 · 法学院模板
 
 默认 `EXPORT_TEMPLATE=law_school`，定稿后导出文件名：
 
 `{项目名称}_法律研究意见书.docx`
+
+该名称是导出模板标签，不改变内容性质：系统生成的是须经法务逐条复核的协查底稿，不构成正式法律意见。
 
 结构：
 
@@ -136,4 +161,5 @@ curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/api/v1/status | 
 | 数据库 | SQLite | PostgreSQL |
 | 前端 | Vite dev | Nginx 静态 |
 | 注册 | 开放 | 可关闭 |
+| 演示账号 | `scripts/start.sh` 本地创建 | 默认不创建（`SEED_DEMO_USERS=false`） |
 | 导出模板 | law_school | law_school |

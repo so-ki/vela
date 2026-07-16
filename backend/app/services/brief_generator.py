@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from sqlalchemy.orm import Session
+
 from app.models.scenario import InvestigationScenario
 from app.services.disclaimer import DISCLAIMER_FULL_TEXT
 
@@ -153,6 +155,7 @@ def _executive_summary_pt(scenario: InvestigationScenario, checklist: dict[str, 
 
 
 def generate_brief(
+    db: Session,
     scenario: InvestigationScenario,
     checklist_payload: dict[str, Any],
     *,
@@ -160,10 +163,16 @@ def generate_brief(
     threshold: int = DEFAULT_THRESHOLD,
     polish: bool = False,
     user_id: Optional[int] = None,
+    generation_config: Any = None,
 ) -> dict[str, Any]:
+    from app.services.generation_guard import require_generation_config
+
+    config = require_generation_config(db, generation_config)
+    if threshold != config.match_threshold or polish != config.polish:
+        raise ValueError("简报参数与冻结配置不一致")
     sections = sections_with_legal or checklist_payload.get("sections_with_legal") or []
     if not sections:
-        raise ValueError("请先完成法源检索（POST /scenarios/{id}/retrieve）")
+        raise ValueError("缺少确认阶段生成并持久化的法源结果；请检查 generation attempt，读接口不会启动检索")
 
     brief_sections: list[dict[str, Any]] = []
     blocked_items: list[dict[str, Any]] = []
@@ -194,7 +203,7 @@ def generate_brief(
                 "hard_block": bool(item.get("hard_block")),
                 "risk_zh": _risk_text_zh(item, best, gate_status, block_reason),
                 "risk_pt": _risk_text_pt(item, best, gate_status, block_reason),
-                "citations": [_citation(h) for h in hits[:3]],
+                "citations": [_citation(h) for h in hits[: config.retrieval_top_k]],
             }
             section_items.append(brief_item)
             if gate_status == "passed":
@@ -222,7 +231,8 @@ def generate_brief(
     else:
         status = "ready"
 
-    title_zh = f"法律风险协查简报 — {scenario.project_name}"
+    profile_title = str(config.output_profile.get("brief_title") or "法律风险协查简报")
+    title_zh = f"{profile_title} — {scenario.project_name}"
     title_pt = f"Briefing de Riscos Jurídicos — {scenario.project_name}"
 
     brief = {
@@ -237,7 +247,13 @@ def generate_brief(
         "blocked_items": blocked_items,
         "passed_count": passed_count,
         "blocked_count": blocked_count,
-        "disclaimer": DISCLAIMER_FULL_TEXT,
+        "disclaimer": str(config.output_profile.get("disclaimer") or DISCLAIMER_FULL_TEXT),
+        "capability_pack": {
+            "pack_id": config.capability_pack_id,
+            "version": config.capability_pack_version,
+            "pack_hash": config.capability_pack_hash,
+        },
+        "output_profile": config.output_profile,
         "generated_at": _utcnow().isoformat(),
         "mode": "template",
     }

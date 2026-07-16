@@ -22,6 +22,10 @@ class LegalHitResponse(BaseModel):
     vector_similarity: float
     keyword_overlap: float
     requires_review: bool
+    grounding_score: float = 0.0
+    citation_status: str = "ungrounded"
+    grounded: bool = False
+    grounding_note: Optional[str] = None
 
 
 class ChecklistItemWithLegalResponse(BaseModel):

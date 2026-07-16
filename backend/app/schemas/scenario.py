@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -27,6 +27,19 @@ class RulesPackSummary(BaseModel):
     status: str = "active"
 
 
+class CapabilityPackSummary(BaseModel):
+    pack_id: str
+    version: str
+    pack_hash: str
+    status: Literal["active", "inactive"]
+    display_name: str
+    description: str
+    country: str
+    industry: str
+    action_type: str
+    languages: List[str]
+
+
 class RulesClassificationResponse(BaseModel):
     schema_version: str
     default_pack_id: str
@@ -35,7 +48,11 @@ class RulesClassificationResponse(BaseModel):
 
 
 class RulesCatalogResponse(BaseModel):
-    rules_pack_id: str = Field(default="brazil_new_energy")
+    rules_pack_id: str
+    capability_pack: CapabilityPackSummary
+    issue_modules: List[str]
+    rules_artifact: dict
+    corpus_artifact: dict
     pack: dict = Field(default_factory=dict)
     jurisdiction: dict
     industries: List[dict]
@@ -79,11 +96,15 @@ class BusinessSubmitRequest(BaseModel):
 
     project_name: str = Field(min_length=1, max_length=255)
     rules_pack_id: Optional[str] = None
-    country: str = Field(default="brazil")
-    state: str = Field(default="sao_paulo")
-    city: str = Field(default="campinas")
-    industry: str = Field(default="new_energy")
-    action_type: str = Field(default="greenfield_plant")
+    # 业务端不负责路由。若旧客户端仍显式提交这些值，后端只把它们
+    # 用于检测与当前支持场景的冲突，最终 proposed scope 仍由后端创建。
+    country: Optional[str] = None
+    state: Optional[str] = None
+    city: Optional[str] = None
+    industry: Optional[str] = None
+    action_type: Optional[str] = None
+    scope_acknowledged: bool = False
+    scope_notice_version: str = "scope-notice-v1"
     investment_structure: Optional[str] = None
     investment_destination: Optional[str] = None
     project_content_scale: Optional[str] = None
@@ -102,9 +123,11 @@ class BusinessSubmitRequest(BaseModel):
 
 class ScopeConfirmRequest(BaseModel):
     compliance_dimensions: List[str] = Field(default_factory=list)
+    expected_proposal_hash: str = Field(min_length=16)
+    fit_decision: Literal["fit", "accept_warning"]
     polish: bool = False
     match_threshold: int = Field(default=70, ge=50, le=95, description="条目匹配度门控阈值")
-    retrieval_top_k: int = Field(default=3, ge=1, le=10, description="每条核查题绑定的法条数量")
+    retrieval_top_k: int = Field(default=3, ge=0, le=10, description="每条核查题绑定的法条数量")
     include_playbook_suggestions: bool = Field(
         default=False,
         description="显式为 true 时，将 Playbook 建议核查项并入清单（不修改规则 JSON）",
@@ -127,6 +150,8 @@ class ArchivedMaterialFile(BaseModel):
 class DocumentExtractFileSnapshot(BaseModel):
     filename: str = ""
     mode: str = Field(default="rules", description="rules | llm | manual")
+    scan_or_empty: bool = False
+    extraction_warning: Optional[str] = None
     project_name: Optional[str] = None
     investment_destination: Optional[str] = None
     investment_structure: Optional[str] = None
@@ -161,6 +186,8 @@ class DocumentExtractSnapshot(BaseModel):
     file_count: int = Field(default=1, ge=0)
     files: List[DocumentExtractFileSnapshot] = Field(default_factory=list)
     mode: str = Field(default="rules", description="rules | llm | manual")
+    scan_or_empty: bool = False
+    extraction_warning: Optional[str] = None
     extracted_at: Optional[datetime] = None
     project_name: Optional[str] = None
     investment_destination: Optional[str] = None
@@ -299,6 +326,8 @@ class ScenarioResponse(BaseModel):
     id: int
     project_name: str
     rules_pack_id: Optional[str] = None
+    scenario_scope: dict = Field(default_factory=dict)
+    is_demo: bool = False
     country: str
     state: str
     city: str

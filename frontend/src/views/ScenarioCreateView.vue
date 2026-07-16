@@ -2,14 +2,15 @@
 import { ref, onMounted, computed, nextTick } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import BusinessReviewModal from '@/components/BusinessReviewModal.vue'
+import CapabilityPackCard from '@/components/CapabilityPackCard.vue'
 import MaterialFieldSections from '@/components/MaterialFieldSections.vue'
 import { REVIEW_FIELD_LABELS, allReviewFieldsFromCatalog, collectMissingSubmitRequiredFields, reviewFieldsForDimensions, type CustomReviewField } from '@/config/businessMaterialReviewFields'
 import {
-  applySceneDefaults,
-  countryLabelForCatalog,
+  capabilityPackFromCatalog,
+  isUsableCapabilityCatalog,
   sceneDefaultsFromCatalog,
 } from '@/config/sceneClassification'
-import { createDemoScenario, createScenario, extractDocumentsFromFiles, fetchDemoTemplate, fetchRulesCatalog, fetchScenario, reviseAndResubmitScenario, submitMaterialsScenario } from '@/api/client'
+import { extractDocumentsFromFiles, fetchRulesCatalog, fetchScenario, reviseAndResubmitScenario, submitMaterialsScenario } from '@/api/client'
 import type { DocumentExtractBatchResult, DocumentExtractResult } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { useMaterialReviewDraftStore } from '@/stores/materialReviewDraft'
@@ -165,17 +166,19 @@ function createEmptyBusinessForm(): ScenarioFormData {
   }
 }
 
-function applyBusinessSubmitDefaults<T extends Record<string, unknown>>(payload: T): T {
-  return applySceneDefaults(payload, catalog.value)
-}
-
-const activeCountryLabel = computed(() => countryLabelForCatalog(catalog.value))
+const supportedPack = computed(() => capabilityPackFromCatalog(catalog.value))
+const catalogReady = computed(() => isUsableCapabilityCatalog(catalog.value))
 
 onMounted(async () => {
   loading.value = true
   error.value = null
   try {
-    catalog.value = await fetchRulesCatalog()
+    const loadedCatalog = await fetchRulesCatalog()
+    catalog.value = isUsableCapabilityCatalog(loadedCatalog) ? loadedCatalog : null
+    if (!catalog.value) {
+      error.value = '无法验证当前正式能力包，已禁止确认与提交，请刷新重试'
+      return
+    }
     if (!auth.isBusiness && !editMode.value) {
       const defaults = sceneDefaultsFromCatalog(catalog.value)
       form.value = {
@@ -229,31 +232,12 @@ onMounted(async () => {
     if (!auth.isBusiness && form.value.compliance_dimensions.length === 0 && catalog.value) {
       form.value.compliance_dimensions = catalog.value.dimensions.map((d: DimensionInfo) => d.id)
     }
-    if (!auth.isBusiness && !form.value.project_name.trim() && !form.value.description.trim()) {
-      await loadDemo()
-    }
   } catch (e: unknown) {
     error.value = extractApiError(e)
   } finally {
     loading.value = false
   }
 })
-
-async function loadDemo() {
-  error.value = null
-  try {
-    const tpl = await fetchDemoTemplate()
-    form.value = {
-      ...form.value,
-      ...tpl,
-      board_date: tpl.board_date || '',
-      start_date: tpl.start_date || '',
-      production_date: tpl.production_date || '',
-    }
-  } catch (e: unknown) {
-    error.value = extractApiError(e)
-  }
-}
 
 function ensureAllDimensions() {
   if (!auth.isBusiness && catalog.value && form.value.compliance_dimensions.length === 0) {
@@ -316,6 +300,8 @@ async function buildPayload() {
   const extractFieldSnapshot = (file: DocumentExtractResult) => ({
     filename: file.filename,
     mode: file.mode,
+    scan_or_empty: file.scan_or_empty ?? false,
+    extraction_warning: file.extraction_warning ?? null,
     project_name: file.project_name ?? null,
     investment_destination: file.investment_destination ?? null,
     investment_structure: file.investment_structure ?? null,
@@ -386,6 +372,8 @@ async function buildPayload() {
         file_count: fileSnapshots.length || 1,
         files: fileSnapshots,
         mode: merged.mode,
+        scan_or_empty: merged.scan_or_empty ?? false,
+        extraction_warning: merged.extraction_warning ?? null,
         source: 'upload',
         ...mergedFormSnapshot(withDefaults),
         compliance_dimensions: merged.compliance_dimensions || [],
@@ -416,11 +404,19 @@ async function buildPayload() {
   }
 
   if (auth.isBusiness) {
-    const { compliance_dimensions: _dims, ...businessBase } = base as typeof base & { compliance_dimensions?: string[] }
-    const withDefaults = applyBusinessSubmitDefaults(businessBase)
+    const {
+      compliance_dimensions: _dims,
+      rules_pack_id: _pack,
+      country: _country,
+      state: _state,
+      city: _city,
+      industry: _industry,
+      action_type: _action,
+      ...businessBase
+    } = base as typeof base & { compliance_dimensions?: string[] }
     return {
-      ...withDefaults,
-      document_extract: buildDocumentExtractSnapshot(withDefaults),
+      ...businessBase,
+      document_extract: buildDocumentExtractSnapshot(businessBase),
     }
   }
   ensureAllDimensions()
@@ -435,6 +431,8 @@ async function buildPayload() {
         file_count: fileSnapshots.length || 1,
         files: fileSnapshots,
         mode: merged.mode,
+        scan_or_empty: merged.scan_or_empty ?? false,
+        extraction_warning: merged.extraction_warning ?? null,
         source: 'upload',
         project_name: merged.project_name ?? base.project_name,
         investment_destination: merged.investment_destination ?? base.investment_destination,
@@ -485,6 +483,7 @@ async function buildPayload() {
 
 function collectValidationIssues(): string[] {
   const issues: string[] = []
+  if (!catalogReady.value) issues.push('后端当前正式能力包（请刷新重试）')
   if (auth.isBusiness && !editMode.value && !pendingFiles.value.length) {
     issues.push('投资方案文件')
   }
@@ -521,6 +520,10 @@ function validateForm(target: 'page' | 'modal' = 'page'): boolean {
 
 function goToMaterialReview() {
   error.value = null
+  if (!catalogReady.value) {
+    error.value = '无法验证当前正式能力包，已禁止确认与提交，请刷新重试'
+    return
+  }
   if (!pendingFiles.value.length) {
     error.value = '请先上传至少一个方案文件'
     return
@@ -629,21 +632,7 @@ async function submit() {
       await router.push({ name: 'scenario-progress', params: { id: scenario.id } })
       return
     }
-    const scenario = await createScenario(payload)
-    router.push({ name: 'checklist', params: { id: scenario.id } })
-  } catch (e: unknown) {
-    error.value = extractApiError(e)
-  } finally {
-    submitting.value = false
-  }
-}
-
-async function submitDemoQuick() {
-  submitting.value = true
-  error.value = null
-  try {
-    const scenario = await createDemoScenario()
-    router.push({ name: 'checklist', params: { id: scenario.id } })
+    error.value = '旧的法务直接生成入口已关闭，请由业务提交材料后在复核台确认范围。'
   } catch (e: unknown) {
     error.value = extractApiError(e)
   } finally {
@@ -785,21 +774,19 @@ function shouldHighlightField(fieldPrefix: string): boolean {
         <p class="muted material-intake-note" v-else-if="auth.isBusiness && !editMode">
           请<strong>上传投资方案</strong>（Word、PDF 等，可多个文件）；系统抽取事实供核对。<strong>协查法域与范围由法务确认</strong>，业务端无需选择法域。
         </p>
-        <p class="industry-pack-note" v-else-if="catalog?.pack?.name && !auth.isBusiness">
-          协查法域：<strong>{{ activeCountryLabel }}</strong> · {{ catalog.pack.name }}
-          <span v-if="catalog.pack.focus"> · {{ catalog.pack.focus }}</span>
+        <p class="industry-pack-note" v-else-if="supportedPack && !auth.isBusiness">
+          当前能力包：<strong>{{ supportedPack.display_name }}</strong> · 版本 {{ supportedPack.version }}
         </p>
         <p class="warn-note role-mismatch-note" v-if="!editMode && !auth.isBusiness && route.name === 'scenario-create'">
           当前登录为<strong>法务账号</strong>（{{ auth.user?.email }}），此页展示的是法务端完整表单。业务端请使用 <strong>biz@demo.vela</strong> 登录，新建协查只需上传方案文件。
         </p>
       </div>
-      <div class="header-actions" v-if="!editMode && !auth.isBusiness">
-        <button type="button" class="btn-secondary" @click="loadDemo" :disabled="loading">填入 BYD 演示模板</button>
-        <button type="button" class="btn-secondary" @click="submitDemoQuick" :disabled="submitting">
-          {{ submitting ? '处理中…' : '一键生成演示清单' }}
-        </button>
-      </div>
     </header>
+
+    <CapabilityPackCard
+      v-if="auth.isBusiness && !editMode"
+      :pack="supportedPack"
+    />
 
     <form class="scenario-form panel" @submit.prevent="submit">
       <p class="error banner-error" v-if="error && !catalog">{{ error }}</p>
@@ -884,19 +871,11 @@ function shouldHighlightField(fieldPrefix: string): boolean {
           </label>
           <label>
             <span>行业</span>
-            <select v-model="form.industry">
-              <option v-for="ind in catalog?.industries || []" :key="ind.id" :value="ind.id">
-                {{ ind.name }}
-              </option>
-            </select>
+            <input :value="supportedPack?.industry || ''" readonly />
           </label>
           <label>
             <span>动作类型</span>
-            <select v-model="form.action_type">
-              <option v-for="act in catalog?.action_types || []" :key="act.id" :value="act.id">
-                {{ act.name }}
-              </option>
-            </select>
+            <input :value="supportedPack?.action_type || ''" readonly />
           </label>
         </div>
       </div>
@@ -958,7 +937,7 @@ function shouldHighlightField(fieldPrefix: string): boolean {
           v-if="auth.isBusiness && businessUploadOnly && extractResult"
           type="button"
           class="btn-primary"
-          :disabled="extracting"
+          :disabled="extracting || !catalogReady"
           @click="goToMaterialReview"
         >
           确认并核对

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session, joinedload
 
+from app.capability_packs.loader import LoadedCapabilityPack
+from app.capability_packs.registry import get_capability_pack_registry
 from app.models.scenario import ComplianceChecklist, InvestigationScenario, utcnow
 from app.models.user import User
 from app.schemas.scenario import (
@@ -20,6 +22,7 @@ from app.services.material_review_service import (
     build_material_return_record,
     business_feedback_from_material_review,
 )
+from app.services.material_file_storage import save_scenario_material_files
 from app.services.project_hub_service import ensure_project_hub
 from app.services.rule_engine import (
     ScenarioInput,
@@ -31,6 +34,13 @@ from app.services.rule_engine import (
 from app.services.rules_registry import resolve_pack_id, resolve_scenario_pack_id
 from app.services.playbook_agent_service import generate_playbook_draft
 from app.services.investigation_adequacy_service import gate_a_allows_checklist_review
+from app.services.scenario_scope_service import (
+    build_demo_scenario_scope,
+    build_proposed_scenario_scope,
+    legacy_scope_for_scenario,
+    material_text_from_uploads,
+)
+from app.services.generation_guard import GenerationConfig, GenerationGuardError, require_generation_config
 
 
 def _pack_labels(action_type: str, pack_id: str | None = None) -> tuple[str, str]:
@@ -50,13 +60,21 @@ def _resolve_payload_pack_id(payload: BusinessSubmitRequest | ScenarioCreateRequ
 def _materials_only_payload(
     payload: BusinessSubmitRequest | ScenarioCreateRequest,
     *,
+    capability_pack: LoadedCapabilityPack,
     document_extract: dict | None = None,
 ) -> dict:
     """业务材料占位清单：不含核查项，待法务确认协查范围。"""
-    pack_id = _resolve_payload_pack_id(payload)
-    pack_name, action_name = _pack_labels(payload.action_type, pack_id)
-    rules = load_rules(pack_id)
-    industry_name = rules.get("industries", {}).get(payload.industry, {}).get("name", payload.industry)
+    manifest = capability_pack.manifest
+    rules = capability_pack.rules
+    binding = manifest.artifact_binding
+    pack_id = manifest.rules_artifact.artifact_id
+    pack_name = manifest.display_name
+    action_name = (rules.get("action_types") or {}).get(binding.action_type, {}).get(
+        "name", payload.action_type
+    )
+    industry_name = (rules.get("industries") or {}).get(binding.industry, {}).get(
+        "name", payload.industry
+    )
     data: dict = {
         "title": "待法务确认协查范围",
         "total_items": 0,
@@ -87,36 +105,69 @@ def create_scenario_materials_only(
     payload: BusinessSubmitRequest,
     *,
     uploads: list[tuple[str, bytes, str | None]] | None = None,
+    demo: bool = False,
 ) -> InvestigationScenario:
     """业务提交材料：保存场景与抽取记录，不生成核查清单。"""
-    pack_id = _resolve_payload_pack_id(payload)
-    checklist_payload = _materials_only_payload(payload)
-    if payload.document_extract:
-        checklist_payload = attach_document_extract_to_payload(checklist_payload, payload)
+    uploaded_material_text = material_text_from_uploads(uploads)
+    scenario_scope = (
+        build_demo_scenario_scope()
+        if demo
+        else build_proposed_scenario_scope(
+            payload,
+            user,
+            material_text_extra=uploaded_material_text,
+        )
+    )
+    proposed = scenario_scope["proposed"]
+    capability_pack = get_capability_pack_registry().get_exact(
+        str(proposed.get("pack_id") or ""),
+        str(proposed.get("pack_version") or ""),
+        str(proposed.get("pack_hash") or ""),
+    )
+    canonical_payload = payload.model_copy(
+        update={
+            "rules_pack_id": proposed["rules_pack_id"],
+            "country": proposed["country"],
+            "state": proposed["state"],
+            "city": proposed["city"],
+            "industry": proposed["industry"],
+            "action_type": proposed["action_type"],
+        }
+    )
+    pack_id = proposed["rules_pack_id"]
+    checklist_payload = _materials_only_payload(
+        canonical_payload,
+        capability_pack=capability_pack,
+    )
+    checklist_payload["scenario_scope"] = scenario_scope
+    if canonical_payload.document_extract:
+        checklist_payload = attach_document_extract_to_payload(checklist_payload, canonical_payload)
 
     scenario = InvestigationScenario(
         user_id=user.id,
-        project_name=payload.project_name,
+        project_name=canonical_payload.project_name,
         rules_pack_id=pack_id,
-        country=payload.country,
-        state=payload.state,
-        city=payload.city,
-        industry=payload.industry,
-        action_type=payload.action_type,
-        investment_structure=payload.investment_structure,
-        investment_destination=payload.investment_destination,
-        project_content_scale=payload.project_content_scale,
-        funding_source=payload.funding_source,
-        description=payload.description,
-        known_risks=payload.known_risks,
-        employee_count=payload.employee_count,
-        capacity_notes=payload.capacity_notes,
-        facility_notes=payload.facility_notes,
+        scenario_scope=scenario_scope,
+        is_demo=demo,
+        country=canonical_payload.country,
+        state=canonical_payload.state,
+        city=canonical_payload.city,
+        industry=canonical_payload.industry,
+        action_type=canonical_payload.action_type,
+        investment_structure=canonical_payload.investment_structure,
+        investment_destination=canonical_payload.investment_destination,
+        project_content_scale=canonical_payload.project_content_scale,
+        funding_source=canonical_payload.funding_source,
+        description=canonical_payload.description,
+        known_risks=canonical_payload.known_risks,
+        employee_count=canonical_payload.employee_count,
+        capacity_notes=canonical_payload.capacity_notes,
+        facility_notes=canonical_payload.facility_notes,
         compliance_dimensions=[],
-        board_date=payload.board_date,
-        start_date=payload.start_date,
-        production_date=payload.production_date,
-        remarks=payload.remarks,
+        board_date=canonical_payload.board_date,
+        start_date=canonical_payload.start_date,
+        production_date=canonical_payload.production_date,
+        remarks=canonical_payload.remarks,
         status="pending_scope",
     )
     db.add(scenario)
@@ -165,7 +216,12 @@ def create_scenario_materials_only(
 
 
 def business_submit_to_create_request(payload: BusinessSubmitRequest) -> ScenarioCreateRequest:
-    return ScenarioCreateRequest(**payload.model_dump(), compliance_dimensions=[])
+    return ScenarioCreateRequest(
+        **payload.model_dump(
+            exclude={"scope_acknowledged", "scope_notice_version"}, exclude_none=True
+        ),
+        compliance_dimensions=[],
+    )
 
 
 def merge_business_resubmit_request(
@@ -175,6 +231,17 @@ def merge_business_resubmit_request(
     """业务补充提交：仅覆盖请求中显式提供的字段，避免部分表单把未填项清空。"""
     base = scenario_to_create_request(scenario)
     updates = payload.model_dump(exclude_unset=True)
+    for key in (
+        "rules_pack_id",
+        "country",
+        "state",
+        "city",
+        "industry",
+        "action_type",
+        "scope_acknowledged",
+        "scope_notice_version",
+    ):
+        updates.pop(key, None)
     updates.pop("compliance_dimensions", None)
     updates["compliance_dimensions"] = []
     return base.model_copy(update=updates)
@@ -216,6 +283,15 @@ def create_scenario_with_checklist(
     user: User,
     payload: ScenarioCreateRequest,
 ) -> InvestigationScenario:
+    raise GenerationGuardError("禁止在法务确认并冻结 snapshot 前直接创建核查清单")
+
+
+def _legacy_create_scenario_with_checklist(
+    db: Session,
+    user: User,
+    payload: ScenarioCreateRequest,
+) -> InvestigationScenario:
+    raise GenerationGuardError("legacy checklist 生成器已禁用")
     pack_id = _resolve_payload_pack_id(payload)
     scenario_input = ScenarioInput(
         project_name=payload.project_name,
@@ -241,7 +317,7 @@ def create_scenario_with_checklist(
         rules_pack_id=pack_id,
     )
 
-    checklist_data = generate_playbook_draft(scenario_input, user_id=user.id, pack_id=pack_id)
+    checklist_data = generate_playbook_draft(db, scenario_input, user_id=user.id, pack_id=pack_id)
     checklist_data = ensure_project_hub(checklist_data)
 
     scenario = InvestigationScenario(
@@ -359,16 +435,32 @@ def regenerate_scenario_checklist(
     *,
     include_playbook_suggestions: bool = False,
     extra_checklist_codes: set[str] | None = None,
+    generation_config: GenerationConfig | None = None,
 ) -> dict:
     """在同一 scenario 上重新生成清单（保留 revision_history 由调用方处理）。"""
-    _apply_payload_to_scenario(scenario, payload)
-    pack_id = _resolve_payload_pack_id(payload)
+    config = require_generation_config(db, generation_config)
+    pack_id = config.rules_pack_id
+    if set(payload.compliance_dimensions) != set(config.compliance_dimensions):
+        raise GenerationGuardError("清单输入维度与冻结 snapshot 不一致")
+    payload = payload.model_copy(
+        update={
+            "rules_pack_id": config.rules_pack_id,
+            "country": config.country,
+            "state": config.state,
+            "city": config.city,
+            "industry": config.industry,
+            "action_type": config.action_type,
+            "compliance_dimensions": list(config.compliance_dimensions),
+        }
+    )
     checklist_data = generate_playbook_draft(
+        db,
         _payload_from_request(payload),
         user_id=scenario.user_id,
         pack_id=pack_id,
         include_playbook_suggestions=include_playbook_suggestions,
         extra_checklist_codes=extra_checklist_codes,
+        generation_config=config,
     )
     checklist_data = ensure_project_hub(checklist_data)
 
@@ -378,7 +470,6 @@ def regenerate_scenario_checklist(
     scenario.checklist.title = checklist_data["title"]
     scenario.checklist.payload = checklist_data
     scenario.checklist.total_items = checklist_data["total_items"]
-    scenario.status = "checklist_generated"
     db.flush()
     return checklist_data
 
@@ -424,7 +515,7 @@ def scenario_to_response(scenario: InvestigationScenario) -> ScenarioResponse:
                 or material_review.get("selected_dimensions")
                 or []
             ),
-            sections=payload.get("sections") or [],
+            sections=payload.get("sections_with_legal") or payload.get("sections") or [],
             disclaimer=payload["disclaimer"],
             created_at=scenario.checklist.created_at,
         )
@@ -447,6 +538,8 @@ def scenario_to_response(scenario: InvestigationScenario) -> ScenarioResponse:
         id=scenario.id,
         project_name=scenario.project_name,
         rules_pack_id=resolved_pack_id,
+        scenario_scope=scenario.scenario_scope or legacy_scope_for_scenario(scenario),
+        is_demo=bool(scenario.is_demo),
         country=scenario.country,
         state=scenario.state,
         city=scenario.city,

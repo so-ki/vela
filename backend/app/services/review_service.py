@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+from sqlalchemy.orm import Session
+
 from app.services.investigation_adequacy_service import gate_a_blocking_review_message
 from app.models.scenario import InvestigationScenario
 from app.models.user import User
@@ -45,7 +47,11 @@ def _assert_gate_a_allows_review(scenario: InvestigationScenario) -> None:
         raise ValueError(block)
 
 
-def init_review(scenario: InvestigationScenario, user: User) -> dict[str, Any]:
+def init_review(db: Session, scenario: InvestigationScenario, user: User) -> dict[str, Any]:
+    from app.services.generation_guard import require_formal_scenario, require_generated_result
+
+    require_formal_scenario(scenario)
+    require_generated_result(db, scenario)
     _assert_gate_a_allows_review(scenario)
     payload = scenario.checklist.payload
     brief = payload.get("brief")

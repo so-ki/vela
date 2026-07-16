@@ -37,7 +37,7 @@ const router = createRouter({
           path: 'onboarding',
           name: 'cold-start',
           component: () => import('@/views/ColdStartView.vue'),
-          meta: { requiresDisclaimer: true },
+          meta: { requiresDisclaimer: true, legalOnly: true },
         },
         {
           path: 'projects/:id',

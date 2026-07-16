@@ -17,9 +17,15 @@ class InterviewCompleteRequest(BaseModel):
 class PlaybookProfileResponse(BaseModel):
     completed: bool
     user_id: Optional[int] = None
+    profile_schema_version: Optional[str] = None
+    profile_version: Optional[str] = None
+    profile_source: Optional[str] = None
+    completed_at: Optional[str] = None
     org_name: Optional[str] = None
     primary_jurisdiction: Optional[str] = None
     industry_focus: List[str] = Field(default_factory=list)
+    default_compliance_dimensions: List[str] = Field(default_factory=list)
+    suggested_checklist_codes: List[str] = Field(default_factory=list)
     output_language: Optional[str] = None
     risk_tolerance: Optional[str] = None
     match_threshold_adjustment: int = 0
@@ -28,6 +34,12 @@ class PlaybookProfileResponse(BaseModel):
     external_counsel_triggers: Optional[str] = None
     playbook_md: Optional[str] = None
     message: Optional[str] = None
+
+
+class OnboardingStatusResponse(BaseModel):
+    completed: bool
+    required: bool
+    role: str
 
 
 class InterviewStartResponse(BaseModel):

@@ -58,11 +58,10 @@ cd vela-platform
 
 ```bash
 cd backend
-cp .env.example .env
-# 可选：填入自己的 QWEN_API_KEY 以测试 LLM 润色
+# 发布 ZIP 不含任何 .env*；可选 LLM Key 应由测试者通过自己的环境变量或密钥管理工具注入
 ```
 
-演示账号由种子脚本创建：`legal@demo.vela` / `Demo1234!`
+本地演示账号由 `./scripts/start.sh` 或手工种子脚本创建。生产镜像默认不创建演示账号，不得公开固定密码账号。
 
 ## 五、安全清单
 
@@ -73,12 +72,14 @@ cp .env.example .env
 
 ## 六、可选：发布 Release 供下载 zip
 
-若对方不使用 Git，可在 GitHub 打 Release 附 zip：
+若对方不使用 Git，只能上传 allowlist 构建并通过自动扫描的 ZIP；不要在 Finder 或命令行直接压缩工作区：
 
-1. 仓库 → **Releases** → **Create a new release**
-2. Tag：`v0.1.0-mvp`
-3. 上传 `Vela_MVP_给Gemini.zip` 或让 GitHub 自动生成 Source code
+1. 运行 `./scripts/build_submission_package.sh /tmp/vela-capability-pack-mvp.zip`
+2. 再运行 `./scripts/check_release_boundaries.sh /tmp/vela-capability-pack-mvp.zip`
+3. 仓库 → **Releases** → **Create a new release**，上传该已扫描文件
+
+发布包不含任何 `.env*`；接收方必须通过自己的密钥管理渠道创建运行环境配置。
 
 ---
 
-**当前本地状态：** 已 commit，等待 `git push` 到你在 GitHub 新建的 remote。
+发布前仍须人工复核分支、变更清单和自动扫描结果。

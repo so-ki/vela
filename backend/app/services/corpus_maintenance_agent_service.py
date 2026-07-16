@@ -109,7 +109,10 @@ def _impact_analysis(
 
     scenarios = (
         db.query(InvestigationScenario)
-        .filter(InvestigationScenario.legal_deleted_at.is_(None))
+        .filter(
+            InvestigationScenario.legal_deleted_at.is_(None),
+            InvestigationScenario.is_demo.is_(False),
+        )
         .order_by(InvestigationScenario.updated_at.desc())
         .limit(80)
         .all()

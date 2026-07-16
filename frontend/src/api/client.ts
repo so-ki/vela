@@ -1,5 +1,14 @@
 import axios from 'axios'
-import type { Disclaimer, ExportConfig, LoginResponse, SsoConfig, SystemStatus, User } from '@/types'
+import type {
+  Disclaimer,
+  ExportConfig,
+  LoginResponse,
+  OnboardingStatus,
+  SsoConfig,
+  SystemStatus,
+  User,
+} from '@/types'
+import type { CapabilityPackIdentity, RulesCatalog, Scenario } from '@/types/scenario'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
@@ -74,30 +83,13 @@ export async function fetchRulesClassification() {
   return data
 }
 
-export async function fetchRulesPacks(includePlanned = false) {
-  const { data } = await api.get('/rules/packs', { params: { include_planned: includePlanned } })
+export async function fetchRulesPacks(): Promise<CapabilityPackIdentity[]> {
+  const { data } = await api.get<CapabilityPackIdentity[]>('/capability-packs')
   return data
 }
 
-export async function fetchRulesCatalog(packId?: string) {
-  const { data } = await api.get('/rules/catalog', {
-    params: packId ? { pack_id: packId } : undefined,
-  })
-  return data
-}
-
-export async function fetchDemoTemplate() {
-  const { data } = await api.get('/rules/demo-template')
-  return data
-}
-
-export async function createScenario(payload: Record<string, unknown>) {
-  const { data } = await api.post('/scenarios', payload)
-  return data
-}
-
-export async function createDemoScenario() {
-  const { data } = await api.post('/scenarios/demo/byd-campinas')
+export async function fetchRulesCatalog(): Promise<RulesCatalog> {
+  const { data } = await api.get<RulesCatalog>('/capability-packs/catalog')
   return data
 }
 
@@ -117,21 +109,6 @@ export async function submitMaterialsScenario(payload: Record<string, unknown>, 
   return data
 }
 
-export async function submitMaterialsDemo() {
-  const { data } = await api.post('/scenarios/demo/submit-materials')
-  return data
-}
-
-export async function generateAndSubmitScenario(payload: Record<string, unknown>, polish = false) {
-  const { data } = await api.post(`/scenarios/generate-and-submit?polish=${polish}`, payload)
-  return data
-}
-
-export async function generateAndSubmitDemo(polish = false) {
-  const { data } = await api.post(`/scenarios/demo/generate-and-submit?polish=${polish}`)
-  return data
-}
-
 export async function generateInvestigationPack(
   scenarioId: number,
   complianceDimensions: string[],
@@ -139,14 +116,23 @@ export async function generateInvestigationPack(
   matchThreshold = 70,
   retrievalTopK = 3,
   selectedIssueCodes: string[] = [],
-) {
-  const { data } = await api.post(`/scenarios/${scenarioId}/generate-investigation`, {
+  expectedProposalHash = '',
+  fitDecision: 'fit' | 'accept_warning' = 'fit',
+): Promise<Scenario> {
+  const { data } = await api.post<Scenario>(`/scenarios/${scenarioId}/confirm-scope`, {
     compliance_dimensions: complianceDimensions,
+    expected_proposal_hash: expectedProposalHash,
+    fit_decision: fitDecision,
     polish,
     match_threshold: matchThreshold,
     retrieval_top_k: retrievalTopK,
     selected_issue_codes: selectedIssueCodes,
   })
+  return data
+}
+
+export async function retryInvestigationPack(scenarioId: number): Promise<Scenario> {
+  const { data } = await api.post<Scenario>(`/scenarios/${scenarioId}/retry-generation`)
   return data
 }
 
@@ -187,15 +173,6 @@ export async function testLlmConnection(payload: {
   return data as { ok: boolean; latency_ms?: number; model?: string; error?: string }
 }
 
-/** @deprecated 使用 generateInvestigationPack */
-export async function confirmScenarioScope(
-  scenarioId: number,
-  complianceDimensions: string[],
-  polish = false,
-) {
-  return generateInvestigationPack(scenarioId, complianceDimensions, polish)
-}
-
 export async function previewMaterialReview(scenarioId: number, complianceDimensions: string[]) {
   const { data } = await api.post(`/scenarios/${scenarioId}/material-review/preview`, {
     compliance_dimensions: complianceDimensions,
@@ -234,9 +211,18 @@ export interface DocumentExtractResult {
   production_date?: string | null
   remarks?: string | null
   compliance_dimensions: string[]
-  facts: Array<{ field: string; value: string; source_snippet?: string | null; source_filename?: string | null }>
+  facts: Array<{
+    field: string
+    value: string
+    source_snippet?: string | null
+    source_filename?: string | null
+    verification_status?: 'verified' | 'unverified' | 'weak_grounding'
+    grounding_score?: number
+  }>
   disclaimer: string
   llm_skipped?: string | null
+  scan_or_empty?: boolean
+  extraction_warning?: string | null
 }
 
 export interface ExtractFieldConflict {
@@ -341,20 +327,8 @@ export async function restoreDeletedScenario(scenarioId: number) {
   return data
 }
 
-export async function fetchScenario(id: number) {
-  const { data } = await api.get(`/scenarios/${id}`)
-  return data
-}
-
-export async function retrieveLegalSources(scenarioId: number) {
-  const { data } = await api.post(`/scenarios/${scenarioId}/retrieve`)
-  return data
-}
-
-export async function generateBrief(scenarioId: number, polish = true) {
-  const { data } = await api.post(`/scenarios/${scenarioId}/brief`, null, {
-    params: { polish },
-  })
+export async function fetchScenario(id: number): Promise<Scenario> {
+  const { data } = await api.get<Scenario>(`/scenarios/${id}`)
   return data
 }
 
@@ -389,11 +363,6 @@ export async function finalizeReview(scenarioId: number) {
 
 export async function approveAllReview(scenarioId: number) {
   const { data } = await api.post(`/scenarios/${scenarioId}/review/approve-all`)
-  return data
-}
-
-export async function createFullSample() {
-  const { data } = await api.post('/scenarios/demo/sample')
   return data
 }
 
@@ -580,9 +549,9 @@ export async function fetchLlmStatus() {
 }
 
 // —— 冷启动 / Playbook ——
-export async function fetchOnboardingStatus() {
-  const { data } = await api.get('/onboarding/status')
-  return data as { completed: boolean }
+export async function fetchOnboardingStatus(): Promise<OnboardingStatus> {
+  const { data } = await api.get<OnboardingStatus>('/onboarding/status')
+  return data
 }
 
 export async function fetchInterviewScript() {

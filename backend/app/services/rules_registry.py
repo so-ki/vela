@@ -27,7 +27,12 @@ def load_index() -> dict[str, Any]:
 
 
 def get_default_pack_id() -> str:
-    return load_index().get("default_pack_id", "brazil_new_energy")
+    from app.capability_packs.registry import get_capability_pack_registry
+
+    active = get_capability_pack_registry().list_active()
+    if len(active) != 1:
+        raise RulesPackNotFoundError("当前 active Capability Pack 数量不唯一")
+    return active[0].manifest.rules_artifact.artifact_id
 
 
 def get_pack_entry(pack_id: str) -> dict[str, Any] | None:

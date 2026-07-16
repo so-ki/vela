@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.models.scenario import InvestigationScenario
-from app.services.legal_ingest import load_corpus
 
 
 def _utcnow_iso() -> str:
@@ -17,7 +16,12 @@ def build_audit_bundle(
     scenario: InvestigationScenario,
     *,
     payload_override: dict[str, Any] | None = None,
+    generation_config: Any = None,
 ) -> dict[str, Any]:
+    if scenario.is_demo:
+        raise ValueError("演示项目不得生成正式 audit bundle")
+    if generation_config is None:
+        raise ValueError("正式 audit bundle 缺少冻结 Capability Pack 上下文")
     payload = payload_override or (scenario.checklist.payload if scenario.checklist else {})
     review = payload.get("review") or {}
     brief = payload.get("brief") or {}
@@ -40,7 +44,7 @@ def build_audit_bundle(
                     }
                 )
 
-    corpus = load_corpus()
+    corpus = generation_config.corpus_data
     return {
         "bundle_version": "1.0",
         "generated_at": _utcnow_iso(),
@@ -49,8 +53,20 @@ def build_audit_bundle(
             "project_name": scenario.project_name,
             "status": scenario.status,
             "compliance_dimensions": scenario.compliance_dimensions,
+            "scenario_scope": scenario.scenario_scope,
         },
         "investigation_settings": payload.get("investigation_settings"),
+        "capability_pack": {
+            "pack_id": generation_config.capability_pack_id,
+            "version": generation_config.capability_pack_version,
+            "pack_hash": generation_config.capability_pack_hash,
+            "rules_artifact_id": generation_config.rules_artifact_id,
+            "rules_artifact_version": generation_config.rules_artifact_version,
+            "rules_artifact_hash": generation_config.rules_artifact_hash,
+            "corpus_artifact_id": generation_config.corpus_artifact_id,
+            "corpus_artifact_version": generation_config.corpus_artifact_version,
+            "corpus_artifact_hash": generation_config.corpus_artifact_hash,
+        },
         "retrieval_meta": payload.get("retrieval_meta"),
         "corpus_version": corpus.get("version"),
         "grounding_report": payload.get("grounding_report"),

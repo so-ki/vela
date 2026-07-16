@@ -71,7 +71,7 @@ def legal_status(_: User = Depends(get_current_user)):
 @router.post("/index", response_model=LegalIndexResponse)
 def build_index(
     force: bool = Query(default=False, description="强制重建索引"),
-    _: User = Depends(get_current_user),
+    _: User = Depends(get_current_legal_user),
 ):
     result = ingest_corpus(force=force)
     return LegalIndexResponse(
@@ -91,7 +91,7 @@ def legal_monitor_status(_: User = Depends(get_current_user)):
 @router.post("/monitor/scan", response_model=LegalMonitorScanResponse)
 def legal_monitor_scan(
     force_reindex: bool = Query(default=False, description="扫描同时强制重建索引"),
-    _: User = Depends(get_current_user),
+    _: User = Depends(get_current_legal_user),
 ):
     result = scan_regulatory_updates(force_reindex=force_reindex)
     scan_reg_feed()
@@ -343,13 +343,19 @@ def brazil_connector_search(
 ):
     from app.services.brazil_connector_service import connector_retrieve_for_item
 
-    hits, meta = connector_retrieve_for_item(
-        item_code=item_code,
-        dimension=dimension,
-        title=q,
-        description=q,
-        state=state,
-    )
+    try:
+        hits, meta = connector_retrieve_for_item(
+            item_code=item_code,
+            dimension=dimension,
+            title=q,
+            description=q,
+            state=state,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="独立法源检索暂不可用，请稍后重试",
+        ) from exc
     return {"query": q, "hits": hits, "meta": meta}
 
 

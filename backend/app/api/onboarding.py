@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
-from sqlalchemy.orm import Session
 
-from app.core.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_legal_user, get_current_user
+from app.core.roles import ROLE_ADMIN, ROLE_BUSINESS, ROLE_LEGAL, require_role
 from app.models.user import User
 from app.schemas.onboarding import (
     InterviewAnswerRequest,
     InterviewCompleteRequest,
     InterviewStartResponse,
+    OnboardingStatusResponse,
     PlaybookProfileResponse,
 )
 from app.services.cold_start_service import (
@@ -30,19 +30,30 @@ router = APIRouter(prefix="/onboarding", tags=["冷启动与 Playbook"])
 
 
 @router.get("/interview/script")
-def interview_script(_: User = Depends(get_current_user)):
+def interview_script(_: User = Depends(get_current_legal_user)):
     return load_interview_script()
 
 
 @router.get("/profile", response_model=PlaybookProfileResponse)
-def playbook_profile(current_user: User = Depends(get_current_user)):
-    p = get_playbook_profile(current_user.id)
+def playbook_profile(current_user: User = Depends(get_current_legal_user)):
+    p = get_playbook_profile(
+        current_user.id,
+        owner_email=current_user.email,
+        owner_auth_provider=current_user.auth_provider,
+        owner_external_subject=current_user.external_subject,
+    )
     return PlaybookProfileResponse(
         completed=bool(p.get("completed")),
         user_id=p.get("user_id", current_user.id),
+        profile_schema_version=p.get("profile_schema_version"),
+        profile_version=p.get("profile_version"),
+        profile_source=p.get("profile_source"),
+        completed_at=p.get("completed_at"),
         org_name=p.get("org_name"),
         primary_jurisdiction=p.get("primary_jurisdiction"),
         industry_focus=p.get("industry_focus") or [],
+        default_compliance_dimensions=p.get("default_compliance_dimensions") or [],
+        suggested_checklist_codes=p.get("suggested_checklist_codes") or [],
         output_language=p.get("output_language"),
         risk_tolerance=p.get("risk_tolerance"),
         match_threshold_adjustment=int(p.get("match_threshold_adjustment") or 0),
@@ -54,13 +65,25 @@ def playbook_profile(current_user: User = Depends(get_current_user)):
     )
 
 
-@router.get("/status")
+@router.get("/status", response_model=OnboardingStatusResponse)
 def onboarding_status(current_user: User = Depends(get_current_user)):
-    return {"completed": is_onboarding_complete(current_user.id)}
+    if current_user.role == ROLE_BUSINESS:
+        return OnboardingStatusResponse(completed=True, required=False, role=current_user.role)
+    require_role(current_user, (ROLE_LEGAL, ROLE_ADMIN))
+    return OnboardingStatusResponse(
+        completed=is_onboarding_complete(
+            current_user.id,
+            owner_email=current_user.email,
+            owner_auth_provider=current_user.auth_provider,
+            owner_external_subject=current_user.external_subject,
+        ),
+        required=True,
+        role=current_user.role,
+    )
 
 
 @router.post("/interview/start", response_model=InterviewStartResponse)
-def interview_start(current_user: User = Depends(get_current_user)):
+def interview_start(current_user: User = Depends(get_current_legal_user)):
     result = start_interview(current_user.id)
     return InterviewStartResponse(**result)
 
@@ -69,7 +92,7 @@ def interview_start(current_user: User = Depends(get_current_user)):
 def interview_answer(
     session_id: str,
     body: InterviewAnswerRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_legal_user),
 ):
     try:
         return submit_interview_answer(session_id, current_user.id, body.question_id, body.answer)
@@ -81,7 +104,7 @@ def interview_answer(
 def interview_sync(
     session_id: str,
     body: dict[str, Any],
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_legal_user),
 ):
     answers = body.get("answers") or {}
     try:
@@ -98,7 +121,7 @@ async def interview_upload(
     parse: bool = Query(default=True),
     parse_into: Optional[str] = Query(default=None),
     merge_mode: str = Query(default="append"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_legal_user),
 ):
     content = await file.read()
     if len(content) < 10:
@@ -119,15 +142,27 @@ async def interview_upload(
 
 
 @router.post("/interview/complete", response_model=PlaybookProfileResponse)
-def interview_complete(body: InterviewCompleteRequest, current_user: User = Depends(get_current_user)):
+def interview_complete(body: InterviewCompleteRequest, current_user: User = Depends(get_current_legal_user)):
     try:
-        profile = complete_interview(body.session_id, current_user.id)
+        profile = complete_interview(
+            body.session_id,
+            current_user.id,
+            owner_email=current_user.email,
+            owner_auth_provider=current_user.auth_provider,
+            owner_external_subject=current_user.external_subject,
+        )
         return PlaybookProfileResponse(
             completed=True,
             user_id=current_user.id,
+            profile_schema_version=profile.get("profile_schema_version"),
+            profile_version=profile.get("profile_version"),
+            profile_source=profile.get("profile_source"),
+            completed_at=profile.get("completed_at"),
             org_name=profile.get("org_name"),
             primary_jurisdiction=profile.get("primary_jurisdiction"),
             industry_focus=profile.get("industry_focus") or [],
+            default_compliance_dimensions=profile.get("default_compliance_dimensions") or [],
+            suggested_checklist_codes=profile.get("suggested_checklist_codes") or [],
             output_language=profile.get("output_language"),
             risk_tolerance=profile.get("risk_tolerance"),
             match_threshold_adjustment=profile.get("match_threshold_adjustment", 0),
@@ -144,7 +179,7 @@ def interview_complete(body: InterviewCompleteRequest, current_user: User = Depe
 async def upload_template(
     file: UploadFile = File(...),
     session_id: Optional[str] = None,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_legal_user),
 ):
     content = await file.read()
     if len(content) < 20:

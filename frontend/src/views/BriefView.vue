@@ -1,20 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, nextTick, watch } from 'vue'
-import { useRoute, useRouter, RouterLink } from 'vue-router'
-import { fetchBrief, fetchLlmStatus, fetchScenario, generateBrief, submitScenarioForReview } from '@/api/client'
+import { ref, onMounted, nextTick, watch } from 'vue'
+import { useRoute, RouterLink } from 'vue-router'
+import { fetchBrief, fetchLlmStatus, fetchScenario } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import type { RiskBrief, Scenario } from '@/types/scenario'
 
 const route = useRoute()
-const router = useRouter()
 const auth = useAuthStore()
 const scenario = ref<Scenario | null>(null)
 const brief = ref<RiskBrief | null>(null)
 const llmStatus = ref<{ available: boolean; message: string; provider?: string | null } | null>(null)
 const loading = ref(true)
-const generating = ref(false)
-const submitting = ref(false)
-const submitted = ref(false)
 const error = ref<string | null>(null)
 
 const statusLabel: Record<string, string> = {
@@ -39,18 +35,12 @@ onMounted(async () => {
   const id = Number(route.params.id)
   try {
     llmStatus.value = await fetchLlmStatus().catch(() => null)
-    scenario.value = await fetchScenario(id)
-    if (scenario.value.status === 'pending_legal_review') {
-      submitted.value = true
-    }
+    const loadedScenario = await fetchScenario(id)
+    scenario.value = loadedScenario
     try {
       brief.value = await fetchBrief(id)
     } catch {
-      if (auth.isLegal) {
-        await runGenerate(id, true)
-      } else {
-        error.value = '简报尚未生成或仍在处理中，请稍后刷新；系统提交法务时会自动生成简报。'
-      }
+      error.value = '简报尚未生成或仍在处理中；本页不会隐式触发生成。'
     }
   } catch {
     error.value = '无法加载简报'
@@ -78,47 +68,6 @@ function scrollToBriefAnchor() {
 
 watch(() => route.hash, () => scrollToBriefAnchor())
 
-async function runGenerate(id: number, polish = true) {
-  generating.value = true
-  error.value = null
-  try {
-    brief.value = await generateBrief(id, polish)
-    if (scenario.value) {
-      scenario.value.status = brief.value.status === 'blocked' ? 'brief_blocked' : 'brief_generated'
-    }
-  } catch (e: unknown) {
-    error.value = extractError(e)
-  } finally {
-    generating.value = false
-  }
-}
-
-function extractError(e: unknown): string {
-  if (typeof e === 'object' && e !== null && 'response' in e) {
-    const resp = (e as { response?: { status?: number; data?: { detail?: string } } }).response
-    if (resp?.status === 404) return '接口未找到，请重启后端（./scripts/start.sh）'
-    if (typeof resp?.data?.detail === 'string') return resp.data.detail
-  }
-  return '生成简报失败，请确认已完成法源检索'
-}
-
-async function runSubmit() {
-  if (!scenario.value) return
-  submitting.value = true
-  error.value = null
-  try {
-    scenario.value = await submitScenarioForReview(scenario.value.id)
-    submitted.value = true
-  } catch (e: unknown) {
-    error.value = extractError(e)
-  } finally {
-    submitting.value = false
-  }
-}
-
-const passedItems = computed(() =>
-  (brief.value?.sections || []).flatMap((s) => s.items.filter((i) => i.gate_status === 'passed')),
-)
 </script>
 
 <template>
@@ -183,14 +132,6 @@ const passedItems = computed(() =>
           >
             进入复核
           </RouterLink>
-          <template v-if="auth.isLegal">
-            <button type="button" class="btn-primary" :disabled="generating" @click="runGenerate(scenario.id, true)">
-              {{ generating ? '生成中…' : 'LLM 润色生成' }}
-            </button>
-            <button type="button" class="btn-secondary" :disabled="generating" @click="runGenerate(scenario.id, false)">
-              仅模板
-            </button>
-          </template>
         </div>
       </header>
 

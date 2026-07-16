@@ -1043,7 +1043,13 @@ def _merge_rule_and_llm(
     covered = {f.get("field") for f in rule_facts if isinstance(f, dict)}
     for fact in llm_facts:
         if isinstance(fact, dict) and fact.get("field") not in covered:
-            rule_facts.append(fact)
+            normalized = dict(fact)
+            value = normalized.get("value")
+            if isinstance(value, (list, tuple, set)):
+                normalized["value"] = ", ".join(str(item) for item in value)
+            elif value is not None and not isinstance(value, str):
+                normalized["value"] = str(value)
+            rule_facts.append(normalized)
     merged["facts"] = rule_facts[:24]
     merged["mode"] = "rules+llm" if llm_result else merged.get("mode", "rules")
     return merged

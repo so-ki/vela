@@ -1,0 +1,11 @@
+{
+  "pack": {"id": "test_fixture_rules", "name": "测试能力制品", "version": "0.0.1", "primary_country": "fixture_country"},
+  "jurisdiction": {"id": "fixture_country", "name": "非真实测试法域", "default_state": "fixture_state"},
+  "industries": {"fixture_industry_rules": {"id": "fixture_industry_rules", "name": "非真实测试行业", "keywords": ["fixture"]}},
+  "action_types": {"fixture_action": {"id": "fixture_action", "name": "非真实测试动作", "keywords": ["fixture"]}},
+  "dimensions": {"fixture_issue": {"id": "fixture_issue", "name": "测试议题", "name_pt": "fixture", "description": "仅验证平台抽象", "order": 1}},
+  "material_fields": [],
+  "dimension_field_requirements": {},
+  "dimension_elements": {},
+  "checklist_items": []
+}

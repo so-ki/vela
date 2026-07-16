@@ -1,0 +1,56 @@
+{
+  "manifest_schema_version": "1.0",
+  "pack_id": "brazil_new_energy_greenfield",
+  "version": "1.0.0",
+  "status": "active",
+  "display_name": "巴西 · 新能源制造 · 绿地设厂",
+  "description": "面向巴西新能源制造绿地设厂项目的首个正式验证能力包。当前 MVP 仅对该能力包提供完整法律协查支持。",
+  "country": "BR",
+  "industry": "new_energy_manufacturing",
+  "action_type": "greenfield_plant",
+  "languages": ["zh-CN", "pt-BR"],
+  "issue_modules": ["labor", "foreign_investment", "tax", "environment", "industry_access", "data_compliance"],
+  "rules_artifact": {
+    "artifact_id": "brazil_new_energy",
+    "version": "2.9",
+    "content_hash": "351c7d6f6f71a5d1cedd3527a10a8b89f1cd72d3079d4b41d42b827aeba62c9c",
+    "resource": "rules://brazil_new_energy.json"
+  },
+  "corpus_artifact": {
+    "artifact_id": "brazil_legal_corpus",
+    "version": "1.9",
+    "content_hash": "8bdc30631c4b2188d522f29d31587a29a4db62609e28ef48170faffe802b8638",
+    "resource": "corpus://brazil_legal_corpus.json"
+  },
+  "artifact_binding": {
+    "country": "brazil",
+    "industry": "new_energy",
+    "action_type": "greenfield_plant"
+  },
+  "routing_hints": {
+    "country": ["BR", "Brazil", "Brasil", "brazil", "巴西"],
+    "industry": ["new_energy", "new_energy_manufacturing", "新能源", "新能源制造", "电池", "储能", "光伏", "电动汽车"],
+    "action_type": ["greenfield_plant", "greenfield", "新建工厂", "绿地设厂", "建设工厂", "设厂", "建设", "工厂"]
+  },
+  "retrieval_config": {
+    "match_threshold_default": 70,
+    "match_threshold_min": 50,
+    "match_threshold_max": 95,
+    "top_k_default": 3,
+    "top_k_min": 0,
+    "top_k_max": 10,
+    "expansion_enabled": true,
+    "expansion_candidate_extra": 2,
+    "expansion_min_keyword_score": 18.0,
+    "expansion_context_limit": 800
+  },
+  "output_profile": {
+    "profile_id": "bilingual_investigation_brief",
+    "version": "1.0",
+    "brief_languages": ["zh-CN", "pt-BR"],
+    "brief_title": "拉美投资合规专项协查简报",
+    "export_template": "law_school",
+    "disclaimer": "本能力包生成内容仅供企业法务协查与复核，不构成正式法律意见。"
+  },
+  "semantic_hash": "87f6d5b98a5d83ed02147d950754bbf924f73638557f442b812b289fbcfc2c70"
+}

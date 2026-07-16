@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any
+
+from sqlalchemy.orm import Session
 
 from app.core.chroma_client import _chroma_available
 from app.services.corpus_text_cleaner import excerpt_for_display, text_for_retrieval
@@ -78,8 +81,9 @@ def _retrieve_keyword(
     top_k: int,
     match_threshold: int = 70,
     min_keyword_score: float = 25.0,
+    corpus_path: Path | str | None = None,
 ) -> list[dict[str, Any]]:
-    corpus = load_corpus()
+    corpus = load_corpus(corpus_path)
     query_tokens = _tokenize(f"{title} {description} {dimension} {item_code}")
     scored: list[tuple[float, dict[str, Any]]] = []
     for doc in corpus["sources"]:
@@ -92,6 +96,30 @@ def _retrieve_keyword(
     return [_format_hit(doc, score, item_code, match_threshold=match_threshold) for score, doc in scored[:top_k]]
 
 
+def query_corpus_readonly(
+    *,
+    item_code: str,
+    dimension: str,
+    title: str,
+    description: str,
+    top_k: int,
+    match_threshold: int = 70,
+    min_keyword_score: float = 25.0,
+) -> list[dict[str, Any]]:
+    """Standalone connector lookup; it cannot write a formal investigation result."""
+    if top_k < 0 or top_k > 20:
+        raise ValueError("只读检索 top-k 超出范围")
+    return _retrieve_keyword(
+        item_code=item_code,
+        dimension=dimension,
+        title=title,
+        description=description,
+        top_k=top_k,
+        match_threshold=match_threshold,
+        min_keyword_score=min_keyword_score,
+    )
+
+
 def _retrieve_chroma(
     *,
     item_code: str,
@@ -100,10 +128,11 @@ def _retrieve_chroma(
     description: str,
     top_k: int,
     match_threshold: int = 70,
+    corpus_path: Path | str | None = None,
 ) -> list[dict[str, Any]]:
     from app.core.chroma_client import get_legal_collection
 
-    corpus = load_corpus()
+    corpus = load_corpus(corpus_path)
     by_id = {d["id"]: d for d in corpus["sources"]}
     query_text = f"{title} {description} {dimension}"
     collection = get_legal_collection()
@@ -144,6 +173,7 @@ def _retrieve_chroma(
 
 
 def retrieve_for_checklist_item(
+    db: Session,
     *,
     item_code: str,
     dimension: str,
@@ -152,7 +182,20 @@ def retrieve_for_checklist_item(
     top_k: int = 3,
     match_threshold: int = 70,
     min_keyword_score: float = 25.0,
+    expansion_pass: bool = False,
+    generation_config: Any = None,
 ) -> list[dict[str, Any]]:
+    from app.services.generation_guard import require_generation_config
+
+    config = require_generation_config(db, generation_config)
+    expected_top_k = config.expansion_candidate_top_k if expansion_pass else config.retrieval_top_k
+    expected_min_score = config.expansion_min_keyword_score if expansion_pass else 25.0
+    if (
+        match_threshold != config.match_threshold
+        or top_k != expected_top_k
+        or min_keyword_score != expected_min_score
+    ):
+        raise ValueError("RAG 参数与冻结配置不一致")
     hits = _retrieve_keyword(
         item_code=item_code,
         dimension=dimension,
@@ -161,6 +204,7 @@ def retrieve_for_checklist_item(
         top_k=top_k,
         match_threshold=match_threshold,
         min_keyword_score=min_keyword_score,
+        corpus_path=config.corpus_artifact_path,
     )
 
     if _chroma_available and len(hits) < top_k:
@@ -172,6 +216,7 @@ def retrieve_for_checklist_item(
                 description=description,
                 top_k=top_k,
                 match_threshold=match_threshold,
+                corpus_path=config.corpus_artifact_path,
             )
             seen = {h["id"] for h in hits}
             for h in chroma_hits:
@@ -186,6 +231,7 @@ def retrieve_for_checklist_item(
 
 
 def retrieve_for_checklist_incremental(
+    db: Session,
     new_sections: list[dict[str, Any]],
     previous_sections_with_legal: list[dict[str, Any]],
     *,
@@ -193,7 +239,13 @@ def retrieve_for_checklist_incremental(
     top_k: int = 3,
     match_threshold: int = 70,
     expansion_context: str = "",
+    generation_config: Any = None,
 ) -> dict[str, Any]:
+    from app.services.generation_guard import require_generation_config
+
+    config = require_generation_config(db, generation_config)
+    if top_k != config.retrieval_top_k or match_threshold != config.match_threshold:
+        raise ValueError("增量 RAG 参数与冻结配置不一致")
     from app.services.retrieval_expansion import retrieve_item_with_expansion
 
     prev_by_code: dict[str, dict[str, Any]] = {}
@@ -215,7 +267,7 @@ def retrieve_for_checklist_incremental(
             code = item["code"]
             if code not in codes_to_refresh and code in prev_by_code:
                 prev_item = prev_by_code[code]
-                hits = list(prev_item.get("legal_hits") or [])
+                hits = list(prev_item.get("legal_hits") or [])[: config.retrieval_top_k]
                 carried += 1
                 items_out.append(
                     {
@@ -230,6 +282,7 @@ def retrieve_for_checklist_incremental(
                     zero_hit_items.append(code)
             else:
                 hits, rmeta = retrieve_item_with_expansion(
+                    db=db,
                     item_code=code,
                     dimension=section["dimension_id"],
                     title=item["title"],
@@ -237,6 +290,7 @@ def retrieve_for_checklist_incremental(
                     match_threshold=match_threshold,
                     expansion_context=expansion_context,
                     top_k=top_k,
+                    generation_config=config,
                 )
                 status = "ok" if hits else "no_match"
                 if rmeta.get("expanded") and rmeta.get("best_score", 0) < match_threshold:
@@ -269,12 +323,19 @@ def retrieve_for_checklist_incremental(
 
 
 def retrieve_for_checklist(
+    db: Session,
     sections: list[dict[str, Any]],
     top_k: int = 3,
     *,
     match_threshold: int = 70,
     expansion_context: str = "",
+    generation_config: Any = None,
 ) -> dict[str, Any]:
+    from app.services.generation_guard import require_generation_config
+
+    config = require_generation_config(db, generation_config)
+    if top_k != config.retrieval_top_k or match_threshold != config.match_threshold:
+        raise ValueError("RAG 参数与冻结配置不一致")
     from app.services.retrieval_expansion import retrieve_item_with_expansion
 
     enriched_sections: list[dict[str, Any]] = []
@@ -286,6 +347,7 @@ def retrieve_for_checklist(
         items_out: list[dict[str, Any]] = []
         for item in section.get("items", []):
             hits, rmeta = retrieve_item_with_expansion(
+                db=db,
                 item_code=item["code"],
                 dimension=section["dimension_id"],
                 title=item["title"],
@@ -293,6 +355,7 @@ def retrieve_for_checklist(
                 match_threshold=match_threshold,
                 expansion_context=expansion_context,
                 top_k=top_k,
+                generation_config=config,
             )
             if rmeta.get("expanded"):
                 expanded_count += 1
@@ -319,7 +382,7 @@ def retrieve_for_checklist(
         "retrieval_meta": {
             "match_threshold": match_threshold,
             "expanded_item_count": expanded_count,
-            "expansion_enabled": bool(expansion_context.strip()),
+            "expansion_enabled": config.expansion_enabled,
         },
         "disclaimer": (
             "以下法条片段来自 LexML / STF / STJ 开放法源索引，仅供协查参考，不构成正式法律意见。"

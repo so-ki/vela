@@ -13,6 +13,8 @@ INTERVIEW_PATH = Path(__file__).resolve().parents[1] / "data" / "cold_start_inte
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 PROFILES_DIR = DATA_DIR / "playbook_profiles"
 TEMPLATES_DIR = DATA_DIR / "playbook_templates"
+PLAYBOOK_PROFILE_SCHEMA_VERSION = "1.0"
+PLAYBOOK_OWNER_BINDING_VERSION = "1.0"
 
 # Playbook profile → default scope (does NOT modify rules JSON)
 INDUSTRY_FOCUS_DEFAULT_DIMENSIONS: dict[str, list[str]] = {
@@ -62,6 +64,67 @@ def _profile_path(user_id: int) -> Path:
     return PROFILES_DIR / f"user_{user_id}.json"
 
 
+def _profile_unavailable(user_id: int, message: str) -> dict[str, Any]:
+    return {
+        "completed": False,
+        "user_id": user_id,
+        "message": message,
+    }
+
+
+def _owner_binding(
+    user_id: int,
+    *,
+    owner_email: Optional[str],
+    owner_auth_provider: Optional[str],
+    owner_external_subject: Optional[str],
+) -> Optional[dict[str, Any]]:
+    """Return a canonical account binding, or None when identity cannot be verified."""
+    email = str(owner_email or "").strip().lower()
+    auth_provider = str(owner_auth_provider or "").strip().lower()
+    external_subject = str(owner_external_subject or "").strip() or None
+    if user_id <= 0 or not email or not auth_provider:
+        return None
+    if auth_provider != "local" and not external_subject:
+        return None
+    return {
+        "binding_version": PLAYBOOK_OWNER_BINDING_VERSION,
+        "user_id": user_id,
+        "email": email,
+        "auth_provider": auth_provider,
+        "external_subject": external_subject,
+    }
+
+
+def save_playbook_profile(
+    user_id: int,
+    profile: dict[str, Any],
+    *,
+    owner_email: str,
+    owner_auth_provider: str,
+    owner_external_subject: Optional[str],
+) -> dict[str, Any]:
+    """Persist a profile bound to the authenticated account, not only a reusable DB id."""
+    if user_id <= 0:
+        raise ValueError("用户 ID 无效")
+    binding = _owner_binding(
+        user_id,
+        owner_email=owner_email,
+        owner_auth_provider=owner_auth_provider,
+        owner_external_subject=owner_external_subject,
+    )
+    if binding is None:
+        raise ValueError("无法验证 Playbook 所属账号身份")
+    payload = dict(profile)
+    payload["user_id"] = user_id
+    payload["owner_binding"] = binding
+    payload.setdefault("profile_schema_version", PLAYBOOK_PROFILE_SCHEMA_VERSION)
+    PROFILES_DIR.mkdir(parents=True, exist_ok=True)
+    with open(_profile_path(user_id), "w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2, sort_keys=True)
+    return payload
+
+
 def _session_path(session_id: str) -> Path:
     return SESSIONS_DIR / f"{session_id}.json"
 
@@ -95,8 +158,19 @@ def suggested_checklist_codes_for_profile(industry_focus: list[str]) -> list[str
     return codes
 
 
-def playbook_scope_hints(user_id: Optional[int]) -> dict[str, Any]:
-    profile = profile_for_generation(user_id)
+def playbook_scope_hints(
+    user_id: Optional[int],
+    *,
+    owner_email: Optional[str] = None,
+    owner_auth_provider: Optional[str] = None,
+    owner_external_subject: Optional[str] = None,
+) -> dict[str, Any]:
+    profile = profile_for_generation(
+        user_id,
+        owner_email=owner_email,
+        owner_auth_provider=owner_auth_provider,
+        owner_external_subject=owner_external_subject,
+    )
     if not profile.get("completed"):
         return {
             "default_compliance_dimensions": [],
@@ -121,28 +195,63 @@ def resolve_compliance_dimensions(
     selected: list[str] | None,
     *,
     user_id: Optional[int] = None,
+    owner_email: Optional[str] = None,
+    owner_auth_provider: Optional[str] = None,
+    owner_external_subject: Optional[str] = None,
 ) -> list[str]:
     """Use explicit selection, else Playbook defaults, else empty (caller may fall back to all)."""
     if selected:
         return [d for d in selected if d in VALID_SCOPE_DIMENSIONS]
-    hints = playbook_scope_hints(user_id)
+    hints = playbook_scope_hints(
+        user_id,
+        owner_email=owner_email,
+        owner_auth_provider=owner_auth_provider,
+        owner_external_subject=owner_external_subject,
+    )
     return list(hints.get("default_compliance_dimensions") or [])
 
 
-def get_playbook_profile(user_id: int) -> dict[str, Any]:
+def get_playbook_profile(
+    user_id: int,
+    *,
+    owner_email: Optional[str] = None,
+    owner_auth_provider: Optional[str] = None,
+    owner_external_subject: Optional[str] = None,
+) -> dict[str, Any]:
+    expected_binding = _owner_binding(
+        user_id,
+        owner_email=owner_email,
+        owner_auth_provider=owner_auth_provider,
+        owner_external_subject=owner_external_subject,
+    )
+    if expected_binding is None:
+        return _profile_unavailable(user_id, "无法验证 Playbook 所属账号，已禁用该档案")
     path = _profile_path(user_id)
     if not path.exists():
-        return {
-            "completed": False,
-            "user_id": user_id,
-            "message": "尚未完成冷启动访谈，将使用平台默认 playbook",
-        }
-    with open(path, encoding="utf-8") as f:
-        return json.load(f)
+        return _profile_unavailable(user_id, "尚未完成冷启动访谈，将使用平台默认 playbook")
+    try:
+        with open(path, encoding="utf-8") as f:
+            profile = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return _profile_unavailable(user_id, "Playbook 档案不可验证，已禁用该档案")
+    if profile.get("user_id") != user_id or profile.get("owner_binding") != expected_binding:
+        return _profile_unavailable(user_id, "Playbook 所属账号不匹配，已禁用该档案")
+    return profile
 
 
-def is_onboarding_complete(user_id: int) -> bool:
-    profile = get_playbook_profile(user_id)
+def is_onboarding_complete(
+    user_id: int,
+    *,
+    owner_email: Optional[str] = None,
+    owner_auth_provider: Optional[str] = None,
+    owner_external_subject: Optional[str] = None,
+) -> bool:
+    profile = get_playbook_profile(
+        user_id,
+        owner_email=owner_email,
+        owner_auth_provider=owner_auth_provider,
+        owner_external_subject=owner_external_subject,
+    )
     return bool(profile.get("completed"))
 
 
@@ -302,7 +411,14 @@ def sync_interview_answers(session_id: str, user_id: int, answers: dict[str, Any
     return {"session_id": session_id, "saved_keys": list(answers.keys())}
 
 
-def complete_interview(session_id: str, user_id: int) -> dict[str, Any]:
+def complete_interview(
+    session_id: str,
+    user_id: int,
+    *,
+    owner_email: str,
+    owner_auth_provider: str,
+    owner_external_subject: Optional[str],
+) -> dict[str, Any]:
     path = _session_path(session_id)
     if not path.exists():
         raise ValueError("访谈会话不存在")
@@ -346,6 +462,9 @@ def complete_interview(session_id: str, user_id: int) -> dict[str, Any]:
     profile = {
         "completed": True,
         "user_id": user_id,
+        "profile_schema_version": PLAYBOOK_PROFILE_SCHEMA_VERSION,
+        "profile_version": f"interview-{script.get('version') or 'unknown'}",
+        "profile_source": "interview",
         "completed_at": _utcnow_iso(),
         "org_name": answers.get("org_name", ""),
         "primary_jurisdiction": answers.get("primary_jurisdiction", "brazil"),
@@ -363,9 +482,13 @@ def complete_interview(session_id: str, user_id: int) -> dict[str, Any]:
         "uploaded_templates": session.get("uploaded_templates") or uploaded,
         "playbook_md": _build_playbook_md(answers, uploaded_files=uploaded),
     }
-    PROFILES_DIR.mkdir(parents=True, exist_ok=True)
-    with open(_profile_path(user_id), "w", encoding="utf-8") as f:
-        json.dump(profile, f, ensure_ascii=False, indent=2)
+    profile = save_playbook_profile(
+        user_id,
+        profile,
+        owner_email=owner_email,
+        owner_auth_provider=owner_auth_provider,
+        owner_external_subject=owner_external_subject,
+    )
     session["status"] = "completed"
     session["completed_at"] = _utcnow_iso()
     with open(path, "w", encoding="utf-8") as f:
@@ -446,10 +569,21 @@ def _build_playbook_md(answers: dict[str, Any], *, uploaded_files: Optional[list
     )
 
 
-def profile_for_generation(user_id: Optional[int]) -> dict[str, Any]:
+def profile_for_generation(
+    user_id: Optional[int],
+    *,
+    owner_email: Optional[str] = None,
+    owner_auth_provider: Optional[str] = None,
+    owner_external_subject: Optional[str] = None,
+) -> dict[str, Any]:
     if not user_id:
         return {"match_threshold_adjustment": 0, "contract_house_rules": "", "completed": False}
-    p = get_playbook_profile(user_id)
+    p = get_playbook_profile(
+        user_id,
+        owner_email=owner_email,
+        owner_auth_provider=owner_auth_provider,
+        owner_external_subject=owner_external_subject,
+    )
     if not p.get("completed"):
         return {"match_threshold_adjustment": 0, "contract_house_rules": "", "completed": False}
     return p

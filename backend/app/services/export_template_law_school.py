@@ -75,7 +75,11 @@ def _cover_table(doc: Document, rows: list[tuple[str, str]]):
     doc.add_paragraph()
 
 
-def build_law_school_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
+def build_law_school_docx(
+    scenario: InvestigationScenario,
+    *,
+    output_profile: dict[str, Any] | None = None,
+) -> tuple[bytes, str]:
     settings = get_settings()
     ctx = export_context(scenario)
     payload = ctx["payload"]
@@ -120,7 +124,7 @@ def build_law_school_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
         [
             ("致", settings.export_recipient_label),
             ("自", f"{settings.export_org_name} · {settings.export_org_department}"),
-            ("关于", f"{scenario_obj.project_name} — 巴西投资合规协查"),
+            ("关于", f"{scenario_obj.project_name} — {payload.get('industry_pack_name') or '投资合规协查'}"),
             ("项目地点", f"{scenario_obj.city} · {scenario_obj.state} · {scenario_obj.country}"),
             ("协查法域", payload.get("industry_pack_name") or payload.get("detected_industry_name", scenario_obj.industry)),
             ("动作类型", payload.get("detected_action_type_name", scenario_obj.action_type)),
@@ -131,8 +135,7 @@ def build_law_school_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
 
     _add_paragraph(
         doc,
-        "【重要说明】本意见书系基于平台协查流程生成的内部法律研究材料，仅供企业法务部及管理层决策参考，"
-        "不构成对巴西法域的正式法律意见，亦不能替代当地执业律师出具的法律文书。",
+        "【重要说明】" + str((output_profile or {}).get("disclaimer") or DISCLAIMER_FULL_TEXT),
         size=11,
         space_after=10,
     )
@@ -224,7 +227,8 @@ def build_law_school_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
             _add_paragraph(doc, f"· {line}", size=11, space_after=3)
 
     _add_heading(doc, "附录 · 免责声明", level=1)
-    for para in DISCLAIMER_FULL_TEXT.split("\n\n"):
+    disclaimer = str((output_profile or {}).get("disclaimer") or DISCLAIMER_FULL_TEXT)
+    for para in disclaimer.split("\n\n"):
         _add_paragraph(doc, para, size=10.5)
 
     _add_paragraph(doc, "", space_after=18)

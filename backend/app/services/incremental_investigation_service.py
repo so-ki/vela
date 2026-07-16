@@ -5,15 +5,16 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
+from sqlalchemy.orm import Session
+
 from app.models.scenario import InvestigationScenario
 from app.services.brief_generator import generate_brief
-from app.services.dimension_gate_service import get_dimension_elements
 from app.services.investigation_adequacy_service import aggregate_investigation_adequacy
 from app.services.legal_ingest import ingest_corpus
 from app.services.legal_rag import retrieve_for_checklist_incremental
 from app.services.material_review_service import scenario_field_snapshot
 from app.services.review_service import _flatten_brief_items, _legal_hits_by_code
-from app.services.rules_registry import resolve_scenario_pack_id
+from app.services.generation_guard import GenerationConfig, require_generation_config
 
 
 def _utcnow_iso() -> str:
@@ -29,10 +30,13 @@ def diff_field_snapshots(baseline: dict[str, Any], current: dict[str, Any]) -> l
     return changed
 
 
-def _elements_cfg_by_id(pack_id: str, compliance_dimensions: list[str]) -> dict[str, dict[str, Any]]:
+def _elements_cfg_by_id(
+    rules_data: dict[str, Any], compliance_dimensions: list[str]
+) -> dict[str, dict[str, Any]]:
     cfg: dict[str, dict[str, Any]] = {}
+    by_dimension = rules_data.get("dimension_elements") or {}
     for dim_id in compliance_dimensions:
-        for el in get_dimension_elements(pack_id).get(dim_id) or []:
+        for el in by_dimension.get(dim_id) or []:
             cfg[el["id"]] = el
     return cfg
 
@@ -43,16 +47,15 @@ def compute_incremental_targets(
     compliance_dimensions: list[str],
     baseline_snapshot: dict[str, Any],
     returned_missing_elements: list[str] | None = None,
+    rules_data: dict[str, Any] | None = None,
+    rules_artifact_id: str | None = None,
 ) -> dict[str, Any]:
     """Determine which fields, elements, and checklist codes need refresh."""
-    pack_id = resolve_scenario_pack_id(
-        rules_pack_id=scenario.rules_pack_id,
-        country=scenario.country,
-        checklist_payload=scenario.checklist.payload if scenario.checklist else None,
-    )
+    if rules_data is None or not rules_artifact_id:
+        raise ValueError("增量目标计算缺少冻结 rules artifact")
     current_snapshot = scenario_field_snapshot(scenario)
     changed_fields = diff_field_snapshots(baseline_snapshot, current_snapshot)
-    elements_cfg = _elements_cfg_by_id(pack_id, compliance_dimensions)
+    elements_cfg = _elements_cfg_by_id(rules_data, compliance_dimensions)
 
     target_elements: set[str] = set(returned_missing_elements or [])
     for el_id, el_cfg in elements_cfg.items():
@@ -66,7 +69,7 @@ def compute_incremental_targets(
         target_codes.update(el_cfg.get("feeds_checklist") or [])
 
     return {
-        "pack_id": pack_id,
+        "pack_id": rules_artifact_id,
         "baseline_snapshot": baseline_snapshot,
         "current_snapshot": current_snapshot,
         "changed_fields": changed_fields,
@@ -269,6 +272,7 @@ def merge_review_state(
 
 
 def run_incremental_investigation_attach(
+    db: Session,
     scenario: InvestigationScenario,
     checklist_payload: dict[str, Any],
     previous_pack: dict[str, Any],
@@ -278,30 +282,38 @@ def run_incremental_investigation_attach(
     returned_missing_elements: list[str] | None,
     polish: bool,
     match_threshold: int = 70,
+    retrieval_top_k: int = 3,
+    generation_config: GenerationConfig | None = None,
     reviewer_name: str,
     reviewer_id: int,
 ) -> tuple[dict[str, Any], dict[str, Any]]:
     """Merge previous pack with delta RAG/brief/adequacy/review. Returns (payload, meta)."""
+    config = require_generation_config(db, generation_config)
+    if match_threshold != config.match_threshold or retrieval_top_k != config.retrieval_top_k:
+        raise ValueError("增量生成参数与冻结配置不一致")
     targets = compute_incremental_targets(
         scenario,
         compliance_dimensions=compliance_dimensions,
         baseline_snapshot=baseline_snapshot,
         returned_missing_elements=returned_missing_elements,
+        rules_data=config.rules_data,
+        rules_artifact_id=config.rules_artifact_id,
     )
     new_sections = checklist_payload.get("sections") or []
     prev_legal = previous_pack.get("sections_with_legal") or previous_pack.get("sections") or []
     refresh_codes = compute_codes_to_refresh(new_sections, prev_legal, set(targets["target_codes"]))
     frozen_codes = sorted(_all_codes(prev_legal) & _all_codes(new_sections) - refresh_codes)
 
-    from app.services.scenario_pipeline import _expansion_context
-
-    ingest_corpus(force=False)
+    ingest_corpus(force=False, corpus_path=config.corpus_artifact_path)
     rag_result = retrieve_for_checklist_incremental(
+        db,
         new_sections,
         prev_legal,
         codes_to_refresh=refresh_codes,
         match_threshold=match_threshold,
-        expansion_context=_expansion_context(scenario),
+        top_k=retrieval_top_k,
+        generation_config=config,
+        expansion_context=str(config.generation_input.get("expansion_context") or ""),
     )
     checklist_payload = {
         **checklist_payload,
@@ -310,11 +322,13 @@ def run_incremental_investigation_attach(
     }
 
     brief = generate_brief(
+        db,
         scenario,
         checklist_payload,
         sections_with_legal=rag_result["sections"],
         polish=polish,
         threshold=match_threshold,
+        generation_config=config,
     )
     checklist_payload = {**checklist_payload, "brief": brief}
 
@@ -328,12 +342,19 @@ def run_incremental_investigation_attach(
     )
     checklist_payload["conflict_flags"] = detect_material_conflicts(scenario, checklist_payload)
     checklist_payload["investigation_settings"] = {
+        "capability_pack_id": config.capability_pack_id,
+        "capability_pack_version": config.capability_pack_version,
+        "capability_pack_hash": config.capability_pack_hash,
         "match_threshold": match_threshold,
-        "expansion_enabled": True,
+        "retrieval_top_k": retrieval_top_k,
+        "expansion_enabled": config.expansion_enabled,
     }
 
     fresh_adequacy = aggregate_investigation_adequacy(
-        scenario, checklist_payload, compliance_dimensions
+        scenario,
+        checklist_payload,
+        compliance_dimensions,
+        generation_config=config,
     )
     adequacy = merge_investigation_adequacy(
         fresh_adequacy,

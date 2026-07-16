@@ -8,7 +8,7 @@ from urllib.parse import quote
 
 from app.services.brazil_official_portals import build_portal_hits
 from app.services.legal_ingest import load_corpus
-from app.services.legal_rag import retrieve_for_checklist_item, SOURCE_LABELS
+from app.services.legal_rag import query_corpus_readonly, SOURCE_LABELS
 from app.services.lexml_fetch_service import fetch_lexml_by_urn
 
 CITATION_TIERS = {
@@ -108,7 +108,7 @@ def connector_retrieve_for_item(
     query = f"{title} {description} {dimension} {state or ''}"
     meta: dict[str, Any] = {"passes": [], "connector": "brazil_legal"}
 
-    hits = retrieve_for_checklist_item(
+    hits = query_corpus_readonly(
         item_code=item_code,
         dimension=dimension,
         title=title,
@@ -132,7 +132,7 @@ def connector_retrieve_for_item(
         meta["best_score"] = best
         return hits[:top_k], meta
 
-    relaxed = retrieve_for_checklist_item(
+    relaxed = query_corpus_readonly(
         item_code=item_code,
         dimension=dimension,
         title=title,

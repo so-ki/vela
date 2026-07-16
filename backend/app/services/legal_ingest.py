@@ -10,8 +10,9 @@ CORPUS_PATH = Path(__file__).resolve().parents[1] / "data" / "brazil_legal_corpu
 INDEX_FLAG = Path(__file__).resolve().parents[2] / "data" / "legal_index.json"
 
 
-def load_corpus() -> dict[str, Any]:
-    with open(CORPUS_PATH, encoding="utf-8") as f:
+def load_corpus(corpus_path: Path | str | None = None) -> dict[str, Any]:
+    path = Path(corpus_path) if corpus_path is not None else CORPUS_PATH
+    with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -28,8 +29,12 @@ def _load_index_flag() -> Optional[dict[str, Any]]:
         return json.load(f)
 
 
-def ingest_corpus(force: bool = False) -> dict[str, Any]:
-    corpus = load_corpus()
+def ingest_corpus(
+    force: bool = False,
+    *,
+    corpus_path: Path | str | None = None,
+) -> dict[str, Any]:
+    corpus = load_corpus(corpus_path)
     sources = corpus["sources"]
     breakdown = _count_by_source(sources)
 

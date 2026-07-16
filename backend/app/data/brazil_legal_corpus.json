@@ -355,9 +355,10 @@
       "checklist_codes": [
         "TAX-004"
       ],
-      "text_pt": "Regulamenta o regime de Ex Tarifário para bens de capital (BK) e bens de informática e automação (BIT), permitindo redução temporária de alíquotas de Imposto de Importação para máquinas e equipamentos sem produção equivalente nacional, relevante para linhas de montagem industrial.",
+      "text_pt": "Resolver de URN :: urn não encontrada O documento solicitado não pôde de ser encontrado, embora a urn informada possa ser válida. urn:lex:br:federal:decreto:2011-06-08;7488 Página Inicial &nbsp;|&nbsp; Página Anterior",
       "text_zh": "规范资本货物及自动化设备的临时进口关税减免制度，适用于无国产替代的工业生产线设备。",
-      "text_pt_clean": "Regulamenta o regime de Ex Tarifário para bens de capital (BK) e bens de informática e automação (BIT), permitindo redução temporária de alíquotas de Imposto de Importação para máquinas e equipamentos sem produção equivalente nacional, relevante para linhas de montagem industrial."
+      "text_pt_clean": "Regulamenta o regime de Ex Tarifário para bens de capital (BK) e bens de informática e automação (BIT), permitindo redução temporária de alíquotas de Imposto de Importação para máquinas e equipamentos sem produção equivalente nacional, relevante para linhas de montagem industrial.",
+      "lexml_synced_at": null
     },
     {
       "id": "lexml-lei-14097-licenciamento",
@@ -381,9 +382,10 @@
       "checklist_codes": [
         "IND-001"
       ],
-      "text_pt": "Estabelece normas gerais para licenciamento urbanístico e obras de construção civil. Exige alvará de construção e habite-se emitidos pelo município, cumprimento do Código de Obras local e normas do Corpo de Bombeiros para edificações industriais.",
+      "text_pt": "Resolver de URN :: urn não encontrada O documento solicitado não pôde de ser encontrado, embora a urn informada possa ser válida. urn:lex:br:federal:lei:2005-01-31;14097 Página Inicial &nbsp;|&nbsp; Página Anterior",
       "text_zh": "规定城市建设许可一般规则；工业建筑须取得市政建设许可、消防合规及占用证。",
-      "text_pt_clean": "Estabelece normas gerais para licenciamento urbanístico e obras de construção civil. Exige alvará de construção e habite-se emitidos pelo município, cumprimento do Código de Obras local e normas do Corpo de Bombeiros para edificações industriais."
+      "text_pt_clean": "Estabelece normas gerais para licenciamento urbanístico e obras de construção civil. Exige alvará de construção e habite-se emitidos pelo município, cumprimento do Código de Obras local e normas do Corpo de Bombeiros para edificações industriais.",
+      "lexml_synced_at": null
     },
     {
       "id": "lexml-inmetro-dec-5440",
@@ -406,9 +408,10 @@
       "checklist_codes": [
         "IND-002"
       ],
-      "text_pt": "Aprova o Regulamento da Avaliação da Conformidade, da Regulamentação, do Controle do Mercado, do Sistema Nacional de Metrologia e da Acreditação. Produtos industrializados, inclusive veículos e componentes elétricos, podem exigir certificação compulsória perante o INMETRO.",
+      "text_pt": "Resolver de URN :: urn não encontrada O documento solicitado não pôde de ser encontrado, embora a urn informada possa ser válida. urn:lex:br:federal:decreto:2005-04-25;5440 Página Inicial &nbsp;|&nbsp; Página Anterior",
       "text_zh": "批准合格评定与市场准入规章；车辆及电气组件等产品可能须 INMETRO 强制认证。",
-      "text_pt_clean": "Aprova o Regulamento da Avaliação da Conformidade, da Regulamentação, do Controle do Mercado, do Sistema Nacional de Metrologia e da Acreditação. Produtos industrializados, inclusive veículos e componentes elétricos, podem exigir certificação compulsória perante o INMETRO."
+      "text_pt_clean": "Aprova o Regulamento da Avaliação da Conformidade, da Regulamentação, do Controle do Mercado, do Sistema Nacional de Metrologia e da Acreditação. Produtos industrializados, inclusive veículos e componentes elétricos, podem exigir certificação compulsória perante o INMETRO.",
+      "lexml_synced_at": null
     },
     {
       "id": "lexml-nr-10-seguranca",

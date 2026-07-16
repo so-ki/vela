@@ -7,15 +7,7 @@ import {
 } from '@/config/businessMaterialReviewFields'
 import type { DocumentExtractBatchResult, DocumentExtractResult } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
-import { applySceneDefaults } from '@/config/sceneClassification'
 import type { RulesCatalog, ScenarioFormData } from '@/types/scenario'
-
-function applyBusinessSubmitDefaults<T extends Record<string, unknown>>(
-  payload: T,
-  catalog: RulesCatalog | null,
-): T {
-  return applySceneDefaults(payload, catalog)
-}
 
 export function useMaterialReview(options: {
   form: Ref<ScenarioFormData>
@@ -138,6 +130,8 @@ export function useMaterialReview(options: {
     const extractFieldSnapshot = (file: DocumentExtractResult) => ({
       filename: file.filename,
       mode: file.mode,
+      scan_or_empty: file.scan_or_empty ?? false,
+      extraction_warning: file.extraction_warning ?? null,
       project_name: file.project_name ?? null,
       investment_destination: file.investment_destination ?? null,
       investment_structure: file.investment_structure ?? null,
@@ -208,6 +202,8 @@ export function useMaterialReview(options: {
           file_count: fileSnapshots.length || 1,
           files: fileSnapshots,
           mode: merged.mode,
+          scan_or_empty: merged.scan_or_empty ?? false,
+          extraction_warning: merged.extraction_warning ?? null,
           source: 'upload',
           ...mergedFormSnapshot(withDefaults),
           compliance_dimensions: merged.compliance_dimensions || [],
@@ -237,13 +233,21 @@ export function useMaterialReview(options: {
       }
     }
 
-    const { compliance_dimensions: _dims, ...businessBase } = base as typeof base & {
+    const {
+      compliance_dimensions: _dims,
+      rules_pack_id: _pack,
+      country: _country,
+      state: _state,
+      city: _city,
+      industry: _industry,
+      action_type: _action,
+      ...businessBase
+    } = base as typeof base & {
       compliance_dimensions?: string[]
     }
-    const withDefaults = applyBusinessSubmitDefaults(businessBase, options.catalog.value)
     return {
-      ...withDefaults,
-      document_extract: buildDocumentExtractSnapshot(withDefaults),
+      ...businessBase,
+      document_extract: buildDocumentExtractSnapshot(businessBase),
     }
   }
 

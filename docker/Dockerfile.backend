@@ -6,9 +6,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf 
 
 COPY requirements.txt requirements-rag.txt ./
 RUN pip install --no-cache-dir -r requirements.txt && \
-    pip install --no-cache-dir -r requirements-rag.txt || true
+    pip install --no-cache-dir -r requirements-rag.txt
 
-COPY . .
+COPY app/__init__.py app/main.py ./app/
+COPY app/api/*.py ./app/api/
+COPY app/core/*.py ./app/core/
+COPY app/models/*.py ./app/models/
+COPY app/schemas/*.py ./app/schemas/
+COPY app/services/*.py ./app/services/
+COPY app/rules/brazil_new_energy.json app/rules/index.json ./app/rules/
+COPY app/data/brazil_legal_corpus.json app/data/brazil_official_portals.json app/data/cold_start_interview.json app/data/contract_house_rules.json app/data/material_house_rules.json ./app/data/
+COPY app/capability_packs/__init__.py app/capability_packs/loader.py app/capability_packs/registry.py app/capability_packs/schemas.py ./app/capability_packs/
+COPY app/capability_packs/brazil_new_energy_greenfield ./app/capability_packs/brazil_new_energy_greenfield
+COPY scripts/seed_demo_user.py ./scripts/
 
 RUN mkdir -p data/chroma
 

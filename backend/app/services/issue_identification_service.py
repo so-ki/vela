@@ -61,7 +61,9 @@ def run_issue_identification(
     *,
     user_id: Optional[int] = None,
 ) -> dict[str, Any]:
-    pack_id = scenario.rules_pack_id or "brazil_new_energy"
+    pack_id = scenario.rules_pack_id
+    if not pack_id:
+        raise ValueError("场景缺少 proposed Capability Pack 的 rules artifact identity")
     code_map = _valid_checklist_codes(pack_id)
     if not code_map:
         return {"suggestions": [], "agent_step": {"step": "issue_identification", "status": "skipped", "reason": "no codes"}}

@@ -14,6 +14,9 @@ class BriefCitationResponse(BaseModel):
     url: str
     match_score: float
     requires_review: bool
+    grounding_score: float = 0.0
+    citation_status: str = "ungrounded"
+    grounded: bool = False
 
 
 class BriefItemResponse(BaseModel):

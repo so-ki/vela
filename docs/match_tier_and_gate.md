@@ -90,7 +90,7 @@ Vela **不是**「自动出具法律意见」的引擎，而是 **协查辅助�
 cd backend && pytest tests/test_rules_pack_loop.py tests/test_contract_structured.py -q
 ```
 
-演示账号：`biz@demo.vela` / `legal@demo.vela`，密码 `Demo1234!`
+本地 `./scripts/start.sh` 演示账号：`biz@demo.vela` / `legal@demo.vela`，密码 `Demo1234!`。生产默认不创建固定演示账号。
 
 ## 8. 预设规则包 vs Playbook Profile
 

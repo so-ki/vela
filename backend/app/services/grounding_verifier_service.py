@@ -64,8 +64,12 @@ def apply_hit_grounding(
     return out
 
 
-def verify_sections_grounding(sections: list[dict[str, Any]]) -> dict[str, Any]:
-    corpus = load_corpus()
+def verify_sections_grounding(
+    sections: list[dict[str, Any]],
+    *,
+    corpus_data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    corpus = corpus_data if corpus_data is not None else load_corpus()
     by_id = {d["id"]: d for d in corpus.get("sources", []) if d.get("id")}
     item_results: list[dict[str, Any]] = []
     total_hits = 0

@@ -17,7 +17,13 @@ import {
   updateReviewItem,
 } from '@/api/client'
 import LegalMaterialGatePanel from '@/components/LegalMaterialGatePanel.vue'
+import CapabilityPackCard from '@/components/CapabilityPackCard.vue'
 import InvestigationAdequacyPanel from '@/components/InvestigationAdequacyPanel.vue'
+import {
+  capabilityPackFromSnapshot,
+  catalogMatchesSnapshot,
+  isUsableCapabilityCatalog,
+} from '@/config/sceneClassification'
 import { useAuthStore } from '@/stores/auth'
 import type { BriefItem, LegalHit, ReviewItem, ReviewState, RiskBrief, RulesCatalog, Scenario } from '@/types/scenario'
 
@@ -144,14 +150,16 @@ const isLocked = computed(() =>
 )
 
 const showScopePanel = computed(
-  () => auth.isLegal && scenario.value?.status === 'pending_scope',
+  () =>
+    auth.isLegal &&
+    ['pending_scope', 'scope_generating', 'scope_generation_failed'].includes(scenario.value?.status || ''),
 )
 
 const showInvestigationAdequacy = computed(
   () =>
     !!catalog.value &&
     !!scenario.value?.investigation_adequacy &&
-    scenario.value.status !== 'pending_scope',
+    !['pending_scope', 'scope_generating', 'scope_generation_failed'].includes(scenario.value.status),
 )
 
 const gateAAllowsReview = computed(
@@ -162,6 +170,13 @@ const showChecklistReview = computed(() => !showScopePanel.value && gateAAllowsR
 
 const showGateABlock = computed(
   () => !showScopePanel.value && showInvestigationAdequacy.value && !gateAAllowsReview.value,
+)
+
+const frozenCapabilityPack = computed(() =>
+  capabilityPackFromSnapshot(
+    scenario.value?.scenario_scope?.snapshot,
+    scenario.value?.scenario_scope?.proposed,
+  ),
 )
 
 const filteredItems = computed(() => {
@@ -238,7 +253,7 @@ watch(
 )
 
 async function loadReviewData(id: number) {
-  if (scenario.value?.status === 'pending_scope') {
+  if (['pending_scope', 'scope_generating', 'scope_generation_failed'].includes(scenario.value?.status || '')) {
     review.value = null
     return
   }
@@ -266,10 +281,21 @@ async function loadPage() {
   error.value = null
   const exportCfg = await fetchExportConfig()
   exportDocxLabel.value = exportCfg.docx_label
+  const loadedScenario = await fetchScenario(id)
+  scenario.value = loadedScenario
   if (auth.isLegal) {
-    catalog.value = await fetchRulesCatalog()
+    try {
+      const loadedCatalog = await fetchRulesCatalog()
+      const snapshot = loadedScenario.scenario_scope?.snapshot
+      catalog.value =
+        isUsableCapabilityCatalog(loadedCatalog) &&
+        (!snapshot || catalogMatchesSnapshot(loadedCatalog, snapshot))
+          ? loadedCatalog
+          : null
+    } catch {
+      catalog.value = null
+    }
   }
-  scenario.value = await fetchScenario(id)
   await loadReviewData(id)
 }
 
@@ -366,8 +392,9 @@ async function runFinalize() {
   finalizing.value = true
   error.value = null
   try {
-    review.value = await finalizeReview(scenario.value.id)
-    scenario.value.status = `review_${review.value.status}`
+    const finalizedReview = await finalizeReview(scenario.value.id)
+    review.value = finalizedReview
+    scenario.value.status = `review_${finalizedReview.status}`
   } catch (e: unknown) {
     error.value = extractError(e)
   } finally {
@@ -474,10 +501,9 @@ async function ensureInlineSnippet(code: string) {
   snippetLoading.value = { ...snippetLoading.value, [code]: true }
   snippetErrors.value = { ...snippetErrors.value, [code]: '' }
   try {
-    if (!briefCache.value) {
-      briefCache.value = await fetchBrief(scenario.value.id)
-    }
-    const match = findBriefItem(briefCache.value, code)
+    const loadedBrief = briefCache.value ?? await fetchBrief(scenario.value.id)
+    briefCache.value = loadedBrief
+    const match = findBriefItem(loadedBrief, code)
     if (!match) {
       snippetErrors.value = {
         ...snippetErrors.value,
@@ -604,10 +630,17 @@ function openFullBrief(code: string) {
       </header>
 
       <LegalMaterialGatePanel
-        v-if="showScopePanel && catalog"
+        v-if="showScopePanel"
         :scenario="scenario"
         :catalog="catalog"
         @investigation-generated="onInvestigationGenerated"
+      />
+
+      <CapabilityPackCard
+        v-else-if="frozenCapabilityPack"
+        :pack="frozenCapabilityPack"
+        frozen
+        compact
       />
 
       <InvestigationAdequacyPanel

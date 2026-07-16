@@ -3,7 +3,7 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: vela
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-vela_change_me}
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}"
       POSTGRES_DB: vela
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -24,7 +24,7 @@ services:
       APP_ENV: production
       DEBUG: "false"
       SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
-      DATABASE_URL: postgresql+psycopg2://vela:${POSTGRES_PASSWORD:-vela_change_me}@db:5432/vela
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
       CHROMA_PERSIST_DIR: /app/data/chroma
       CORS_ORIGINS: ${PUBLIC_URL:-http://localhost}
       FRONTEND_URL: ${PUBLIC_URL:-http://localhost}
@@ -44,6 +44,7 @@ services:
       EXPORT_RECIPIENT_LABEL: ${EXPORT_RECIPIENT_LABEL:-企业管理层}
       QWEN_API_KEY: ${QWEN_API_KEY:-}
       LLM_POLISH_ENABLED: ${LLM_POLISH_ENABLED:-false}
+      SEED_DEMO_USERS: ${SEED_DEMO_USERS:-false}
     volumes:
       - backend_data:/app/data
     healthcheck:
@@ -62,7 +63,7 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "${HTTP_PORT:-8080}:80"
+      - "${HTTP_BIND_ADDRESS:-0.0.0.0}:${HTTP_PORT:-8080}:80"
 
 volumes:
   pgdata:
