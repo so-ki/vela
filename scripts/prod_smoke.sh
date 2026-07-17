@@ -135,8 +135,10 @@ if [ "$db_pid1_uid" != "70" ]; then
 fi
 
 echo "==> provision disposable smoke users"
-"${COMPOSE[@]}" cp backend/scripts/seed_demo_user.py backend:/tmp/seed_demo_user.py
-"${COMPOSE[@]}" exec -T backend env PYTHONPATH=/app python /tmp/seed_demo_user.py
+# Keep the production image seed-free and its root filesystem read-only: the
+# disposable smoke helper is streamed from the trusted checkout over stdin.
+"${COMPOSE[@]}" exec -T backend env PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/app python - \
+  < "$ROOT/backend/scripts/seed_demo_user.py"
 
 echo "==> PostgreSQL migration head and model drift"
 "${COMPOSE[@]}" exec -T -e VELA_ENTRYPOINT_MODE=check backend python -m scripts.container_entrypoint

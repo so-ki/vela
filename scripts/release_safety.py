@@ -676,6 +676,12 @@ def check_docker() -> None:
         errors.append("production Compose smoke 不得以破坏 app 导入路径的文件方式运行 entrypoint")
     if "python -m scripts.container_entrypoint" not in prod_smoke:
         errors.append("production Compose smoke 未以模块方式运行 migration check")
+    if '"${COMPOSE[@]}" cp ' in prod_smoke:
+        errors.append("production Compose smoke 不得向只读容器根文件系统复制测试脚本")
+    if 'exec -T backend env PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/app python -' not in prod_smoke or (
+        '< "$ROOT/backend/scripts/seed_demo_user.py"' not in prod_smoke
+    ):
+        errors.append("production Compose smoke 未通过标准输入向只读后端注入一次性测试脚本")
     if "COPY alembic.ini ./" not in prod_dockerfile or "COPY alembic ./alembic" not in prod_dockerfile:
         errors.append("production image 未携带 Alembic 配置与迁移")
     if '"alembic"' not in entrypoint or '"upgrade"' not in entrypoint or '"head"' not in entrypoint:

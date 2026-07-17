@@ -118,3 +118,11 @@ def test_production_smoke_preserves_failure_evidence_before_cleanup() -> None:
     assert content.index("logs --no-color --tail=200") < content.index(
         "down -v --remove-orphans"
     )
+
+
+def test_production_smoke_streams_seed_into_read_only_backend() -> None:
+    content = (release_safety.ROOT / "scripts/prod_smoke.sh").read_text(encoding="utf-8")
+
+    assert '"${COMPOSE[@]}" cp ' not in content
+    assert 'exec -T backend env PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/app python -' in content
+    assert '< "$ROOT/backend/scripts/seed_demo_user.py"' in content
