@@ -726,10 +726,28 @@ def check_docker() -> None:
         errors.append("production frontend 未使用非特权 8080 端口")
     if "pid /tmp/nginx.pid" not in frontend_prod_dockerfile:
         errors.append("production frontend 未把 Nginx PID 写入只读根文件系统之外")
-    if "FROM node:24-alpine AS build" not in frontend_prod_dockerfile:
-        errors.append("production frontend build 未使用受支持的 Node 24 LTS")
-    if "FROM nginx:1.30.4-alpine" not in frontend_prod_dockerfile:
-        errors.append("production frontend runtime 未使用已修复的 Nginx 1.30.4 stable")
+    if not frontend_prod_dockerfile.startswith(
+        "FROM node:24-alpine@sha256:"
+        "a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS build\n"
+    ):
+        errors.append("production frontend build 未固定到已审计的 Node 24 Alpine 摘要")
+    if (
+        "FROM nginx:1.30.4-alpine@sha256:"
+        "59d10bca5c674965ef4ff884715000dd60ef5567c36663523f108eec8e4105d4\n"
+    ) not in frontend_prod_dockerfile:
+        errors.append("production frontend runtime 未固定到已审计的 Nginx 1.30.4 Alpine 摘要")
+    for marker in (
+        "test \"$(grep -Fc 'pid /var/run/nginx.pid;' \"$main_config\")\" = '1'",
+        "sed -i 's|pid /var/run/nginx.pid;|pid /tmp/nginx.pid;|'",
+        "test \"$(grep -Fc 'pid /tmp/nginx.pid;' \"$main_config\")\" = '1'",
+        "! grep -Fq 'pid /var/run/nginx.pid;'",
+        "nginx -t",
+        'CMD ["nginx", "-g", "daemon off;"]',
+    ):
+        if marker not in frontend_prod_dockerfile:
+            errors.append(f"production frontend 缺少单一 PID / 配置语法控制：{marker}")
+    if "daemon off; pid " in frontend_prod_dockerfile:
+        errors.append("production frontend 不得在 -g 与 nginx.conf 重复定义 pid")
     for marker in ("proxy_read_timeout 180s;", "proxy_send_timeout 180s;", "client_body_timeout 180s;"):
         if marker not in nginx_config:
             errors.append(f"production Nginx 缺少上传/生成长请求边界：{marker}")

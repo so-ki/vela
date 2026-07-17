@@ -12,6 +12,7 @@
 ## 生产容器基线
 
 - 生产后端基础镜像：Docker Official Image `python:3.12.13-alpine3.24@sha256:6d43704baacd1bfbe7c295d7f13079d5d8104ed33568873133f8fc69980419df`（多架构 manifest）。
+- 生产前端构建/运行基础镜像：Docker Official Image `node:24-alpine@sha256:a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd` 与 `nginx:1.30.4-alpine@sha256:59d10bca5c674965ef4ff884715000dd60ef5567c36663523f108eec8e4105d4`。
 - 生产数据库基础镜像：Docker Official Image `postgres:16.14-alpine3.24@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777`；包装层用 Alpine 官方 `su-exec=0.3-r0` 替换上游 `gosu 1.19` Go 二进制，并将固定摘要内 entrypoint 的唯一降权调用精确改写为 `/sbin/su-exec`。
 - 生产安装使用 `--only-binary=:all:`；完整锁文件已对 CPython 3.12 的 musllinux 1.1/1.2 x86_64 轮子做下载预检，不允许在运行镜像内临时编译依赖。
 - 生产镜像不安装 `curl`、编译器或包管理器扩展；Compose 健康检查改用 Python 标准库。

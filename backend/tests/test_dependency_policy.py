@@ -96,3 +96,22 @@ def test_production_postgres_replaces_the_scanner_flagged_gosu_binary() -> None:
     assert 'test "$(/sbin/su-exec postgres id -u)" = \'70\'' in content
     assert 'test "$(/sbin/su-exec postgres id -g)" = \'70\'' in content
     assert "'/var/lib/postgresql'" in content
+
+
+def test_production_frontend_pins_bases_and_defines_pid_once() -> None:
+    content = (REPOSITORY_ROOT / "docker/Dockerfile.frontend.prod").read_text(
+        encoding="utf-8"
+    )
+
+    assert content.startswith(
+        "FROM node:24-alpine@sha256:"
+        "a0b9bf06e4e6193cf7a0f58816cc935ff8c2a908f81e6f1a95432d679c54fbfd AS build\n"
+    )
+    assert (
+        "FROM nginx:1.30.4-alpine@sha256:"
+        "59d10bca5c674965ef4ff884715000dd60ef5567c36663523f108eec8e4105d4\n"
+    ) in content
+    assert "sed -i 's|pid /var/run/nginx.pid;|pid /tmp/nginx.pid;|'" in content
+    assert "nginx -t" in content
+    assert 'CMD ["nginx", "-g", "daemon off;"]' in content
+    assert "daemon off; pid " not in content
