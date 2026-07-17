@@ -219,9 +219,9 @@ watch(() => route.hash, () => scrollToBriefAnchor())
                 <span
                   v-if="cite.citation_status"
                   class="badge"
-                  :class="cite.citation_status === 'corpus_verified' ? 'ok' : 'warn'"
+                  :class="cite.citation_status === 'excerpt_matched' || cite.citation_status === 'corpus_verified' ? 'ok' : 'warn'"
                 >
-                  {{ cite.citation_status === 'corpus_verified' ? '已验' : '待核对' }}
+                  {{ cite.citation_status === 'excerpt_matched' || cite.citation_status === 'corpus_verified' ? '摘录与本地语料一致' : '待核对' }}
                 </span>
                 <a :href="cite.url" target="_blank" rel="noopener" class="hit-link">溯源 ↗</a>
               </div>

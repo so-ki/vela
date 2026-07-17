@@ -10,6 +10,8 @@
 
 **法律责任边界：** AI 输出仅是可溯源的协查底稿，必须经过法务逐条复核和定稿，不构成正式法律意见。
 
+**发布状态：** 当前仅为单客户、私网受控试点 RC；冻结证据、启用清单和不可越过的限制见 [`docs/RELEASE_CANDIDATE.md`](docs/RELEASE_CANDIDATE.md)。
+
 **复赛演示：** 只走 [`docs/DEMO_GOLDEN_PATH.md`](docs/DEMO_GOLDEN_PATH.md) 一条线；门控说明见 [`docs/match_tier_and_gate.md`](docs/match_tier_and_gate.md)。
 
 ### P1 LLM + Harness（复赛）
@@ -21,7 +23,7 @@
 | **B2 材料 Playbook** | `material_house_rules.json` 纯规则预检 |
 | **B3/B4** | 缺口说明 / S2 Red Team（不改 tier） |
 | **AI 设置栏** | 工作台 → **AI 设置**：Provider、Base URL、Model、API Key、测试连接 |
-| **Golden Path** | 无 LLM Key 时规则回退，E2E `15/15` |
+| **Golden Path** | 无 LLM Key 时规则回退，冻结 E2E `17/17` |
 
 详见 [`docs/P1_LLM_HARNESS.md`](docs/P1_LLM_HARNESS.md)。
 
@@ -31,11 +33,11 @@
 
 | 层级 | 技术 |
 |------|------|
-| 后端 | Python 3.9+ · FastAPI · SQLAlchemy · JWT |
+| 后端 | Python 3.12 · FastAPI · SQLAlchemy · JWT |
 | 前端 | Vue 3 · Vite · Pinia · Vue Router |
 | 数据库 | SQLite（开发）/ PostgreSQL（生产） |
-| 向量库 | Chroma（法源索引，关键词 + 向量检索） |
-| LLM | 通义千问 DashScope / DeepSeek（简报润色，可选） |
+| 检索 | 确定性关键词检索（Chroma 因上游安全公告暂不随生产版发布） |
+| LLM | 本地开发可选受控调用；生产受控试点默认且强制不外发 |
 
 ---
 
@@ -51,15 +53,15 @@ chmod +x scripts/start.sh
 ```bash
 # 后端
 cd backend
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+python3.12 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.lock
 # .env 可选；发布包不包含任何 .env*。如需 LLM，请通过本地环境变量安全注入。
 python scripts/seed_demo_user.py
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 
 # 前端（新终端）
 cd frontend
-npm install
+npm ci
 npm run dev -- --host 127.0.0.1 --port 5173
 ```
 
@@ -68,7 +70,7 @@ npm run dev -- --host 127.0.0.1 --port 5173
 - 本地开发演示账户：`legal@demo.vela` / `biz@demo.vela`（密码均为 `Demo1234!`，仅由 `scripts/start.sh` 或手工 seed 创建；生产默认不创建）
 - 演示 business 可直接进入业务工作台，不填写 Legal Playbook；演示 legal 已预置 `demo-legal-playbook-v1.0.0`。真实 business 同样不做 Legal onboarding，真实新 legal 用户仍须完成 onboarding。
 
-### LLM 润色（可选）
+### LLM 润色（仅本地开发实验，可选）
 
 在 `backend/.env` 中配置任选其一：
 
@@ -86,7 +88,7 @@ QWEN_MODEL=qwen-plus
 LLM_POLISH_ENABLED=true
 ```
 
-重启后端后，访问 `GET /api/v1/llm/status` 或简报页查看是否启用。未配置 Key 时自动回退为规则模板模式。
+重启开发后端后，访问 `GET /api/v1/llm/status` 或简报页查看是否启用。未配置 Key 时自动回退为规则模板模式。生产受控试点会拒绝第三方 LLM 外发；不得把此开发配置复制到 `.env.prod`。
 
 ---
 
@@ -114,7 +116,7 @@ docker compose up --build
 docker compose exec backend python scripts/seed_demo_user.py
 ```
 
-生产部署不会默认创建演示账号，见 [`DEPLOYMENT.md`](DEPLOYMENT.md)。构建前可运行 `./scripts/check_release_boundaries.sh` 检查 Docker COPY 候选；提交包使用 `./scripts/build_submission_package.sh /tmp/vela-capability-pack-mvp.zip`，禁止直接压缩工作区。
+生产启动路径不支持创建固定口令演示账号，见 [`DEPLOYMENT.md`](DEPLOYMENT.md)。构建前可运行 `./scripts/check_release_boundaries.sh` 检查 Docker COPY 候选；提交包使用 `./scripts/build_submission_package.sh /tmp/vela-capability-pack-mvp.zip`，禁止直接压缩工作区。
 
 ---
 
@@ -125,7 +127,7 @@ vela-platform/
 ├── backend/
 │   ├── app/
 │   │   ├── api/          # REST 路由
-│   │   ├── core/         # 配置、数据库、认证、Chroma
+│   │   ├── core/         # 配置、数据库、认证、检索后端边界
 │   │   ├── data/         # 巴西法源语料 brazil_legal_corpus.json
 │   │   ├── models/       # SQLAlchemy 模型
 │   │   ├── rules/        # 场景规则库 brazil_new_energy.json
@@ -153,7 +155,7 @@ vela-platform/
 - [x] 用户注册 / 登录（JWT）
 - [x] 免责声明强制确认（注册勾选 + 弹窗复核）
 - [x] SQLite 用户表 + 审计日志表
-- [x] Chroma 向量库客户端
+- [x] 确定性关键词检索（Chroma 接入保留但未随生产版安装）
 - [x] Vue 3 前端：登录、注册、工作台、路线图
 - [x] 本地一键启动脚本 + Docker Compose
 
@@ -209,7 +211,7 @@ vela-platform/
 | 方法 | 路径 | 说明 |
 |------|------|------|
 | GET | `/api/v1/health` | 健康检查（无需登录） |
-| GET | `/api/v1/status` | 系统状态（数据库、Chroma） |
+| GET | `/api/v1/status` | 系统状态（数据库、检索后端） |
 | GET | `/api/v1/llm/status` | LLM 润色服务状态 |
 | GET | `/api/v1/auth/disclaimer` | 获取免责声明 |
 | POST | `/api/v1/auth/register` | 注册 |
@@ -255,9 +257,9 @@ vela-platform/
 |------|------|------|
 | GET | `/api/v1/scenarios/{id}/review` | 获取复核状态 |
 | POST | `/api/v1/scenarios/{id}/review/init` | 仅基于已生成结果初始化复核；不得隐式生成 |
-| PATCH | `/api/v1/scenarios/{id}/review/items/{code}` | 更新单条复核 |
-| POST | `/api/v1/scenarios/{id}/review/approve-all` | 全部确认 |
-| POST | `/api/v1/scenarios/{id}/review/finalize` | 提交复核定稿 |
+| PATCH | `/api/v1/scenarios/{id}/review/items/{code}` | 按 `expected_revision` 条件更新单条复核 |
+| POST | `/api/v1/scenarios/{id}/review/approve-all` | 按 `expected_revision` 条件批量确认低风险项 |
+| POST | `/api/v1/scenarios/{id}/review/finalize` | 按 `expected_revision` 条件提交复核定稿 |
 
 ### 导出
 
@@ -312,13 +314,13 @@ vela-platform/
 
 ## 已知限制与后续规划
 
-**产品策略：** 当前只对 `brazil_new_energy_greenfield` 提供完整支持，即 **巴西 · 新能源制造 · 绿地设厂**。规则与语料围绕 BYD 坎皮纳斯类项目验证；并购、研发机构、既有工厂扩建、矿产、跨境电商及其他国家/行业均不属于当前正式能力。
+**产品策略：** 当前仅对 `brazil_new_energy_greenfield` 开放受控试点工程范围，即 **巴西 · 圣保罗州 · 新能源制造 · 绿地设厂**。工程链路已经过本地验收，但法律内容仍为 provisional，须巴西法务逐项复核；并购、研发机构、既有工厂扩建、矿产、跨境电商及其他国家/行业均不属于当前受控试点能力。
 
 | 项 | 现状 | 规划 |
 |----|------|------|
 | 正式 Capability Pack | **`brazil_new_energy_greenfield`**：巴西 · 新能源制造 · 绿地设厂；规则制品 v2.9 | 经法律内容审核后再增加独立能力包 |
 | 法域与动作 | 巴西单国 · 绿地设厂 | 其他国家、并购或扩建尚未上线 |
-| 法源库 | **70+ 条**精选语料（v1.9 已清洗 HTML）+ 可选 Chroma | `backend/scripts/propose_corpus_entry.py` + `data/corpus_pending_review.json` 人工审核 |
+| 法源库 | **70+ 条**精选语料（v1.9 已清洗 HTML）+ 确定性关键词检索 | `backend/scripts/propose_corpus_entry.py` + `data/corpus_pending_review.json` 人工审核 |
 | 核查项定位 | 冻结 snapshot + 规则触发 + 可选受限 LLM（不得扩展维度或议题） | 随后续独立 Capability Pack 验证扩展 |
 | 法规监测 | 手动扫描 + 提醒列表 | 自动爬虫 + 订阅推送 |
 | 导出 | Word 法学院意见书 + PDF legacy 底稿 | 律所 `.docx` 样张加载、PDF 与 Word 统一 |
@@ -326,12 +328,12 @@ vela-platform/
 
 ---
 
-## 许可证
+## 使用授权边界
 
-本项目为演示 / 比赛用途。法条原文版权归相应官方机构所有；平台输出不构成正式法律意见。
+仓库当前未附带开源许可证，因此不默示授予复制、分发或对外商用权利。内部演示可按项目所有者授权进行；任何真实客户试点必须先由权利人与客户签署明确的试点使用、保密、数据处理和退出安排。法条原文版权归相应官方机构所有；平台输出不构成正式法律意见。
 
 ---
 
 ## 上传 GitHub / 邀请测试者
 
-见 **[DEPLOYMENT.md](./DEPLOYMENT.md)**（生产 Docker / SSO / 导出配置）、**[客户操作手册.md](./客户操作手册.md)** / **[客户操作手册.docx](./客户操作手册.docx)**（面向法务/业务用户）、**[操作手册.md](./操作手册.md)** / **[操作手册.docx](./操作手册.docx)**（含部署与演示脚本）、**[GITHUB_SETUP.md](./GITHUB_SETUP.md)**、**[TESTING.md](./TESTING.md)** 与 **[API.md](./API.md)**（REST 集成说明）。
+见 **[DEPLOYMENT.md](./DEPLOYMENT.md)**（生产 Docker / 受控试点边界 / 账户与导出配置）、**[Python 运行依赖安全基线](./docs/dependency_security.md)**、**[客户操作手册.md](./客户操作手册.md)**（面向法务/业务用户）、**[操作手册.md](./操作手册.md)**（含部署与演示脚本）、**[GITHUB_SETUP.md](./GITHUB_SETUP.md)**、**[TESTING.md](./TESTING.md)** 与 **[API.md](./API.md)**（REST 集成说明）。

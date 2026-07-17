@@ -4,27 +4,16 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 import subprocess
 import sys
 from urllib.parse import quote
 
+from app.core.secret_policy import is_weak_secret
 
-DEFAULT_OR_WEAK_SECRETS = {
-    "change-me",
-    "changeme",
-    "dev-secret-key-change-in-production",
-    "replace-me",
-    "vela-dev-secret-key-change-in-production",
-}
-DEFAULT_OR_WEAK_DATABASE_PASSWORDS = {
-    "change-me",
-    "changeme",
-    "password",
-    "postgres",
-    "replace-me",
-    "vela",
-    "vela_change_me",
-}
+DEFAULT_OR_WEAK_DATABASE_PASSWORDS = {"password", "postgres", "vela", "vela_change_me"}
+APP_ROOT = Path(__file__).resolve().parents[1]
+ALEMBIC_CONFIG = APP_ROOT / "alembic.ini"
 
 
 def _required(name: str) -> str:
@@ -34,29 +23,53 @@ def _required(name: str) -> str:
     return value
 
 
+def _run_migrations() -> None:
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "alembic",
+            "-c",
+            str(ALEMBIC_CONFIG),
+            "upgrade",
+            "head",
+        ],
+        cwd=APP_ROOT,
+        check=True,
+    )
+
+
 def main() -> int:
     if os.environ.get("APP_ENV", "").strip().lower() != "production":
         raise RuntimeError("production image requires APP_ENV=production")
 
     secret_key = _required("SECRET_KEY")
-    if len(secret_key) < 32 or secret_key.lower() in DEFAULT_OR_WEAK_SECRETS:
-        raise RuntimeError("SECRET_KEY must be a non-default value of at least 32 characters")
+    if is_weak_secret(secret_key, min_length=32, min_unique=8):
+        raise RuntimeError(
+            "SECRET_KEY must be a diverse, non-default value of at least 32 characters"
+        )
 
     database_password = _required("POSTGRES_PASSWORD")
-    if (
-        len(database_password) < 16
-        or database_password.lower() in DEFAULT_OR_WEAK_DATABASE_PASSWORDS
+    if is_weak_secret(database_password, min_length=16, min_unique=6) or (
+        database_password.lower() in DEFAULT_OR_WEAK_DATABASE_PASSWORDS
     ):
         raise RuntimeError(
-            "POSTGRES_PASSWORD must be a non-default value of at least 16 characters"
+            "POSTGRES_PASSWORD must be a diverse, non-default value of at least 16 characters"
         )
     encoded_password = quote(database_password, safe="")
     os.environ["DATABASE_URL"] = (
         f"postgresql+psycopg2://vela:{encoded_password}@db:5432/vela"
     )
 
-    if os.environ.get("SEED_DEMO_USERS", "false").strip().lower() == "true":
-        subprocess.run([sys.executable, "scripts/seed_demo_user.py"], check=True)
+    mode = os.environ.get("VELA_ENTRYPOINT_MODE", "web").strip().lower()
+    if mode not in {"migrate", "web"}:
+        raise RuntimeError("VELA_ENTRYPOINT_MODE must be either migrate or web")
+
+    # Alembic is the only production DDL path.  A standalone web container
+    # performs the same idempotent upgrade as the compose migration gate.
+    _run_migrations()
+    if mode == "migrate":
+        return 0
 
     command = [
         "gunicorn",
@@ -66,7 +79,7 @@ def main() -> int:
         "-b",
         "0.0.0.0:8000",
         "--workers",
-        "2",
+        "1",
         "--timeout",
         "180",
     ]

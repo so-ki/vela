@@ -17,6 +17,7 @@ from app.services.contract_house_rules_service import (
 from app.services.document_extractor import read_upload_text
 from app.services.project_hub_service import link_contract_to_investigation, project_context
 from app.services.user_preference_service import record_contract_finding_decision
+from app.services.upload_security import enforce_project_document_quota
 
 
 def _utcnow_iso() -> str:
@@ -230,6 +231,7 @@ def upload_contract_document(
     ensure_project_hub(payload)
     doc_id = uuid.uuid4().hex[:16]
     text = read_upload_text(filename, content)
+    enforce_project_document_quota(payload, text)
     doc = {
         "id": doc_id,
         "filename": filename,

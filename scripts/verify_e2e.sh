@@ -86,7 +86,7 @@ verify_demo_identity "$TOKEN" legal@demo.vela legal true \
 verify_demo_identity "$BIZ" biz@demo.vela business false \
   && ok "business demo ready (Playbook not required)" || bad "business demo auth/onboarding"
 
-log "2. Capability Pack catalog (Brazil greenfield v1.0.0)"
+log "2. Capability Pack catalog (Brazil São Paulo greenfield v1.3.0 provisional)"
 PACK=$(curl_t "$CURL_MAX" "$API/capability-packs/catalog" -H "$(auth_header "$TOKEN")")
 echo "$PACK" | python3 -c "
 import sys, json
@@ -95,7 +95,9 @@ assert d.get('pack',{}).get('id')=='brazil_new_energy', d
 assert d.get('rules_pack_id')=='brazil_new_energy', d
 cap=d.get('capability_pack') or {}
 assert cap.get('pack_id')=='brazil_new_energy_greenfield', d
-assert cap.get('version')=='1.0.0', cap
+assert cap.get('version')=='1.3.0', cap
+assert cap.get('state')=='sao_paulo', cap
+assert cap.get('content_status')=='provisional', cap
 assert cap.get('status')=='active', cap
 assert len(cap.get('pack_hash',''))==64, cap
 assert d.get('scene_defaults',{}).get('country')=='BR', d
@@ -120,7 +122,7 @@ import sys,json
 d=json.load(sys.stdin)
 d.pop('compliance_dimensions', None)
 d['scope_acknowledged']=True
-d['scope_notice_version']='scope-notice-v1'
+d['scope_notice_version']='scope-notice-v2'
 print(json.dumps(d, ensure_ascii=False))
 ")
 SUB=$(curl_t_post "$CURL_MAX" "$API/scenarios/submit-materials" -H "$(auth_header "$BIZ")" \
@@ -144,7 +146,7 @@ d=json.load(sys.stdin)
 assert d.get('status')=='pending_scope', d
 proposal=(d.get('scenario_scope') or {}).get('proposed') or {}
 assert proposal.get('pack_id')=='brazil_new_energy_greenfield', proposal
-assert proposal.get('pack_version')=='1.0.0', proposal
+assert proposal.get('pack_version')=='1.3.0', proposal
 assert len(proposal.get('pack_hash',''))==64, proposal
 print('status:', d['status'])
 " && ok "business submit materials" || bad "business submit materials"
@@ -155,7 +157,7 @@ import sys, json
 d=json.load(sys.stdin)
 snapshot=(d.get('scenario_scope') or {}).get('snapshot') or {}
 assert snapshot.get('capability_pack_id')=='brazil_new_energy_greenfield', snapshot
-assert snapshot.get('capability_pack_version')=='1.0.0', snapshot
+assert snapshot.get('capability_pack_version')=='1.3.0', snapshot
 assert snapshot.get('rules_artifact_id')=='brazil_new_energy', snapshot
 assert snapshot.get('corpus_artifact_id')=='brazil_legal_corpus', snapshot
 assert snapshot.get('retrieval_config'), snapshot
@@ -164,10 +166,12 @@ assert d.get('status')=='pending_legal_review', d
 assert d.get('checklist',{}).get('total_items',0)>=20, d
 print('items:', d['checklist']['total_items'])
 " && ok "legal confirm scope" || bad "legal confirm scope"
-curl_t_post "$CURL_MAX" "$API/scenarios/$SUB_ID/review/init" -H "$(auth_header "$LEGAL")" >/dev/null
-curl_t_patch "$CURL_MAX" "$API/scenarios/$SUB_ID/review/items/LAB-001" \
+REVIEW=$(curl_t_post "$CURL_MAX" "$API/scenarios/$SUB_ID/review/init" -H "$(auth_header "$LEGAL")")
+REVIEW_REVISION=$(echo "$REVIEW" | python3 -c "import sys,json; print(json.load(sys.stdin)['revision'])")
+REVIEW=$(curl_t_patch "$CURL_MAX" "$API/scenarios/$SUB_ID/review/items/LAB-001" \
   -H "$(auth_header "$LEGAL")" -H 'Content-Type: application/json' \
-  -d '{"decision":"rejected","comment":"雇员规模描述与现场调研不一致，请补充用工计划。"}' >/dev/null
+  -d "{\"decision\":\"rejected\",\"comment\":\"雇员规模描述与现场调研不一致，请补充用工计划。\",\"expected_revision\":$REVIEW_REVISION}")
+REVIEW_REVISION=$(echo "$REVIEW" | python3 -c "import sys,json; print(json.load(sys.stdin)['revision'])")
 BF=$(curl_t "$CURL_MAX" "$API/scenarios/$SUB_ID" -H "$(auth_header "$BIZ")")
 echo "$BF" | python3 -c "
 import sys, json
@@ -235,7 +239,7 @@ GEN_CODE=$(curl -s --max-time "$CURL_MAX" -o /dev/null -w '%{http_code}' -X POST
 log "9. Return to business + revise resubmit"
 curl_t_post "$CURL_MAX" "$API/scenarios/$SUB_ID/review/return-to-business" \
   -H "$(auth_header "$LEGAL")" -H 'Content-Type: application/json' \
-  -d '{"note":"请补充雇员规模与用工计划说明"}' >/dev/null
+  -d "{\"note\":\"请补充雇员规模与用工计划说明\",\"expected_revision\":$REVIEW_REVISION}" >/dev/null
 RET_CHECK=$(curl_t "$CURL_MAX" "$API/scenarios/$SUB_ID" -H "$(auth_header "$BIZ")")
 echo "$RET_CHECK" | python3 -c "
 import sys, json

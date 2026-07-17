@@ -5,9 +5,11 @@ from pathlib import Path
 from typing import Any, Optional
 
 from app.core.chroma_client import COLLECTION_NAME, _chroma_available
+from app.core.secure_json_store import atomic_write_json
 
 CORPUS_PATH = Path(__file__).resolve().parents[1] / "data" / "brazil_legal_corpus.json"
 INDEX_FLAG = Path(__file__).resolve().parents[2] / "data" / "legal_index.json"
+RETRIEVABLE_REVIEW_STATUSES = frozenset({"expert_verified", "provisional"})
 
 
 def load_corpus(corpus_path: Path | str | None = None) -> dict[str, Any]:
@@ -16,10 +18,28 @@ def load_corpus(corpus_path: Path | str | None = None) -> dict[str, Any]:
         return json.load(f)
 
 
+def corpus_review_status(corpus: dict[str, Any], doc: dict[str, Any]) -> str:
+    """Resolve explicit evidence status; undeclared corpora fail closed."""
+
+    explicit = str(doc.get("review_status") or "").strip().lower()
+    if explicit:
+        return explicit
+    declared_default = str(corpus.get("default_review_status") or "").strip().lower()
+    if declared_default in RETRIEVABLE_REVIEW_STATUSES:
+        return declared_default
+    return "pending"
+
+
+def retrievable_corpus_sources(corpus: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        doc
+        for doc in corpus.get("sources", [])
+        if corpus_review_status(corpus, doc) in RETRIEVABLE_REVIEW_STATUSES
+    ]
+
+
 def _save_index_flag(payload: dict[str, Any]) -> None:
-    INDEX_FLAG.parent.mkdir(parents=True, exist_ok=True)
-    with open(INDEX_FLAG, "w", encoding="utf-8") as f:
-        json.dump(payload, f, ensure_ascii=False, indent=2)
+    atomic_write_json(INDEX_FLAG, payload)
 
 
 def _load_index_flag() -> Optional[dict[str, Any]]:
@@ -35,7 +55,7 @@ def ingest_corpus(
     corpus_path: Path | str | None = None,
 ) -> dict[str, Any]:
     corpus = load_corpus(corpus_path)
-    sources = corpus["sources"]
+    sources = retrievable_corpus_sources(corpus)
     breakdown = _count_by_source(sources)
 
     flag = _load_index_flag()
@@ -83,6 +103,7 @@ def ingest_corpus(
     payload = {
         "mode": mode,
         "document_count": len(sources),
+        "excluded_document_count": len(corpus.get("sources", [])) - len(sources),
         "chroma_count": chroma_count,
         "sources_breakdown": breakdown,
     }
@@ -91,7 +112,10 @@ def ingest_corpus(
     return {
         "status": "ok",
         "mode": mode,
-        "message": f"已索引 {len(sources)} 条法源片段（模式: {mode}）",
+        "message": (
+            f"已索引 {len(sources)} 条可检索法源片段（模式: {mode}）；"
+            f"隔离/待审 {len(corpus.get('sources', [])) - len(sources)} 条"
+        ),
         "indexed": len(sources),
         "collection": COLLECTION_NAME,
         "sources_breakdown": breakdown,
@@ -127,7 +151,10 @@ def get_index_status() -> dict[str, Any]:
     corpus = load_corpus()
     base = {
         "installed": _chroma_available,
-        "document_count": len(corpus.get("sources", [])),
+        "document_count": len(retrievable_corpus_sources(corpus)),
+        "excluded_document_count": (
+            len(corpus.get("sources", [])) - len(retrievable_corpus_sources(corpus))
+        ),
         "collection": COLLECTION_NAME,
         "mode": flag.get("mode", "keyword") if flag else "pending",
     }

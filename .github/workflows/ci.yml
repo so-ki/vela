@@ -1,0 +1,155 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests and migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend
+    env:
+      APP_ENV: test
+      DATABASE_URL: sqlite:////tmp/vela-tests.db
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.lock
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.lock pytest==8.4.2 pip-audit==2.10.1
+      - name: Audit locked runtime dependencies
+        run: python -m pip_audit -r requirements.lock
+      - name: Run backend tests
+        run: python -m pytest tests -q
+      - name: Run controlled-pilot legal quality gate
+        env:
+          PYTHONPATH: .
+        run: python scripts/run_legal_quality_gate.py --target controlled-pilot
+      - name: Exercise clean migration round trip
+        env:
+          DATABASE_URL: sqlite:////tmp/vela-migrations.db
+        run: |
+          python -m alembic upgrade head
+          python -m alembic downgrade base
+          python -m alembic upgrade head
+
+  frontend:
+    name: Frontend audit, tests and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Audit production and development dependencies
+        run: npm audit --audit-level=high
+      - name: Run component tests
+        run: npm run test:components
+      - name: Build production frontend
+        run: npm run build
+
+  release-boundary:
+    name: Release boundary
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+      - name: Verify production release boundaries
+        run: bash scripts/check_release_boundaries.sh
+      - name: Build and scan allowlisted release package
+        run: |
+          bash scripts/build_submission_package.sh /tmp/vela-capability-pack-mvp.zip
+          bash scripts/check_release_boundaries.sh /tmp/vela-capability-pack-mvp.zip
+
+  production-compose-smoke:
+    name: Production images, PostgreSQL migration, and smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install locked browser-test dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install Chromium for the production UI smoke
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Verify Docker Compose runtime
+        run: docker compose version
+      - name: Build and exercise the isolated production stack
+        env:
+          VELA_SMOKE_PORT: "18089"
+        run: bash scripts/prod_smoke.sh
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: ${{ !cancelled() }}
+        with:
+          name: production-ui-smoke-report
+          path: frontend/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  api-e2e:
+    name: API golden path
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APP_ENV: test
+      DATABASE_URL: sqlite:////tmp/vela-e2e.db
+      SECRET_KEY: ci-only-ephemeral-secret-key-00000000000000000000
+      CORPUS_AGENT_ENABLED: "false"
+      LLM_POLISH_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.lock
+      - name: Install locked backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements.lock
+      - name: Run API golden path against a clean database
+        run: |
+          python backend/scripts/seed_demo_user.py
+          python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 >/tmp/vela-e2e.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/api/v1/health >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          bash scripts/verify_e2e.sh

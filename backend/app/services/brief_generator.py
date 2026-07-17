@@ -33,6 +33,8 @@ def _citation(hit: dict[str, Any]) -> dict[str, Any]:
         "url": hit.get("url", ""),
         "match_score": float(hit.get("match_score", 0)),
         "requires_review": bool(hit.get("requires_review", False)),
+        "review_status": hit.get("review_status", "pending"),
+        "verification_scope": hit.get("verification_scope", "provisional corpus entry"),
         "grounding_score": float(hit.get("grounding_score", 0)),
         "citation_status": hit.get("citation_status", "ungrounded"),
         "grounded": bool(hit.get("grounded", False)),

@@ -91,13 +91,21 @@ class CapabilityPackRegistry:
             raise CapabilityPackRegistryError("Capability Pack version/hash 与冻结身份不一致")
         return pack
 
-    def match(self, *, country: str, industry: str, action_type: str) -> LoadedCapabilityPack:
-        route = (country.upper(), industry.lower(), action_type.lower())
+    def match(
+        self,
+        *,
+        country: str,
+        state: str,
+        industry: str,
+        action_type: str,
+    ) -> LoadedCapabilityPack:
+        route = (country.upper(), state.lower(), industry.lower(), action_type.lower())
         matches = [
             pack
             for pack in self.list_active()
             if (
                 pack.manifest.country.upper(),
+                pack.manifest.state.lower(),
                 pack.manifest.industry.lower(),
                 pack.manifest.action_type.lower(),
             )
@@ -105,7 +113,8 @@ class CapabilityPackRegistry:
         ]
         if not matches:
             raise CapabilityPackUnsupportedError(
-                f"当前没有匹配的正式 Capability Pack：{country}/{industry}/{action_type}"
+                f"当前没有匹配的受控试点 Capability Pack："
+                f"{country}/{state}/{industry}/{action_type}"
             )
         if len(matches) != 1:
             raise CapabilityPackRegistryError("同一路由匹配到多个 active Capability Pack")
@@ -116,6 +125,7 @@ class CapabilityPackRegistry:
         *,
         material_text: str,
         country_hint: str | None = None,
+        state_hint: str | None = None,
         industry_hint: str | None = None,
         action_type_hint: str | None = None,
     ) -> LoadedCapabilityPack:
@@ -148,15 +158,19 @@ class CapabilityPackRegistry:
             hints = manifest.routing_hints
             if (
                 compatible(country_hint, manifest.country, hints.country)
+                and compatible(state_hint, manifest.state, hints.state)
                 and compatible(industry_hint, manifest.industry, hints.industry)
                 and compatible(action_type_hint, manifest.action_type, hints.action_type)
                 and evidenced(manifest.country, hints.country)
+                and evidenced(manifest.state, hints.state)
                 and evidenced(manifest.industry, hints.industry)
                 and evidenced(manifest.action_type, hints.action_type)
+                and not any(contains_alias(alias) for alias in hints.excluded_states)
+                and not any(contains_alias(alias) for alias in hints.excluded_action_types)
             ):
                 matches.append(pack)
         if not matches:
-            raise CapabilityPackUnsupportedError("项目材料未匹配任何正式 Capability Pack")
+            raise CapabilityPackUnsupportedError("项目材料未匹配任何受控试点 Capability Pack")
         if len(matches) != 1:
             raise CapabilityPackRegistryError("项目材料匹配到多个 active Capability Pack")
         return matches[0]

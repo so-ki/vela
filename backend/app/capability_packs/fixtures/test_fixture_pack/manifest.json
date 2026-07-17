@@ -1,11 +1,13 @@
 {
-  "manifest_schema_version": "1.0",
+  "manifest_schema_version": "1.1",
   "pack_id": "test_fixture_pack",
   "version": "0.0.1",
   "status": "active",
+  "content_status": "expert_verified",
   "display_name": "非真实测试能力包",
   "description": "仅用于证明平台 Registry 不依赖任何真实国家或法律能力。",
   "country": "ZZ-TEST",
+  "state": "ZZ-STATE",
   "industry": "fixture_industry",
   "action_type": "fixture_action",
   "languages": ["test"],
@@ -24,13 +26,17 @@
   },
   "artifact_binding": {
     "country": "fixture_country",
+    "state": "fixture_state",
     "industry": "fixture_industry_rules",
     "action_type": "fixture_action"
   },
   "routing_hints": {
     "country": ["fixture-country-token"],
+    "state": ["fixture-state-token"],
     "industry": ["fixture-industry-token"],
-    "action_type": ["fixture-action-token"]
+    "action_type": ["fixture-action-token"],
+    "excluded_states": [],
+    "excluded_action_types": []
   },
   "retrieval_config": {
     "match_threshold_default": 70,
@@ -52,5 +58,5 @@
     "export_template": "legacy",
     "disclaimer": "非真实法律内容。"
   },
-  "semantic_hash": "f26ffb980150a83e798b9ad33791cdccdde3db7b1ee67ec42867455bac0439f7"
+  "semantic_hash": "51822d1c086ab255af3ad0ab84a6f093bcab61e29638c93c1ce0d9928c2e3fe6"
 }

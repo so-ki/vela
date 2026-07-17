@@ -17,6 +17,7 @@ def write_audit_log(
     resource_id: Optional[str] = None,
     detail: Optional[str] = None,
     ip_address: Optional[str] = None,
+    commit: bool = True,
 ) -> AuditLog:
     entry = AuditLog(
         user_id=user.id,
@@ -27,6 +28,12 @@ def write_audit_log(
         ip_address=ip_address,
     )
     db.add(entry)
-    db.commit()
-    db.refresh(entry)
+    if commit:
+        db.commit()
+        db.refresh(entry)
+    else:
+        # Let callers persist the business mutation and its audit record in the
+        # same transaction.  A review decision without its audit attribution is
+        # not an acceptable partial success.
+        db.flush()
     return entry

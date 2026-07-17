@@ -1,6 +1,6 @@
 # Vela 协查流程 v2（显式确认 + 冻结快照）
 
-> 当前唯一正式流程对应 `submit-materials`、`confirm-scope`、generation attempt、统一复核与导出。
+> 当前唯一受控试点流程对应 `submit-materials`、`confirm-scope`、generation attempt、统一复核与导出。
 > 旧 `docs/vela_investigation_workflow_v2.xmind` 仅保留在工作区作历史参考，不随发布 ZIP 分发；以下 Markdown 与 `content.json` 为当前权威流程说明。
 
 ---
@@ -50,7 +50,7 @@ flowchart TB
 | 顺序 | 阶段 | 谁操作 | 正式页面 / 接口 |
 |------|------|--------|-----------------|
 | 1 | 上传、核对项目事实 | 业务 | 材料提交页；可先调用 `POST /scenarios/extract-document` |
-| 2 | 查看正式能力边界并知情确认 | 业务 | Capability Pack 卡片；`POST /scenarios/submit-materials` |
+| 2 | 查看受控试点工程边界并知情确认 | 业务 | Capability Pack 卡片；`POST /scenarios/submit-materials` |
 | 3 | 创建 proposed scope | 后端 | 状态 `pending_scope`；此时不得生成清单、RAG 或简报 |
 | 4 | 查看场景卡、材料卡并选择维度 | 法务 | `LegalMaterialGatePanel` |
 | 5 | **确认范围并生成** | 法务 | `POST /scenarios/{id}/confirm-scope` |
@@ -65,7 +65,7 @@ flowchart TB
 
 ## Capability Pack 边界
 
-当前 Registry 只有一个正式能力包：
+当前 Registry 只有一个受控试点能力包：
 
 - `brazil_new_energy_greenfield`
 - 展示名称：巴西 · 新能源制造 · 绿地设厂

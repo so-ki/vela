@@ -1,0 +1,127 @@
+{
+  "experiment_id": "ingestion-qa-v1",
+  "frozen_at": "2026-07-17",
+  "jurisdiction": "BR-SP",
+  "sample_size": 10,
+  "selection_rule": "Ten official AL-SP instruments directly related to Lei 997/1976, Decreto 8.468/1976, environmental licensing or energy-generation amendments. Preserve this order. Use the one native official PDF exposed by the selected norm pages and render the other nine official HTML texts to PDF with the pinned Playwright Chromium runtime.",
+  "metric": "manually_annotated_anchor_omission_rate",
+  "metric_limitations": "This is not character error rate, OCR accuracy, legal completeness, amendment completeness or legal validity. It only checks whether 30 pre-registered title/article/topic anchors survive the PDF ingestion path.",
+  "pre_registered_decision": {
+    "maximum_anchor_omission_rate": 0.05,
+    "at_or_below_threshold": "pdf_ingestion_anchor_consistency_supported_for_this_frozen_sample_only",
+    "above_threshold": "pdf_ingestion_requires_manual_source_comparison_and_no_consistency_claim",
+    "incomplete_run": "transport_render_or_extraction_error_blocks_any_decision"
+  },
+  "targets": [
+    {
+      "id": "lei-997-1976-compilacao",
+      "instrument": "Lei nº 997, de 31 de maio de 1976",
+      "source_type": "official_html_rendered_pdf",
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/lei/1976/compilacao-lei-997-31.05.1976.html",
+      "anchors": [
+        "Lei nº 997, de 31 de maio de 1976",
+        "Atualizada até a Lei nº 9.477",
+        "Artigo 5º"
+      ]
+    },
+    {
+      "id": "decreto-8468-1976",
+      "instrument": "Decreto nº 8.468, de 8 de setembro de 1976",
+      "source_type": "official_html_rendered_pdf",
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/1976/decreto-8468-08.09.1976.html",
+      "anchors": [
+        "Decreto nº 8.468, de 8 de setembro de 1976",
+        "Artigo 57",
+        "Artigo 58"
+      ]
+    },
+    {
+      "id": "decreto-69120-2024",
+      "instrument": "Decreto nº 69.120, de 9 de dezembro de 2024",
+      "source_type": "official_html_rendered_pdf",
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/2024/decreto-69120-09.12.2024.html",
+      "anchors": [
+        "Decreto nº 69.120, de 9 de dezembro de 2024",
+        "Artigo 57-A",
+        "Licença Ambiental por Adesão e Compromisso Unificada"
+      ]
+    },
+    {
+      "id": "decreto-64512-2019",
+      "instrument": "Decreto nº 64.512, de 3 de outubro de 2019",
+      "source_type": "official_html_rendered_pdf",
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/2019/decreto-64512-03.10.2019.html",
+      "anchors": [
+        "Decreto nº 64.512, de 3 de outubro de 2019",
+        "Parágrafo único do artigo 72",
+        "Licença Prévia"
+      ]
+    },
+    {
+      "id": "decreto-63296-2018",
+      "instrument": "Decreto nº 63.296, de 21 de março de 2018",
+      "source_type": "official_html_rendered_pdf",
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/2018/decreto-63296-21.03.2018.html",
+      "anchors": [
+        "Decreto nº 63.296, de 21 de março de 2018",
+        "inciso XV do artigo 57",
+        "Declaração de Conformidade da Atividade Agropecuária"
+      ]
+    },
+    {
+      "id": "decreto-63119-2017",
+      "instrument": "Decreto nº 63.119, de 27 de dezembro de 2017",
+      "source_type": "official_html_rendered_pdf",
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/2017/decreto-63119-27.12.2017.html",
+      "anchors": [
+        "Decreto nº 63.119, de 27 de dezembro de 2017",
+        "Decreto nº 62.973",
+        "§ 3º do artigo 57"
+      ]
+    },
+    {
+      "id": "decreto-62973-2017",
+      "instrument": "Decreto nº 62.973, de 28 de novembro de 2017",
+      "source_type": "official_html_rendered_pdf",
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/2017/decreto-62973-28.11.2017.html",
+      "anchors": [
+        "Decreto nº 62.973, de 28 de novembro de 2017",
+        "Licença Prévia (LP)",
+        "Licença de Instalação (LI)"
+      ]
+    },
+    {
+      "id": "decreto-59113-2013",
+      "instrument": "Decreto nº 59.113, de 23 de abril de 2013",
+      "source_type": "official_html_rendered_pdf",
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/2013/decreto-59113-23.04.2013.html",
+      "anchors": [
+        "Decreto nº 59.113, de 23 de abril de 2013",
+        "partículas inaláveis (MP10)",
+        "Retificação do D.O. de 24-4-2013"
+      ]
+    },
+    {
+      "id": "decreto-54487-2009",
+      "instrument": "Decreto nº 54.487, de 26 de junho de 2009",
+      "source_type": "official_native_pdf",
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/2009/decreto-54487-26.06.2009.pdf",
+      "anchors": [
+        "Decreto nº 54.487, de 26 de junho de 2009",
+        "artigo 101-A",
+        "Anexos 12 e 13"
+      ]
+    },
+    {
+      "id": "decreto-53205-2008",
+      "instrument": "Decreto nº 53.205, de 3 de julho de 2008",
+      "source_type": "official_html_rendered_pdf",
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/2008/decreto-53205-03.07.2008.html",
+      "anchors": [
+        "Decreto nº 53.205, de 3 de julho de 2008",
+        "inciso XIV do artigo 57",
+        "termelétricas ou co-geradoras de energia"
+      ]
+    }
+  ]
+}

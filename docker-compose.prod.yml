@@ -1,3 +1,12 @@
+x-backend-build: &backend-build
+  context: ./backend
+  dockerfile: ../docker/Dockerfile.backend.prod
+
+x-database-environment: &database-environment
+  APP_ENV: production
+  SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+
 services:
   db:
     image: postgres:16-alpine
@@ -12,41 +21,67 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
-  backend:
-    build:
-      context: ./backend
-      dockerfile: ../docker/Dockerfile.backend.prod
+  migrate:
+    build: *backend-build
     depends_on:
       db:
         condition: service_healthy
     environment:
-      APP_ENV: production
+      <<: *database-environment
+      VELA_ENTRYPOINT_MODE: migrate
+    restart: "no"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+
+  backend:
+    build: *backend-build
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      <<: *database-environment
       DEBUG: "false"
-      SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+      ACCESS_TOKEN_EXPIRE_MINUTES: "60"
+      ALGORITHM: HS256
+      DEPLOYMENT_MODE: single_tenant
+      INSTANCE_ORGANIZATION: ${INSTANCE_ORGANIZATION:?set INSTANCE_ORGANIZATION to the only pilot organisation}
       CHROMA_PERSIST_DIR: /app/data/chroma
+      CORPUS_AGENT_ENABLED: "false"
       CORS_ORIGINS: ${PUBLIC_URL:-http://localhost}
       FRONTEND_URL: ${PUBLIC_URL:-http://localhost}
       PUBLIC_API_URL: ${PUBLIC_URL:-http://localhost}/api/v1
       ALLOW_OPEN_REGISTRATION: ${ALLOW_OPEN_REGISTRATION:-false}
       ALLOW_PASSWORD_LOGIN: ${ALLOW_PASSWORD_LOGIN:-true}
+      RATE_LIMIT_ENABLED: "true"
       SSO_ENABLED: ${SSO_ENABLED:-false}
       SSO_PROVIDER_NAME: ${SSO_PROVIDER_NAME:-企业 SSO}
       SSO_ISSUER_URL: ${SSO_ISSUER_URL:-}
       SSO_CLIENT_ID: ${SSO_CLIENT_ID:-}
       SSO_CLIENT_SECRET: ${SSO_CLIENT_SECRET:-}
       SSO_REDIRECT_URI: ${SSO_REDIRECT_URI:-}
-      SSO_DEFAULT_ROLE: ${SSO_DEFAULT_ROLE:-legal}
+      SSO_DEFAULT_ROLE: ${SSO_DEFAULT_ROLE:-business}
       EXPORT_TEMPLATE: ${EXPORT_TEMPLATE:-law_school}
       EXPORT_ORG_NAME: ${EXPORT_ORG_NAME:-Vela 出海法务台}
       EXPORT_ORG_DEPARTMENT: ${EXPORT_ORG_DEPARTMENT:-企业法务部}
       EXPORT_RECIPIENT_LABEL: ${EXPORT_RECIPIENT_LABEL:-企业管理层}
-      QWEN_API_KEY: ${QWEN_API_KEY:-}
-      LLM_POLISH_ENABLED: ${LLM_POLISH_ENABLED:-false}
-      SEED_DEMO_USERS: ${SEED_DEMO_USERS:-false}
+      LLM_POLISH_ENABLED: "false"
     volumes:
       - backend_data:/app/data
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
       interval: 15s
@@ -63,7 +98,17 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "${HTTP_BIND_ADDRESS:-0.0.0.0}:${HTTP_PORT:-8080}:80"
+      - "127.0.0.1:${HTTP_PORT:-8080}:8080"
+    restart: unless-stopped
+    read_only: true
+    tmpfs:
+      # Nginx buffers request bodies in /tmp. This must stay above the
+      # application batch-upload ceiling (100 MiB) plus proxy overhead.
+      - /tmp:rw,noexec,nosuid,size=192m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
 volumes:
   pgdata:

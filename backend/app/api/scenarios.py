@@ -2,14 +2,17 @@ from __future__ import annotations
 
 from typing import List, Optional
 import copy
+import json
+import logging
 from datetime import datetime, timezone
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import FileResponse, Response
 from sqlalchemy import update
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy.orm.attributes import flag_modified
+from sqlalchemy.orm.exc import StaleDataError
+from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
 from app.core.deps import get_current_legal_user, get_current_user
@@ -41,6 +44,8 @@ from app.services.export_service import build_sample_docx, build_sample_pdf
 from app.services.legal_ingest import get_index_status, ingest_corpus
 from app.services.legal_rag import retrieve_for_checklist
 from app.services.review_service import (
+    ReviewRevisionConflict,
+    ReviewStateConflict,
     approve_all_pending,
     business_feedback_from_review,
     return_review_to_business,
@@ -51,7 +56,8 @@ from app.services.review_service import (
 )
 from app.services.playbook_deviation_service import (
     append_scenario_deviation,
-    record_deviation,
+    build_deviation_entry,
+    persist_deviation_entry,
 )
 from app.services.user_preference_service import record_review_decision
 from app.services.cold_start_service import playbook_scope_hints, resolve_compliance_dimensions
@@ -88,14 +94,112 @@ from app.services.scenario_scope_service import (
     match_capability_pack_for_payload,
     material_text_from_uploads,
 )
+from app.services.upload_security import (
+    MAX_BATCH_FILES,
+    read_upload_limited,
+    read_uploads_limited,
+)
+from app.services.checklist_payload_service import (
+    CHECKLIST_REVISION_CONFLICT_MESSAGE,
+    ChecklistRevisionConflict,
+    assign_checklist_payload,
+    commit_checklist_payload,
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["协查场景"])
 
 
 def _save_payload(db: Session, scenario: InvestigationScenario, payload: dict) -> None:
-    scenario.checklist.payload = copy.deepcopy(payload)
-    flag_modified(scenario.checklist, "payload")
-    db.commit()
+    try:
+        commit_checklist_payload(db, scenario, payload)
+    except ChecklistRevisionConflict as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+
+def _commit_review_mutation(
+    db: Session,
+    scenario: InvestigationScenario,
+    payload: dict,
+    *,
+    current_user: User,
+    audit_entries: list[tuple[str, str]],
+    new_scenario_status: str | None = None,
+) -> None:
+    """CAS-save a review mutation and its audit records in one transaction."""
+
+    expected_updated_at = scenario.updated_at
+    expected_status = scenario.status
+    changed_at = datetime.now(timezone.utc)
+    values: dict[str, object] = {"updated_at": changed_at}
+    if new_scenario_status is not None:
+        values["status"] = new_scenario_status
+
+    result = db.execute(
+        update(InvestigationScenario)
+        .where(
+            InvestigationScenario.id == scenario.id,
+            InvestigationScenario.updated_at == expected_updated_at,
+            InvestigationScenario.status == expected_status,
+        )
+        .values(**values)
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="复核内容或场景状态已被其他法务更新，请刷新后重试",
+        )
+
+    assign_checklist_payload(scenario, payload)
+    try:
+        for action, detail in audit_entries:
+            write_audit_log(
+                db,
+                user=current_user,
+                action=action,
+                resource_type="scenario",
+                resource_id=str(scenario.id),
+                detail=detail,
+                commit=False,
+            )
+        db.commit()
+    except StaleDataError as exc:
+        db.rollback()
+        raise ChecklistRevisionConflict(CHECKLIST_REVISION_CONFLICT_MESSAGE) from exc
+    except Exception:
+        db.rollback()
+        raise
+
+    scenario.updated_at = changed_at
+    if new_scenario_status is not None:
+        scenario.status = new_scenario_status
+
+
+def _review_audit_detail(
+    *,
+    current_user: User,
+    review: dict,
+    item: dict | None = None,
+    previous: dict | None = None,
+    extra: dict | None = None,
+) -> str:
+    data = {
+        "reviewer_id": current_user.id,
+        "reviewer_name": current_user.full_name,
+        "review_revision": review.get("revision", 0),
+        "reviewed_at": (item or {}).get("reviewed_at") or review.get("last_changed_at"),
+        "item_code": (item or {}).get("code"),
+        "decision": (item or {}).get("decision"),
+        "comment": (item or {}).get("comment"),
+        "override": bool((item or {}).get("manual_override")),
+        "external_counsel_required": bool((item or {}).get("external_counsel_required")),
+        "previous": previous,
+        **(extra or {}),
+    }
+    return json.dumps(data, ensure_ascii=False, sort_keys=True)
 
 
 async def _parse_business_submit_request(
@@ -104,15 +208,26 @@ async def _parse_business_submit_request(
     content_type = request.headers.get("content-type", "")
     uploads: list[tuple[str, bytes, str | None]] = []
     if content_type.startswith("multipart/form-data"):
-        form = await request.form()
+        form = await request.form(max_files=MAX_BATCH_FILES, max_fields=5, max_part_size=1024 * 1024)
         raw = form.get("payload")
         if not raw:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="缺少 payload 字段")
         payload = BusinessSubmitRequest.model_validate_json(str(raw))
-        for item in form.getlist("files"):
-            if isinstance(item, UploadFile) or (hasattr(item, "read") and hasattr(item, "filename")):
-                content = await item.read()
-                uploads.append((item.filename or "upload.bin", content, item.content_type))
+        file_items = [
+            item
+            for item in form.getlist("files")
+            if isinstance(item, UploadFile) or (hasattr(item, "read") and hasattr(item, "filename"))
+        ]
+        if file_items:
+            content_types = [getattr(item, "content_type", None) for item in file_items]
+            try:
+                bounded = await read_uploads_limited(file_items)
+            except ValueError as exc:
+                raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail=str(exc)) from exc
+            uploads = [
+                (filename, content, content_types[index])
+                for index, (filename, content) in enumerate(bounded)
+            ]
         return payload, uploads
     body = await request.json()
     payload = BusinessSubmitRequest.model_validate(body)
@@ -198,14 +313,21 @@ def mining_demo_template(_: User = Depends(get_current_user)):
 
 @router.post("/scenarios/extract-document", response_model=DocumentExtractResponse)
 async def extract_scenario_document(
-    file: UploadFile = File(..., description="投资方案 .txt / .md / .docx / .pdf（≤200MB）"),
-    _: User = Depends(get_current_user),
+    file: UploadFile = File(..., description="投资方案 .txt / .md / .docx / .pdf（≤25MB）"),
+    llm_consent: bool = Form(False, description="是否同意本次将材料发送至已批准 LLM Provider"),
+    current_user: User = Depends(get_current_user),
 ):
     """从上传方案抽取客观事实，预填协查表单（规则引擎；配置 LLM 时优先 AI 抽取）。"""
     filename = file.filename or "upload.txt"
-    content = await file.read()
     try:
-        result = extract_facts_from_document(filename, content)
+        content = await read_upload_limited(file)
+        result = await run_in_threadpool(
+            extract_facts_from_document,
+            filename,
+            content,
+            current_user.id,
+            llm_consent,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return DocumentExtractResponse(**{"filename": filename, **result})
@@ -213,21 +335,22 @@ async def extract_scenario_document(
 
 @router.post("/scenarios/extract-documents", response_model=DocumentExtractBatchResponse)
 async def extract_scenario_documents(
-    files: List[UploadFile] = File(..., description="投资方案，可上传多个（每个≤200MB，合计≤2GB）"),
-    _: User = Depends(get_current_user),
+    files: List[UploadFile] = File(..., description="投资方案，最多10个（每个≤25MB，合计≤100MB）"),
+    llm_consent: bool = Form(False, description="是否同意本次将材料发送至已批准 LLM Provider"),
+    current_user: User = Depends(get_current_user),
 ):
     """逐文件抽取事实，并合并去重为一份预填表单。"""
     if not files:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="请至少上传一个文件")
 
-    uploads: list[tuple[str, bytes]] = []
-    for upload in files:
-        filename = upload.filename or "upload.txt"
-        content = await upload.read()
-        uploads.append((filename, content))
-
     try:
-        successes, failures, merged, conflicts = extract_documents_batch(uploads)
+        uploads = await read_uploads_limited(files)
+        successes, failures, merged, conflicts = await run_in_threadpool(
+            extract_documents_batch,
+            uploads,
+            current_user.id,
+            llm_consent,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -799,7 +922,16 @@ def download_scenario_material_file(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="文件不存在")
 
     display_name = stored_name.split("__", 1)[1] if "__" in stored_name else stored_name
-    return FileResponse(path, filename=display_name, media_type="application/octet-stream")
+    return FileResponse(
+        path,
+        filename=display_name,
+        media_type="application/octet-stream",
+        headers={
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+            "X-Vela-Content-Screening": "active-content-only-not-antivirus",
+        },
+    )
 
 
 @router.post(
@@ -1046,32 +1178,23 @@ def start_review(
     if tier_report:
         review["tier_report"] = tier_report
     payload["review"] = review
-    scenario.checklist.payload = payload
-    flag_modified(scenario.checklist, "payload")
-    result = db.execute(
-        update(InvestigationScenario)
-        .where(
-            InvestigationScenario.id == scenario.id,
-            InvestigationScenario.status == "pending_legal_review",
-        )
-        .values(status="review_in_progress")
+    _commit_review_mutation(
+        db,
+        scenario,
+        payload,
+        current_user=current_user,
+        new_scenario_status="review_in_progress",
+        audit_entries=[
+            (
+                "review.init",
+                _review_audit_detail(
+                    current_user=current_user,
+                    review=review,
+                    extra={"item_count": len(review.get("items", []))},
+                ),
+            )
+        ],
     )
-    if result.rowcount != 1:
-        db.rollback()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="复核状态已变化，请刷新")
-    db.commit()
-
-    try:
-        write_audit_log(
-            db,
-            user=current_user,
-            action="review.init",
-            resource_type="scenario",
-            resource_id=str(scenario.id),
-            detail=f"初始化法务复核 {len(review.get('items', []))} 条",
-        )
-    except Exception:
-        db.rollback()
 
     return ReviewResponse(**review_to_response(scenario_id, review))
 
@@ -1095,12 +1218,17 @@ def patch_review_item(
 
     try:
         review = update_review_item(
-            review,
+            copy.deepcopy(review),
             code=item_code,
             decision=body.decision,
             comment=body.comment,
             external_counsel_required=body.external_counsel_required,
+            reviewer_id=current_user.id,
+            reviewer_name=current_user.full_name,
+            expected_revision=body.expected_revision,
         )
+    except (ReviewRevisionConflict, ReviewStateConflict) as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -1108,8 +1236,9 @@ def patch_review_item(
     payload["review"] = review
 
     target = next((i for i in review.get("items", []) if i["code"] == item_code), None)
+    deviation_entry = None
     if body.decision == "rejected" and target:
-        entry = record_deviation(
+        deviation_entry = build_deviation_entry(
             scenario_id=scenario.id,
             project_name=scenario.project_name,
             code=item_code,
@@ -1119,18 +1248,53 @@ def patch_review_item(
             match_score=float(target.get("match_score") or 0),
             gate_status=target.get("gate_status", ""),
         )
-        payload = append_scenario_deviation(payload, entry)
+        payload = append_scenario_deviation(payload, deviation_entry)
 
-    record_review_decision(
-        current_user.id,
-        code=item_code,
-        decision=body.decision,
-        comment=body.comment,
-        match_score=float((target or {}).get("match_score") or 0),
-        tier=(target or {}).get("tier", ""),
+    previous = next(
+        (
+            event.get("previous")
+            for event in reversed(review.get("change_history") or [])
+            if event.get("action") == "item_updated" and event.get("item_code") == item_code
+        ),
+        None,
+    )
+    _commit_review_mutation(
+        db,
+        scenario,
+        payload,
+        current_user=current_user,
+        audit_entries=[
+            (
+                "review.item_update",
+                _review_audit_detail(
+                    current_user=current_user,
+                    review=review,
+                    item=target,
+                    previous=previous,
+                ),
+            )
+        ],
     )
 
-    _save_payload(db, scenario, payload)
+    # Preference/deviation files are advisory learning state, not the source of
+    # truth. Write them only after the review + audit transaction succeeds so a
+    # rejected CAS request cannot leave a ghost learning event.
+    if deviation_entry is not None:
+        try:
+            persist_deviation_entry(deviation_entry)
+        except Exception:
+            logger.warning("failed to persist playbook deviation after review commit", exc_info=True)
+    try:
+        record_review_decision(
+            current_user.id,
+            code=item_code,
+            decision=body.decision,
+            comment=body.comment,
+            match_score=float((target or {}).get("match_score") or 0),
+            tier=(target or {}).get("tier", ""),
+        )
+    except Exception:
+        logger.warning("failed to persist review preference after review commit", exc_info=True)
 
     return ReviewResponse(**review_to_response(scenario_id, review))
 
@@ -1138,6 +1302,7 @@ def patch_review_item(
 @router.post("/scenarios/{scenario_id}/review/approve-all", response_model=ReviewResponse)
 def approve_all_review_items(
     scenario_id: int,
+    expected_revision: int = Query(..., ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_legal_user),
 ):
@@ -1151,13 +1316,55 @@ def approve_all_review_items(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="复核尚未初始化")
 
     try:
-        review = approve_all_pending(copy.deepcopy(review))
+        review = approve_all_pending(
+            copy.deepcopy(review),
+            reviewer_id=current_user.id,
+            reviewer_name=current_user.full_name,
+            expected_revision=expected_revision,
+        )
+    except (ReviewRevisionConflict, ReviewStateConflict) as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     payload = copy.deepcopy(scenario.checklist.payload)
     payload["review"] = review
-    _save_payload(db, scenario, payload)
+    approved_codes = list(review.get("last_bulk_approved_codes") or [])
+    approved_items = {
+        item.get("code"): item
+        for item in review.get("items", [])
+        if item.get("code") in approved_codes
+    }
+    entries = [
+        (
+            "review.bulk_approve_s1",
+            _review_audit_detail(
+                current_user=current_user,
+                review=review,
+                item=approved_items.get(code),
+                extra={"bulk": True},
+            ),
+        )
+        for code in approved_codes
+    ]
+    if not entries:
+        entries = [
+            (
+                "review.bulk_approve_s1",
+                _review_audit_detail(
+                    current_user=current_user,
+                    review=review,
+                    extra={"bulk": True, "changed_count": 0},
+                ),
+            )
+        ]
+    _commit_review_mutation(
+        db,
+        scenario,
+        payload,
+        current_user=current_user,
+        audit_entries=entries,
+    )
     return ReviewResponse(**review_to_response(scenario_id, review))
 
 
@@ -1179,22 +1386,39 @@ def return_scenario_to_business(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="复核尚未初始化")
 
     try:
-        review = return_review_to_business(copy.deepcopy(review), current_user, note=body.note)
+        review = return_review_to_business(
+            copy.deepcopy(review),
+            current_user,
+            note=body.note,
+            expected_revision=body.expected_revision,
+        )
+    except (ReviewRevisionConflict, ReviewStateConflict) as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
     payload = copy.deepcopy(scenario.checklist.payload)
     payload["review"] = review
-    scenario.status = "returned_for_revision"
-    _save_payload(db, scenario, payload)
-
-    write_audit_log(
+    _commit_review_mutation(
         db,
-        user=current_user,
-        action="review.return_to_business",
-        resource_type="scenario",
-        resource_id=str(scenario.id),
-        detail=f"退回业务补充：{scenario.project_name}（驳回 {review.get('return_snapshot', {}).get('rejected_count', 0)} 条）",
+        scenario,
+        payload,
+        current_user=current_user,
+        new_scenario_status="returned_for_revision",
+        audit_entries=[
+            (
+                "review.return_to_business",
+                _review_audit_detail(
+                    current_user=current_user,
+                    review=review,
+                    extra={
+                        "status": "returned",
+                        "return_note": review.get("return_note"),
+                        "rejected_count": review.get("return_snapshot", {}).get("rejected_count", 0),
+                    },
+                ),
+            )
+        ],
     )
 
     db.refresh(scenario)
@@ -1204,6 +1428,7 @@ def return_scenario_to_business(
 @router.post("/scenarios/{scenario_id}/review/finalize", response_model=ReviewResponse)
 def finalize_scenario_review(
     scenario_id: int,
+    expected_revision: int = Query(..., ge=0),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_legal_user),
 ):
@@ -1226,7 +1451,12 @@ def finalize_scenario_review(
             revision_round=revision_round,
             finalize_seq=finalize_seq,
             tier_report=payload.get("tier_report") or (payload.get("investigation_adequacy") or {}).get("tier_report"),
+            reviewer_id=current_user.id,
+            reviewer_name=current_user.full_name,
+            expected_revision=expected_revision,
         )
+    except (ReviewRevisionConflict, ReviewStateConflict) as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
@@ -1236,24 +1466,38 @@ def finalize_scenario_review(
             "version": review.get("version_label"),
             "status": review.get("status"),
             "finalized_at": review.get("finalized_at"),
+            "reviewer_id": review.get("finalized_by_id"),
+            "reviewer_name": review.get("finalized_by_name"),
+            "review_revision": review.get("revision"),
         }
     )
     payload["finalize_history"] = finalize_history
+    final_scenario_status = f"review_{review['status']}"
     payload["audit_bundle"] = build_audit_bundle(
         scenario,
         payload_override=payload,
         generation_config=generation_config,
+        scenario_status_override=final_scenario_status,
     )
-    scenario.status = f"review_{review['status']}"
-    _save_payload(db, scenario, payload)
-
-    write_audit_log(
+    _commit_review_mutation(
         db,
-        user=current_user,
-        action="review.finalize",
-        resource_type="scenario",
-        resource_id=str(scenario.id),
-        detail=f"法务复核定稿：{review['status']}",
+        scenario,
+        payload,
+        current_user=current_user,
+        new_scenario_status=final_scenario_status,
+        audit_entries=[
+            (
+                "review.finalize",
+                _review_audit_detail(
+                    current_user=current_user,
+                    review=review,
+                    extra={
+                        "status": review.get("status"),
+                        "version_label": review.get("version_label"),
+                    },
+                ),
+            )
+        ],
     )
 
     return ReviewResponse(**review_to_response(scenario_id, review))

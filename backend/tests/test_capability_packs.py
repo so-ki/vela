@@ -75,9 +75,11 @@ def test_production_registry_loads_formal_brazil_pack() -> None:
 
     assert pack.is_test_fixture is False
     assert pack.manifest.pack_id == FORMAL_PACK_ID
-    assert pack.manifest.version == "1.0.0"
+    assert pack.manifest.version == "1.3.0"
+    assert pack.manifest.content_status == "provisional"
     assert pack.manifest.status == "active"
     assert pack.manifest.country == "BR"
+    assert pack.manifest.state == "sao_paulo"
     assert pack.manifest.industry == "new_energy_manufacturing"
     assert pack.manifest.action_type == "greenfield_plant"
     assert pack.manifest.semantic_hash == pack.manifest.canonical_semantic_hash()
@@ -94,6 +96,7 @@ def test_test_environment_explicitly_loads_fixture_but_public_list_hides_it() ->
     assert pack.manifest.display_name == "非真实测试能力包"
     assert registry.match(
         country="ZZ-TEST",
+        state="ZZ-STATE",
         industry="fixture_industry",
         action_type="fixture_action",
     ).pack_id == FIXTURE_PACK_ID
@@ -188,6 +191,7 @@ def test_registry_matches_formal_pack_by_route() -> None:
 
     match = registry.match(
         country="br",
+        state="SAO_PAULO",
         industry="NEW_ENERGY_MANUFACTURING",
         action_type="GREENFIELD_PLANT",
     )
@@ -201,6 +205,7 @@ def test_unmatched_route_fails_without_brazil_fallback() -> None:
     with pytest.raises(CapabilityPackUnsupportedError):
         registry.match(
             country="MX",
+            state="nuevo_leon",
             industry="mining",
             action_type="acquisition",
         )
@@ -213,6 +218,7 @@ def test_material_match_requires_text_evidence_even_when_client_hints_claim_form
         registry.match_material(
             material_text="本项目拟在墨西哥收购铜矿企业并取得既有采矿权。",
             country_hint="BR",
+            state_hint="sao_paulo",
             industry_hint="new_energy_manufacturing",
             action_type_hint="greenfield_plant",
         )
@@ -224,6 +230,57 @@ def test_short_country_code_does_not_match_inside_an_unrelated_word() -> None:
     with pytest.raises(CapabilityPackUnsupportedError):
         registry.match_material(
             material_text="墨西哥项目：sobre 新能源 建设工厂",
+        )
+
+
+@pytest.mark.parametrize(
+    "material_text",
+    [
+        "项目拟在巴西圣保罗州绿地设厂，新建新能源制造工厂。",
+        "A greenfield new-energy manufacturing plant in the State of São Paulo, Brazil.",
+        "Implantação de nova planta industrial greenfield de energia renovável no Estado de São Paulo, Brasil.",
+    ],
+)
+def test_material_match_accepts_explicit_four_dimension_evidence_across_languages(
+    material_text: str,
+) -> None:
+    registry = CapabilityPackRegistry(app_env="production")
+
+    match = registry.match_material(material_text=material_text)
+
+    assert match.pack_id == FORMAL_PACK_ID
+
+
+@pytest.mark.parametrize(
+    "material_text",
+    [
+        "材料标签写作巴西圣保罗州新能源 greenfield，但项目实际选址为 Rio de Janeiro。",
+        "A greenfield new-energy project in São Paulo, Brazil will acquire an existing factory.",
+        "Projeto greenfield de energia renovável em São Paulo, Brasil para expansão de fábrica existente.",
+    ],
+)
+def test_material_match_rejects_out_of_scope_state_or_brownfield_actions(
+    material_text: str,
+) -> None:
+    registry = CapabilityPackRegistry(app_env="production")
+
+    with pytest.raises(CapabilityPackUnsupportedError):
+        registry.match_material(
+            material_text=material_text,
+            country_hint="BR",
+            state_hint="sao_paulo",
+            industry_hint="new_energy_manufacturing",
+            action_type_hint="greenfield_plant",
+        )
+
+
+def test_explicit_rio_state_hint_cannot_be_silently_rewritten_to_sao_paulo() -> None:
+    registry = CapabilityPackRegistry(app_env="production")
+
+    with pytest.raises(CapabilityPackUnsupportedError):
+        registry.match_material(
+            material_text="巴西圣保罗州新能源制造绿地设厂项目。",
+            state_hint="RJ",
         )
 
 

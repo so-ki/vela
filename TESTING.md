@@ -14,8 +14,8 @@ cd vela-platform
 ## 环境要求
 
 - macOS / Linux / Windows（WSL 推荐）
-- Python 3.9+
-- Node.js 18+
+- Python 3.12+
+- Node.js 20+（CI 使用 22）
 - 可选：通义千问 API Key（启用 LLM 润色）
 
 ## 快速启动
@@ -41,7 +41,7 @@ cd backend
 # 发布包不包含任何 .env*；如需 LLM，使用本地环境变量注入 QWEN_API_KEY 或 DEEPSEEK_API_KEY
 python3 -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements.lock
 python scripts/seed_demo_user.py
 ```
 
@@ -49,7 +49,7 @@ python scripts/seed_demo_user.py
 
 ### 业务 / 法务分角色流程
 
-当前唯一正式能力包是 `brazil_new_energy_greenfield`（巴西 · 新能源制造 · 绿地设厂）；测试 fixture 不代表法律能力，也不应出现在生产 Registry 或发布包。
+当前唯一受控试点能力包是 `brazil_new_energy_greenfield`（巴西 · 圣保罗州 · 新能源制造 · 绿地设厂；法律内容 provisional）；测试 fixture 不代表法律能力，也不应出现在生产 Registry 或发布包。
 
 测试生成物只验证协查流程与可溯源底稿；AI 输出须经法务逐条复核，不构成正式法律意见。
 
@@ -64,6 +64,8 @@ python scripts/seed_demo_user.py
 
 ### 自动化验收（推荐）
 
+GitHub CI 会额外构建生产前后端镜像，并用一次性 PostgreSQL 16、Alembic migration gate 和回环地址执行完整 Compose 冒烟；这一步覆盖本地无 Docker 时无法证明的正式部署路径。
+
 服务启动后运行：
 
 ```bash
@@ -73,7 +75,7 @@ chmod +x scripts/verify_e2e.sh
 
 覆盖：业务知情、法务原子确认、快照/attempt 幂等、Capability Pack 制品绑定、RAG/brief 只读、法务驳回→业务可见及旧入口 410。
 
-语料清洗后若需重建向量索引：`curl -X POST http://127.0.0.1:8000/api/v1/legal/index?force=true`（需法务登录 token）。
+语料变更后可调用 `curl -X POST http://127.0.0.1:8000/api/v1/legal/index?force=true`（需法务登录 token）重建确定性关键词索引标记。
 
 ## 演示与门控文档
 
@@ -104,7 +106,7 @@ lsof -ti:5173 | xargs kill -9
 
 **法源索引**
 
-首次运行会自动构建索引；若 Chroma 向量下载失败，系统会回退关键词检索，不影响演示。
+首次运行会自动构建确定性关键词索引；本发布不下载或运行 Chroma 向量模型。
 
 ## 反馈
 

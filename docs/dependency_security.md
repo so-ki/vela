@@ -1,0 +1,53 @@
+# Python 运行依赖安全基线
+
+## 发布矩阵
+
+- Python：3.12（独立验证环境为 CPython 3.12.13）
+- 直接依赖源：`backend/requirements.txt`
+- 生产安装入口：`backend/requirements.lock`（包含跨平台 marker 的完整锁定图）
+- 兼容入口：`backend/requirements-rag.txt`（当前仅引用生产锁定图，不额外安装向量库）
+- 漏洞扫描器：PyPA `pip-audit` 2.10.1
+- 最后审计日期：2026-07-17
+
+| 直接依赖 | 已审计版本 | 说明 |
+|---|---:|---|
+| FastAPI | 0.139.0 | 与 Starlette 1.3.1 同组验证 |
+| Starlette | 1.3.1 | 显式锁定 Web 框架边界 |
+| Uvicorn | 0.51.0 | `standard` extra；Gunicorn worker 配置已检查 |
+| PyJWT | 2.13.0 | 取代 `python-jose[cryptography]` |
+| python-multipart | 0.0.32 | 上传表单解析 |
+| pypdf | 6.14.2 | PDF 文本提取回归通过 |
+
+`requirements.lock` 当前包含 45 条精确版本记录（部分带平台 marker）。在全新 Python 3.12 虚拟环境安装后，隔离的 `pip-audit --path ...` 结果为：
+
+```text
+No known vulnerabilities found
+```
+
+这是时点性结论，不代表未来不会新增公告。每次发布都必须在新建环境中重新安装并扫描，不得直接扫描开发者长期复用的 `.venv`。
+
+## Chroma 暂停决策
+
+对当时最新 Chroma 1.5.9 的独立安装图扫描命中 `PYSEC-2026-311` / `CVE-2026-45829`：1.0.0 起的受影响版本存在预认证代码注入，当时无修复版本。参见 [OSV 审核记录](https://osv.dev/vulnerability/GHSA-f4j7-r4q5-qw2c)。
+
+本版本因此：
+
+- 不在生产 Docker 镜像中安装 Chroma；
+- 不在 `requirements*.txt` 中声明 Chroma；
+- 使用已有的确定性关键词检索；
+- 仅在上游存在已公布修复、独立服务完成认证与网络隔离、并重新通过回归和依赖审计后恢复向量检索。
+
+## 重复审计
+
+`pip-audit` 必须安装在另一个工具环境，避免将审计器自身的依赖计入应用运行图。
+
+```bash
+python3.12 -m venv /tmp/vela-runtime
+/tmp/vela-runtime/bin/pip install -r backend/requirements.lock
+
+python3.12 -m venv /tmp/vela-audit
+/tmp/vela-audit/bin/pip install pip-audit==2.10.1
+/tmp/vela-audit/bin/pip-audit \
+  --path /tmp/vela-runtime/lib/python3.12/site-packages \
+  --progress-spinner off
+```

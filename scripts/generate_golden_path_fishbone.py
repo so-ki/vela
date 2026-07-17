@@ -255,7 +255,7 @@ def gen_fishbone():
         "③ 检索与风险分级 · 系统自动→法务审核",
         [
             "规则引擎/清单生成（非 LLM 编题）",
-            "RAG + 关键词维度加权 + Chroma 可选",
+            "RAG + 确定性关键词维度加权",
             "Brazil Connector / 外链降级（查不到不编）",
             "Grounding 溯源 + 匹配度 0-100",
             "S1/S2/S3 分级 · Investigation Agent 流水线",

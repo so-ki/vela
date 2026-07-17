@@ -21,7 +21,9 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String(128), nullable=False)
     hashed_password: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     organization: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    role: Mapped[str] = mapped_column(String(32), default="legal", nullable=False)
+    role: Mapped[str] = mapped_column(
+        String(32), default="business", server_default="business", nullable=False
+    )
     auth_provider: Mapped[str] = mapped_column(String(32), default="local", nullable=False)
     external_subject: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

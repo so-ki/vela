@@ -97,13 +97,14 @@ def _formal_payload(project_name: str = "巴西新能源绿地工厂") -> dict:
     return {
         "project_name": project_name,
         "country": "BR",
+        "state": "sao_paulo",
         "industry": "new_energy_manufacturing",
         "action_type": "greenfield_plant",
         "investment_structure": "境外投资人通过巴西子公司实施投资",
         "project_content_scale": "建设新能源电池、储能与电动汽车制造工厂",
-        "description": "项目拟在巴西建设新能源制造绿地工厂并雇佣当地员工。",
+        "description": "项目拟在巴西圣保罗州建设新能源制造绿地工厂并雇佣当地员工。",
         "scope_acknowledged": True,
-        "scope_notice_version": "scope-notice-v1",
+        "scope_notice_version": "scope-notice-v2",
     }
 
 
@@ -116,7 +117,7 @@ def _submit_formal(client: TestClient, project_name: str = "巴西新能源绿�
                 "files",
                 (
                     "proposal.txt",
-                    "巴西新能源制造绿地设厂投资方案".encode(),
+                    "巴西圣保罗州新能源制造绿地设厂投资方案".encode(),
                     "text/plain",
                 ),
             )
@@ -208,7 +209,8 @@ def test_catalog_api_returns_only_the_formal_brazil_pack(db_factory):
         assert catalog_response.status_code == 200, catalog_response.text
         catalog = catalog_response.json()
         assert catalog["capability_pack"]["pack_id"] == FORMAL_PACK_ID
-        assert catalog["capability_pack"]["version"] == "1.0.0"
+        assert catalog["capability_pack"]["version"] == "1.3.0"
+        assert catalog["capability_pack"]["content_status"] == "provisional"
         assert catalog["capability_pack"]["status"] == "active"
         assert catalog["rules_artifact"]["artifact_id"] == "brazil_new_energy"
         assert catalog["corpus_artifact"]["artifact_id"] == "brazil_legal_corpus"
@@ -277,7 +279,7 @@ def test_uploaded_source_text_participates_in_pack_matching(db_factory):
                     "files",
                     (
                         "route-evidence.txt",
-                        "项目位于巴西，拟建设新能源电池制造绿地工厂。".encode(),
+                        "项目位于巴西圣保罗州，拟建设新能源电池制造绿地工厂。".encode(),
                         "text/plain",
                     ),
                 )
@@ -504,11 +506,12 @@ def test_fixture_pack_only_builds_service_proposal_and_snapshot_without_formal_p
     registry = CapabilityPackRegistry(app_env="test", include_test_fixtures=True)
     fixture_pack = registry.get(FIXTURE_PACK_ID)
     payload = BusinessSubmitRequest(
-        project_name="fixture-country-token fixture-industry-token fixture-action-token",
+        project_name="fixture-country-token fixture-state-token fixture-industry-token fixture-action-token",
         country="ZZ-TEST",
+        state="ZZ-STATE",
         industry="fixture_industry",
         action_type="fixture_action",
-        description="fixture-country-token fixture-industry-token fixture-action-token material",
+        description="fixture-country-token fixture-state-token fixture-industry-token fixture-action-token material",
         scope_acknowledged=True,
     )
     with db_factory() as db:

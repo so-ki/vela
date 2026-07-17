@@ -30,7 +30,7 @@ from app.services.rules_registry import build_supported_locations
 
 
 SCOPE_SCHEMA_VERSION = "2.0"
-SCOPE_NOTICE_VERSION = "scope-notice-v1"
+SCOPE_NOTICE_VERSION = "scope-notice-v2"
 GENERATION_INPUT_SCHEMA_VERSION = "1.0"
 GENERATION_LEASE_SECONDS = 300
 GENERATION_MAX_SECONDS = 1800
@@ -61,7 +61,7 @@ def _validate_proposal(proposal: dict[str, Any], expected_hash: str) -> None:
         raise GenerationConflictError("场景提议内容或哈希已变化，请刷新后重新确认")
 
 
-def _proposal_for_pack(pack: LoadedCapabilityPack) -> dict[str, Any]:
+def _proposal_for_pack(pack: LoadedCapabilityPack, payload: Any | None = None) -> dict[str, Any]:
     manifest = pack.manifest
     rules = pack.rules
     binding = manifest.artifact_binding
@@ -80,8 +80,15 @@ def _proposal_for_pack(pack: LoadedCapabilityPack) -> dict[str, Any]:
         "rules_artifact_id": manifest.rules_artifact.artifact_id,
         "rules_pack_id": manifest.rules_artifact.artifact_id,
         "country": manifest.country,
-        "state": location.get("state") or jurisdiction.get("default_state") or "",
-        "city": location.get("city") or "",
+        "state": manifest.state,
+        # A city is not part of this pack's routing identity. Preserve only an
+        # explicitly submitted city; never silently turn a state-wide project
+        # into the first city listed by the rules artifact.
+        "city": (
+            str(getattr(payload, "city", None) or "").strip()
+            if payload is not None
+            else (location.get("city") or "")
+        ),
         "industry": manifest.industry,
         "action_type": manifest.action_type,
         "labels": {
@@ -99,13 +106,13 @@ def build_current_scope_proposal() -> dict[str, Any]:
     """Compatibility helper for the single formal MVP; never falls back on error."""
     active = get_capability_pack_registry().list_active()
     if len(active) != 1:
-        raise CapabilityPackRegistryError("当前正式 Capability Pack 数量不唯一，不能隐式选择")
+        raise CapabilityPackRegistryError("当前受控试点 Capability Pack 数量不唯一，不能隐式选择")
     return _proposal_for_pack(active[0])
 
 
 def _material_text(payload: Any) -> str:
     fields = (
-        "project_name", "investment_destination", "project_content_scale", "description",
+        "project_name", "city", "investment_destination", "project_content_scale", "description",
         "investment_structure", "known_risks", "capacity_notes", "facility_notes", "remarks",
     )
     values = [str(getattr(payload, field, None) or "") for field in fields]
@@ -159,7 +166,7 @@ def build_proposed_scenario_scope(
     material_text_extra: str = "",
 ) -> dict[str, Any]:
     if not getattr(payload, "scope_acknowledged", False):
-        raise ValueError("请确认已知悉当前完整支持场景后再提交材料")
+        raise ValueError("请确认已知悉当前受控试点覆盖范围后再提交材料")
     notice_version = getattr(payload, "scope_notice_version", SCOPE_NOTICE_VERSION)
     if notice_version != SCOPE_NOTICE_VERSION:
         raise ValueError("当前支持场景说明已更新，请刷新页面后重新确认")
@@ -169,7 +176,7 @@ def build_proposed_scenario_scope(
         registry=active_registry,
         material_text_extra=material_text_extra,
     )
-    proposed = _proposal_for_pack(pack)
+    proposed = _proposal_for_pack(pack, payload)
     fit = assess_submitted_scene(payload, proposed)
     if fit["result"] == "blocked":
         raise ValueError("提交的能力包提示与后端 Registry 匹配结果不一致")
@@ -200,11 +207,12 @@ def match_capability_pack_for_payload(
         pack = active_registry.match_material(
             material_text=f"{_material_text(payload)} {material_text_extra}".strip(),
             country_hint=getattr(payload, "country", None),
+            state_hint=getattr(payload, "state", None),
             industry_hint=getattr(payload, "industry", None),
             action_type_hint=getattr(payload, "action_type", None),
         )
     except CapabilityPackUnsupportedError as exc:
-        raise ValueError("项目材料不属于当前支持的正式 Capability Pack") from exc
+        raise ValueError("项目材料不属于当前受控试点 Capability Pack") from exc
     return pack
 
 

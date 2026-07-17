@@ -137,7 +137,7 @@ function extractApiError(e: unknown): string {
 
 async function finalSubmit() {
   if (!catalogReady.value) {
-    error.value = '无法验证当前正式能力包，已禁止确认和提交，请刷新重试'
+    error.value = '无法加载当前受控试点能力包，已禁止确认和提交，请刷新重试'
     return
   }
   showFieldValidation.value = true
@@ -147,7 +147,7 @@ async function finalSubmit() {
   }
   showFieldValidation.value = false
   if (!editMode.value && !scopeAcknowledged.value) {
-    error.value = '请先勾选并确认已知悉当前完整支持场景'
+    error.value = '请先勾选并确认已知悉当前受控试点覆盖范围'
     return
   }
   submitting.value = true
@@ -156,7 +156,7 @@ async function finalSubmit() {
     const payload = {
       ...(await buildPayload()),
       ...(!editMode.value
-        ? { scope_acknowledged: true, scope_notice_version: 'scope-notice-v1' }
+        ? { scope_acknowledged: true, scope_notice_version: 'scope-notice-v2' }
         : {}),
     }
     const uploadFiles = pendingFiles.value.length ? pendingFiles.value : undefined
@@ -193,7 +193,7 @@ onMounted(async () => {
     const loadedCatalog = await fetchRulesCatalog()
     catalog.value = isUsableCapabilityCatalog(loadedCatalog) ? loadedCatalog : null
     if (!catalog.value) {
-      error.value = '无法验证当前正式能力包，已禁止确认和提交，请刷新重试'
+      error.value = '无法加载当前受控试点能力包，已禁止确认和提交，请刷新重试'
     }
   } catch (e: unknown) {
     error.value = extractApiError(e)
@@ -291,7 +291,7 @@ onUnmounted(() => {
               </p>
               <label class="scope-acknowledgement">
                 <input v-model="scopeAcknowledged" type="checkbox" :disabled="!catalogReady" />
-                <span>我已知悉当前完整支持的是上述场景，并提交材料供法务进一步判断。</span>
+                <span>我已知悉当前受控试点仅覆盖上述场景；法律内容为临时版本，仍须专家复核。</span>
               </label>
             </CapabilityPackCard>
             <BusinessMaterialReviewTable

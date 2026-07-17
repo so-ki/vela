@@ -14,7 +14,7 @@
 |----|------|
 | 产品定位 | C 混合：固定 intake + 法务维度动态必填 |
 | 业务动作 | 上传方案 → AI 抽取 → 核对事实 → 查看 Capability Pack → 知情确认 → 提交 |
-| 业务责任 | 确认方案事实真实、完整，并知晓当前完整支持边界；不判断法律适用性 |
+| 业务责任 | 确认方案事实真实、完整，并知晓当前受控试点工程边界；不判断法律适用性 |
 | 提交必填 | `project_name`、`investment_structure`、`description`（3 项） |
 | 建议核对字段 | `description`、`investment_structure`、`funding_source`、`known_risks` |
 | 提交结果 | 仅创建 `pending_scope` 与 proposed scope；法务确认前不生成 |

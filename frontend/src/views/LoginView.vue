@@ -8,8 +8,9 @@ import type { SsoConfig } from '@/types'
 const auth = useAuthStore()
 const router = useRouter()
 const route = useRoute()
-const email = ref('legal@demo.vela')
-const password = ref('Demo1234!')
+const email = ref('')
+const password = ref('')
+const showDemoHint = import.meta.env.DEV
 const localError = ref<string | null>(null)
 const ssoConfig = ref<SsoConfig | null>(null)
 
@@ -69,7 +70,7 @@ function startSsoLogin() {
       >
         <label>
           <span>邮箱</span>
-          <input v-model="email" type="email" required autocomplete="email" placeholder="legal@demo.vela" />
+          <input v-model="email" type="email" required autocomplete="email" placeholder="name@company.com" />
         </label>
         <label>
           <span>密码</span>
@@ -88,7 +89,7 @@ function startSsoLogin() {
         <RouterLink to="/register">注册账户</RouterLink>
       </p>
 
-      <p class="demo-hint" v-if="ssoConfig?.allow_password_login !== false">
+      <p class="demo-hint" v-if="showDemoHint && ssoConfig?.allow_password_login !== false">
         演示账户：<br />
         法务 legal@demo.vela / Demo1234!<br />
         业务 biz@demo.vela / Demo1234!

@@ -12,12 +12,16 @@ from app.core.config import get_settings
 from app.services.intent_parser import _extract_json
 from app.services.grounding_utils import verify_snippet_in_source
 from app.services.llm_client import get_llm_config
+from app.services.upload_security import (
+    ALLOWED_SUFFIXES,
+    MAX_BATCH_BYTES as MAX_BATCH_TOTAL_BYTES,
+    MAX_BATCH_FILES,
+    MAX_EXTRACTED_CHARACTERS,
+    MAX_FILE_BYTES as MAX_BYTES,
+    validate_upload_container,
+)
 
-MAX_BYTES = 200 * 1024 * 1024
-MAX_BATCH_FILES = 50
-MAX_BATCH_TOTAL_BYTES = MAX_BYTES * 10
-ALLOWED_SUFFIXES = {".txt", ".md", ".docx", ".pdf"}
-
+MAX_PDF_PAGES = 250
 VALID_DIMENSIONS = ["labor", "foreign_investment", "tax", "environment", "industry_access"]
 
 DIMENSION_KEYWORDS: dict[str, list[str]] = {
@@ -95,12 +99,16 @@ def read_upload_text(filename: str, content: bytes) -> str:
         raise ValueError(f"仅支持 {', '.join(sorted(ALLOWED_SUFFIXES))} 文件")
 
     if len(content) > MAX_BYTES:
-        raise ValueError("文件大小不能超过 200MB")
+        raise ValueError("文件大小不能超过 25MB")
+    validate_upload_container(filename, content)
 
     if suffix in {".txt", ".md"}:
         for encoding in ("utf-8", "utf-8-sig", "gb18030", "gbk"):
             try:
-                return content.decode(encoding).strip()
+                text = content.decode(encoding).strip()
+                if len(text) > MAX_EXTRACTED_CHARACTERS:
+                    raise ValueError("文档可抽取文本超过安全上限")
+                return text
             except UnicodeDecodeError:
                 continue
         raise ValueError("无法识别文本编码，请使用 UTF-8 保存")
@@ -110,9 +118,19 @@ def read_upload_text(filename: str, content: bytes) -> str:
 
     doc = Document(io.BytesIO(content))
     parts = [p.text.strip() for p in doc.paragraphs if p.text.strip()]
+    for table in doc.tables:
+        for row in table.rows:
+            row_text = " | ".join(cell.text.strip() for cell in row.cells if cell.text.strip())
+            if row_text:
+                parts.append(row_text)
+    for section in doc.sections:
+        parts.extend(p.text.strip() for p in section.header.paragraphs if p.text.strip())
+        parts.extend(p.text.strip() for p in section.footer.paragraphs if p.text.strip())
     text = "\n".join(parts).strip()
     if not text:
         raise ValueError("Word 文档未读取到有效文本，请确认非扫描件图片")
+    if len(text) > MAX_EXTRACTED_CHARACTERS:
+        raise ValueError("文档可抽取文本超过安全上限")
     return text
 
 
@@ -123,11 +141,15 @@ def _read_pdf_text(content: bytes) -> str:
         raise ValueError("无法解析 PDF 文件，请确认文件未损坏") from exc
 
     page_count = len(reader.pages)
+    if page_count > MAX_PDF_PAGES:
+        raise ValueError(f"PDF 页数不能超过 {MAX_PDF_PAGES} 页")
     parts: list[str] = []
     for page in reader.pages:
         page_text = page.extract_text()
         if page_text:
             parts.append(page_text.strip())
+        if sum(len(part) for part in parts) > MAX_EXTRACTED_CHARACTERS:
+            raise ValueError("PDF 可抽取文本超过安全上限")
 
     text = "\n".join(parts).strip()
     if not text:
@@ -953,7 +975,7 @@ def extract_facts_rule_based(text: str) -> dict[str, Any]:
 def extract_facts_llm(text: str, user_id: Optional[int] = None) -> tuple[dict[str, Any] | None, str | None]:
     from app.services.llm_client import chat_completion_json, is_llm_enabled
 
-    if not is_llm_enabled(user_id):
+    if not is_llm_enabled(user_id, task="extract"):
         return None, "未配置 LLM，使用规则抽取"
 
     clipped = text[:6000]
@@ -1064,7 +1086,12 @@ def _scan_or_empty_warning(text: str) -> tuple[bool, str | None]:
     return False, None
 
 
-def extract_facts_from_document(filename: str, content: bytes) -> dict[str, Any]:
+def extract_facts_from_document(
+    filename: str,
+    content: bytes,
+    user_id: Optional[int] = None,
+    llm_consent: bool = False,
+) -> dict[str, Any]:
     try:
         text = read_upload_text(filename, content)
     except ValueError as exc:
@@ -1093,8 +1120,12 @@ def extract_facts_from_document(filename: str, content: bytes) -> dict[str, Any]
     # Stage A: rule-based extraction first
     rule_result = extract_facts_rule_based(text)
 
-    # Stage B: LLM fills gaps only
-    llm_result, llm_err = extract_facts_llm(text)
+    # Stage B: raw uploaded material leaves the process only after an
+    # authenticated user makes an explicit choice for this upload request.
+    if user_id and llm_consent:
+        llm_result, llm_err = extract_facts_llm(text, user_id=user_id)
+    else:
+        llm_result, llm_err = None, "未逐案同意，材料未发送给第三方 LLM"
     merged = _merge_rule_and_llm(rule_result, llm_result)
     if llm_err:
         merged["llm_skipped"] = llm_err
@@ -1360,6 +1391,8 @@ def detect_field_conflicts(file_results: list[tuple[str, dict[str, Any]]]) -> li
 
 def extract_documents_batch(
     uploads: list[tuple[str, bytes]],
+    user_id: Optional[int] = None,
+    llm_consent: bool = False,
 ) -> tuple[list[tuple[str, dict[str, Any]]], list[str], dict[str, Any], list[dict[str, Any]]]:
     if not uploads:
         raise ValueError("请至少上传一个文件")
@@ -1368,13 +1401,23 @@ def extract_documents_batch(
 
     total_bytes = sum(len(content) for _, content in uploads)
     if total_bytes > MAX_BATCH_TOTAL_BYTES:
-        raise ValueError("所有文件合计不能超过 2GB")
+        raise ValueError("所有文件合计不能超过 100MB")
 
     successes: list[tuple[str, dict[str, Any]]] = []
     failures: list[str] = []
     for filename, content in uploads:
         try:
-            successes.append((filename, extract_facts_from_document(filename, content)))
+            successes.append(
+                (
+                    filename,
+                    extract_facts_from_document(
+                        filename,
+                        content,
+                        user_id=user_id,
+                        llm_consent=llm_consent,
+                    ),
+                )
+            )
         except ValueError as exc:
             failures.append(f"{filename}: {exc}")
 

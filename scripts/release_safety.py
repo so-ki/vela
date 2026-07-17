@@ -145,6 +145,8 @@ ROOT_FILES = (
 
 EXPLICIT_RUNTIME_FILES = (
     "backend/.dockerignore",
+    "backend/alembic.ini",
+    "backend/requirements.lock",
     "backend/requirements-rag.txt",
     "backend/requirements.txt",
     "backend/app/__init__.py",
@@ -163,6 +165,11 @@ EXPLICIT_RUNTIME_FILES = (
     "backend/scripts/migrate_sqlite.py",
     "backend/scripts/propose_corpus_entry.py",
     "backend/scripts/container_entrypoint.py",
+    "backend/scripts/create_user.py",
+    "backend/scripts/render_official_pages_to_pdf.mjs",
+    "backend/scripts/run_ingestion_qa.py",
+    "backend/scripts/run_legal_quality_gate.py",
+    "backend/scripts/run_state_metadata_coverage.py",
     "backend/scripts/seed_demo_user.py",
     "frontend/.dockerignore",
     "frontend/index.html",
@@ -178,12 +185,14 @@ EXPLICIT_RUNTIME_FILES = (
 )
 
 PACKAGE_TREES = (
+    "backend/alembic",
     "backend/app/api",
     "backend/app/core",
     "backend/app/models",
     "backend/app/schemas",
     "backend/app/services",
     "backend/app/capability_packs/brazil_new_energy_greenfield",
+    "backend/evals",
     "docs",
     "frontend/public",
     "frontend/src",
@@ -209,7 +218,9 @@ PACKAGE_SUFFIXES = {
     ".css",
     ".html",
     ".json",
+    ".mako",
     ".md",
+    ".mjs",
     ".opml",
     ".png",
     ".py",
@@ -219,6 +230,8 @@ PACKAGE_SUFFIXES = {
     ".vue",
     ".xmind",
 }
+
+MARKDOWN_LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 
 
 class BoundaryError(RuntimeError):
@@ -587,16 +600,29 @@ def check_docker() -> None:
             errors.append(f"Docker context 传输了未被 COPY allowlist 使用的文件：{repo_relative}")
 
     prod_dockerfile = (ROOT / "docker/Dockerfile.backend.prod").read_text(encoding="utf-8")
+    frontend_prod_dockerfile = (ROOT / "docker/Dockerfile.frontend.prod").read_text(encoding="utf-8")
+    nginx_config = (ROOT / "docker/nginx.conf").read_text(encoding="utf-8")
     compose = (ROOT / "docker-compose.prod.yml").read_text(encoding="utf-8")
     dev_compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
     entrypoint = (ROOT / "backend/scripts/container_entrypoint.py").read_text(encoding="utf-8")
     vite_config = (ROOT / "frontend/vite.config.ts").read_text(encoding="utf-8")
-    if "ENV SEED_DEMO_USERS=false" not in prod_dockerfile:
-        errors.append("production demo seed 缺少默认关闭开关")
+    ci_workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    if "ENV SEED_DEMO_USERS" in prod_dockerfile:
+        errors.append("production image 不得暴露固定口令 demo seed 开关")
+    if "seed_demo_user.py" in prod_dockerfile:
+        errors.append("production image 不得携带固定口令 demo seed 脚本")
     if 'CMD ["python", "scripts/container_entrypoint.py"]' not in prod_dockerfile:
         errors.append("production image 未使用 fail-closed Python entrypoint")
-    if 'os.environ.get("SEED_DEMO_USERS", "false")' not in entrypoint:
-        errors.append("production demo seed 未受显式 true 条件保护")
+    if "COPY alembic.ini ./" not in prod_dockerfile or "COPY alembic ./alembic" not in prod_dockerfile:
+        errors.append("production image 未携带 Alembic 配置与迁移")
+    if '"alembic"' not in entrypoint or '"upgrade"' not in entrypoint or '"head"' not in entrypoint:
+        errors.append("production entrypoint 未在 Web 启动前执行 Alembic upgrade head")
+    if "VELA_ENTRYPOINT_MODE: migrate" not in compose:
+        errors.append("production compose 缺少一次性 migration service")
+    if "service_completed_successfully" not in compose:
+        errors.append("production Web 未等待 migration service 成功")
+    if "SEED_DEMO_USERS" in entrypoint or "SEED_DEMO_USERS:" in compose:
+        errors.append("production startup path 不得包含固定口令 demo seed 开关")
     if "vela_change_me" in compose or "POSTGRES_PASSWORD:-" in compose:
         errors.append("production compose 仍包含数据库密码默认值")
     if "POSTGRES_PASSWORD:?set POSTGRES_PASSWORD" not in compose:
@@ -605,18 +631,62 @@ def check_docker() -> None:
         errors.append("production compose 不得直接拼接 DATABASE_URL")
     if 'quote(database_password, safe="")' not in entrypoint:
         errors.append("production entrypoint 未 URL-encode 数据库密码")
-    if '_required("SECRET_KEY")' not in entrypoint or "len(secret_key) < 32" not in entrypoint:
+    if '_required("SECRET_KEY")' not in entrypoint or "is_weak_secret(secret_key, min_length=32" not in entrypoint:
         errors.append("production entrypoint 未 fail-closed 校验 SECRET_KEY")
     if '_required("POSTGRES_PASSWORD")' not in entrypoint:
         errors.append("production entrypoint 未 fail-closed 校验数据库密码")
-    if "SEED_DEMO_USERS: ${SEED_DEMO_USERS:-false}" not in compose:
-        errors.append("production compose 未默认关闭 demo seed")
-    if "${HTTP_BIND_ADDRESS:-0.0.0.0}:${HTTP_PORT:-8080}:80" not in compose:
-        errors.append("production compose 未提供显式 HTTP bind address")
+    if "127.0.0.1:${HTTP_PORT:-8080}:8080" not in compose:
+        errors.append("production compose 默认 HTTP bind address 未限制在 loopback")
+    frontend_block = compose.split("\n  frontend:\n", 1)[-1].split("\nvolumes:\n", 1)[0]
+    for marker, message in (
+        ("read_only: true", "production frontend 根文件系统未设为只读"),
+        ("cap_drop:", "production frontend 未移除 Linux capabilities"),
+        ("- ALL", "production frontend 未移除全部 Linux capabilities"),
+        ("no-new-privileges:true", "production frontend 未禁止提权"),
+        ("/tmp:rw,noexec,nosuid,size=192m", "production frontend 临时文件系统不足以承载 100 MiB 上传缓冲"),
+    ):
+        if marker not in frontend_block:
+            errors.append(message)
+    if "USER nginx" not in frontend_prod_dockerfile:
+        errors.append("production frontend image 未以 nginx 非 root 用户运行")
+    if "EXPOSE 8080" not in frontend_prod_dockerfile or "listen 8080;" not in nginx_config:
+        errors.append("production frontend 未使用非特权 8080 端口")
+    if "pid /tmp/nginx.pid" not in frontend_prod_dockerfile:
+        errors.append("production frontend 未把 Nginx PID 写入只读根文件系统之外")
+    if "FROM node:24-alpine AS build" not in frontend_prod_dockerfile:
+        errors.append("production frontend build 未使用受支持的 Node 24 LTS")
+    if "FROM nginx:1.30.4-alpine" not in frontend_prod_dockerfile:
+        errors.append("production frontend runtime 未使用已修复的 Nginx 1.30.4 stable")
+    for marker in ("proxy_read_timeout 180s;", "proxy_send_timeout 180s;", "client_body_timeout 180s;"):
+        if marker not in nginx_config:
+            errors.append(f"production Nginx 缺少上传/生成长请求边界：{marker}")
+    if "DEPLOYMENT_MODE: single_tenant" not in compose:
+        errors.append("production compose 未固定 single_tenant 受控试点边界")
+    if "INSTANCE_ORGANIZATION: ${INSTANCE_ORGANIZATION:?" not in compose:
+        errors.append("production compose 未强制绑定唯一试点组织")
+    if 'CORPUS_AGENT_ENABLED: "false"' not in compose:
+        errors.append("production compose 未关闭 Web 进程 corpus agent")
+    if 'LLM_POLISH_ENABLED: "false"' not in compose:
+        errors.append("production compose 未关闭受控试点 LLM polish")
+    if 'SSO_ENABLED: ${SSO_ENABLED:-false}' not in compose:
+        errors.append("production compose 未默认关闭未审计 SSO")
+    if 'ALLOW_OPEN_REGISTRATION: ${ALLOW_OPEN_REGISTRATION:-false}' not in compose:
+        errors.append("production compose 未默认关闭开放注册")
+    if 'RATE_LIMIT_ENABLED: "true"' not in compose:
+        errors.append("production compose 未启用认证速率限制")
+    if '"--workers",\n        "1"' not in entrypoint:
+        errors.append("production Web 进程未固定为单 worker")
     if '"127.0.0.1:8000:8000"' not in dev_compose or '"127.0.0.1:5173:5173"' not in dev_compose:
         errors.append("development compose 端口未限制在 loopback")
     if "env.VITE_API_PROXY || 'http://127.0.0.1:8000'" not in vite_config:
         errors.append("Vite dev proxy 未读取 VITE_API_PROXY")
+    if "production-compose-smoke:" not in ci_workflow or "bash scripts/prod_smoke.sh" not in ci_workflow:
+        errors.append("CI 缺少真实生产镜像、PostgreSQL migration 与 Compose smoke")
+    prod_smoke = (ROOT / "scripts/prod_smoke.sh").read_text(encoding="utf-8")
+    if "npm run test:e2e" not in prod_smoke or "playwright install --with-deps chromium" not in ci_workflow:
+        errors.append("生产 Compose smoke 未用真实浏览器覆盖构建后的 SPA 登录路径")
+    if re.search(r"uses:\s+actions/(?:checkout|setup-python|setup-node)@v\d", ci_workflow):
+        errors.append("CI 官方 Actions 仍使用可移动 major tag，必须固定到完整 commit SHA")
 
     if "backend/app/data/corpus_pending_review.json" in all_candidates:
         errors.append("pending corpus 出现在 Docker COPY 候选")
@@ -685,7 +755,52 @@ def _collect_package_files() -> dict[str, bytes]:
         for error in errors:
             print(f"ERROR package candidate: {error}", file=sys.stderr)
         raise BoundaryError(f"package allowlist check failed ({len(errors)} errors)")
+    _validate_internal_markdown_links(files)
     return files
+
+
+def _validate_internal_markdown_links(files: dict[str, bytes]) -> None:
+    """Reject links that point at files omitted from the release allowlist."""
+    available = set(files)
+    errors: list[str] = []
+    for relative, content in files.items():
+        if not relative.lower().endswith(".md"):
+            continue
+        text = content.decode("utf-8", errors="replace")
+        parent = Path(relative).parent
+        for raw_target in MARKDOWN_LINK.findall(text):
+            target = raw_target.strip().split("#", 1)[0].strip()
+            if not target or target.startswith(("http://", "https://", "mailto:")):
+                continue
+            target_path = (parent / target).as_posix()
+            normalized = Path(target_path)
+            if normalized.is_absolute() or ".." in normalized.parts:
+                # Resolve safe repo-relative ../ links without allowing escape.
+                normalized_parts: list[str] = []
+                escaped = False
+                for part in normalized.parts:
+                    if part in ("", "."):
+                        continue
+                    if part == "..":
+                        if not normalized_parts:
+                            escaped = True
+                            break
+                        normalized_parts.pop()
+                    else:
+                        normalized_parts.append(part)
+                if escaped:
+                    errors.append(f"markdown-link-escape: {relative} -> {raw_target}")
+                    continue
+                target_path = "/".join(normalized_parts)
+            else:
+                target_path = normalized.as_posix()
+            target_path = target_path.removeprefix("./")
+            if target_path not in available:
+                errors.append(f"markdown-link-missing: {relative} -> {raw_target}")
+    if errors:
+        for error in errors:
+            print(f"ERROR package candidate: {error}", file=sys.stderr)
+        raise BoundaryError(f"package Markdown link check failed ({len(errors)} errors)")
 
 
 def _zip_info(relative: str, mode: int = 0o644) -> zipfile.ZipInfo:
@@ -718,6 +833,29 @@ def _validated_output_path(output: Path) -> Path:
     return resolved
 
 
+def _write_sha256_sidecar(output: Path) -> tuple[str, Path]:
+    """Atomically publish a checksum sidecar for an already-built ZIP."""
+    digest = hashlib.sha256(output.read_bytes()).hexdigest()
+    sidecar = output.with_name(f"{output.name}.sha256")
+    descriptor, temporary_sidecar_name = tempfile.mkstemp(
+        dir=output.parent,
+        prefix=f".{output.name}.",
+        suffix=".tmp.sha256",
+    )
+    temporary_sidecar = Path(temporary_sidecar_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            stream.write(f"{digest}  {output.name}\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary_sidecar, sidecar)
+        sidecar.chmod(0o644)
+    finally:
+        if temporary_sidecar.exists():
+            temporary_sidecar.unlink()
+    return digest, sidecar
+
+
 def build_package(output: Path) -> None:
     files = _collect_package_files()
     manifest = "".join(f"{hashlib.sha256(content).hexdigest()}  {relative}\n" for relative, content in files.items())
@@ -738,11 +876,13 @@ def build_package(output: Path) -> None:
                 archive.writestr(_zip_info(relative, mode=mode), content)
         scan_package(temporary)
         os.replace(temporary, output)
+        output.chmod(0o644)
     finally:
         if temporary.exists():
             temporary.unlink()
-    digest = hashlib.sha256(output.read_bytes()).hexdigest()
+    digest, sidecar = _write_sha256_sidecar(output)
     print(f"OK submission ZIP: {output}")
+    print(f"OK SHA-256 sidecar: {sidecar}")
     print(f"OK entries: {len(files)}; sha256: {digest}")
 
 
@@ -871,6 +1011,7 @@ def scan_package(archive_path: Path) -> None:
     required = {
         "SUBMISSION_MANIFEST.sha256",
         "backend/app/capability_packs/brazil_new_energy_greenfield/manifest.json",
+        "docs/RELEASE_CANDIDATE.md",
         "docker/Dockerfile.backend.prod",
         "frontend/src/main.ts",
         "scripts/check_release_boundaries.sh",

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
+from starlette.concurrency import run_in_threadpool
 
 from app.core.deps import get_current_legal_user, get_current_user
 from app.core.roles import ROLE_ADMIN, ROLE_BUSINESS, ROLE_LEGAL, require_role
@@ -11,8 +12,11 @@ from app.schemas.onboarding import (
     InterviewAnswerRequest,
     InterviewCompleteRequest,
     InterviewStartResponse,
+    InterviewSyncRequest,
     OnboardingStatusResponse,
     PlaybookProfileResponse,
+    QUESTION_ID_PATTERN,
+    SessionId,
 )
 from app.services.cold_start_service import (
     complete_interview,
@@ -25,6 +29,7 @@ from app.services.cold_start_service import (
     sync_interview_answers,
     upload_interview_attachment,
 )
+from app.services.upload_security import read_upload_limited
 
 router = APIRouter(prefix="/onboarding", tags=["冷启动与 Playbook"])
 
@@ -84,13 +89,16 @@ def onboarding_status(current_user: User = Depends(get_current_user)):
 
 @router.post("/interview/start", response_model=InterviewStartResponse)
 def interview_start(current_user: User = Depends(get_current_legal_user)):
-    result = start_interview(current_user.id)
+    try:
+        result = start_interview(current_user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
     return InterviewStartResponse(**result)
 
 
 @router.post("/interview/{session_id}/answer")
 def interview_answer(
-    session_id: str,
+    session_id: SessionId,
     body: InterviewAnswerRequest,
     current_user: User = Depends(get_current_legal_user),
 ):
@@ -102,33 +110,46 @@ def interview_answer(
 
 @router.post("/interview/{session_id}/sync")
 def interview_sync(
-    session_id: str,
-    body: dict[str, Any],
+    session_id: SessionId,
+    body: InterviewSyncRequest,
     current_user: User = Depends(get_current_legal_user),
 ):
-    answers = body.get("answers") or {}
     try:
-        return sync_interview_answers(session_id, current_user.id, answers)
+        return sync_interview_answers(session_id, current_user.id, body.answers)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.post("/interview/{session_id}/upload")
 async def interview_upload(
-    session_id: str,
+    session_id: SessionId,
     file: UploadFile = File(...),
-    purpose: str = Query(default="general"),
+    purpose: str = Query(
+        default="general",
+        min_length=1,
+        max_length=64,
+        pattern=QUESTION_ID_PATTERN,
+    ),
     parse: bool = Query(default=True),
-    parse_into: Optional[str] = Query(default=None),
-    merge_mode: str = Query(default="append"),
+    parse_into: Optional[str] = Query(
+        default=None,
+        min_length=1,
+        max_length=64,
+        pattern=QUESTION_ID_PATTERN,
+    ),
+    merge_mode: Literal["append", "replace"] = Query(default="append"),
     current_user: User = Depends(get_current_legal_user),
 ):
-    content = await file.read()
+    try:
+        content = await read_upload_limited(file)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     if len(content) < 10:
         raise HTTPException(status_code=400, detail="文件过短或为空")
     try:
-        return upload_interview_attachment(
-            session_id,
+        return await run_in_threadpool(
+            upload_interview_attachment,
+            str(session_id),
             current_user.id,
             purpose=purpose,
             filename=file.filename or "upload.bin",
@@ -178,17 +199,24 @@ def interview_complete(body: InterviewCompleteRequest, current_user: User = Depe
 @router.post("/templates")
 async def upload_template(
     file: UploadFile = File(...),
-    session_id: Optional[str] = None,
+    session_id: Optional[SessionId] = Query(default=None),
     current_user: User = Depends(get_current_legal_user),
 ):
-    content = await file.read()
+    try:
+        content = await read_upload_limited(file)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     if len(content) < 20:
         raise HTTPException(status_code=400, detail="模板文件过短")
-    meta = save_playbook_template(
-        current_user.id,
-        session_id=session_id,
-        filename=file.filename or "template.docx",
-        content=content,
-        purpose="general",
-    )
+    try:
+        meta = await run_in_threadpool(
+            save_playbook_template,
+            current_user.id,
+            session_id=str(session_id) if session_id is not None else None,
+            filename=file.filename or "template.docx",
+            content=content,
+            purpose="general",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     return meta

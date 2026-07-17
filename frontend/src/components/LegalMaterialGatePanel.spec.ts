@@ -72,8 +72,8 @@ describe('LegalMaterialGatePanel frozen behavior', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('能力包身份不一致')
-    expect(wrapper.text()).toContain('待重新验证的能力包')
-    expect(wrapper.text()).not.toContain('正式支持')
+    expect(wrapper.text()).toContain('待工程复核的能力包')
+    expect(wrapper.text()).not.toContain('工程可用')
     expect(wrapper.find('input[type="checkbox"]').attributes('disabled')).toBeDefined()
     expect(api.generateInvestigationPack).not.toHaveBeenCalled()
   })
@@ -118,9 +118,9 @@ describe('LegalMaterialGatePanel frozen behavior', () => {
     })
     await flushPromises()
 
-    expect(wrapper.text()).toContain('已冻结能力包')
+    expect(wrapper.text()).toContain('已冻结试点能力包')
     expect(wrapper.text()).toContain('巴西 · 新能源制造 · 绿地设厂')
-    expect(wrapper.text()).toContain('版本 1.0.0')
+    expect(wrapper.text()).toContain('版本 1.3.0')
     const retry = wrapper.find('button.btn-primary')
     expect(retry.attributes('disabled')).toBeUndefined()
     await retry.trigger('click')

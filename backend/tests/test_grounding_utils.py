@@ -28,7 +28,16 @@ def test_verify_snippet_exact_match():
     result = verify_snippet_in_source(snippet, source)
     assert result["grounded"] is True
     assert result["grounding_score"] >= 0.55
-    assert result["citation_status"] == "corpus_verified"
+    assert result["citation_status"] == "excerpt_matched"
+
+
+def test_matching_prefix_with_fabricated_tail_is_not_grounded():
+    source = "a" * 120 + " official source ending"
+    snippet = "a" * 100 + " fabricated legal conclusion"
+    result = verify_snippet_in_source(snippet, source)
+    assert result["grounded"] is False
+    assert result["full_excerpt_match"] is False
+    assert result["citation_status"] != "excerpt_matched"
 
 
 def test_verify_snippet_empty_excerpt():

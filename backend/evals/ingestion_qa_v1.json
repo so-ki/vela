@@ -1,0 +1,191 @@
+{
+  "anchor_omission_rate": 0.1667,
+  "decision": "invalid_pre_registered_anchors_no_ingestion_decision",
+  "expected_anchor_count": 30,
+  "experiment_id": "ingestion-qa-v1",
+  "limitations": "This is not character error rate, OCR accuracy, legal completeness, amendment completeness or legal validity. It only checks whether 30 pre-registered title/article/topic anchors survive the PDF ingestion path.",
+  "matched_anchor_count": 25,
+  "metric": "manually_annotated_anchor_omission_rate",
+  "observed_at": "2026-07-17",
+  "omitted_anchor_count": 5,
+  "pre_registered_maximum_omission_rate": 0.05,
+  "raw_pipeline_decision_before_invalidation": "pdf_ingestion_requires_manual_source_comparison_and_no_consistency_claim",
+  "status": "invalidated_after_source_anchor_validation",
+  "invalidation": {
+    "checked_at": "2026-07-17",
+    "reason": "Five pre-registered anchors were absent from the official HTML before PDF rendering, so their misses cannot measure PDF ingestion loss.",
+    "affected_targets": {
+      "decreto-8468-1976": ["Decreto nº 8.468, de 8 de setembro de 1976"],
+      "decreto-69120-2024": ["Decreto nº 69.120, de 9 de dezembro de 2024"],
+      "decreto-64512-2019": ["Decreto nº 64.512, de 3 de outubro de 2019"],
+      "decreto-53205-2008": [
+        "Decreto nº 53.205, de 3 de julho de 2008",
+        "termelétricas ou co-geradoras de energia"
+      ]
+    },
+    "superseded_by": "ingestion-qa-v2"
+  },
+  "results": [
+    {
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/lei/1976/compilacao-lei-997-31.05.1976.html",
+      "error": null,
+      "expected_anchor_count": 3,
+      "extracted_characters": 13708,
+      "id": "lei-997-1976-compilacao",
+      "instrument": "Lei nº 997, de 31 de maio de 1976",
+      "matched_anchor_count": 3,
+      "missed_anchors": [],
+      "pdf_bytes": 131615,
+      "pdf_sha256": "6bef81b99564c57c87ccb58f52bfbce7eb389cc8ecaa3fbedac77dbfde5ba589",
+      "source_text_characters": 13773,
+      "source_text_sha256": "feede85300bfbd3b458a5e2ef5c227df62b360529c9219ec5b04195bc9eac40e",
+      "source_type": "official_html_rendered_pdf"
+    },
+    {
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/1976/decreto-8468-08.09.1976.html",
+      "error": null,
+      "expected_anchor_count": 3,
+      "extracted_characters": 140795,
+      "id": "decreto-8468-1976",
+      "instrument": "Decreto nº 8.468, de 8 de setembro de 1976",
+      "matched_anchor_count": 2,
+      "missed_anchors": [
+        "Decreto nº 8.468, de 8 de setembro de 1976"
+      ],
+      "pdf_bytes": 2531834,
+      "pdf_sha256": "50ffd66b4f75180cadd0d63d2ef22e25d2e2f257c3176b853fc9e9e1bfafed7f",
+      "source_text_characters": 143589,
+      "source_text_sha256": "14337e1cf84a029f6a7eabb6becc2367d9ee74e5ff01addbdc02c929c5ae21d5",
+      "source_type": "official_html_rendered_pdf"
+    },
+    {
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/2024/decreto-69120-09.12.2024.html",
+      "error": null,
+      "expected_anchor_count": 3,
+      "extracted_characters": 11515,
+      "id": "decreto-69120-2024",
+      "instrument": "Decreto nº 69.120, de 9 de dezembro de 2024",
+      "matched_anchor_count": 2,
+      "missed_anchors": [
+        "Decreto nº 69.120, de 9 de dezembro de 2024"
+      ],
+      "pdf_bytes": 86953,
+      "pdf_sha256": "c8d03e67ffc8eabc82689e41421625d5674cc25f3da043235c8d0cb337958d26",
+      "source_text_characters": 11637,
+      "source_text_sha256": "f02bf22cc57e70a8515262d0aeee25da93d0f108af85f4336c22617b5c279332",
+      "source_type": "official_html_rendered_pdf"
+    },
+    {
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/2019/decreto-64512-03.10.2019.html",
+      "error": null,
+      "expected_anchor_count": 3,
+      "extracted_characters": 8613,
+      "id": "decreto-64512-2019",
+      "instrument": "Decreto nº 64.512, de 3 de outubro de 2019",
+      "matched_anchor_count": 2,
+      "missed_anchors": [
+        "Decreto nº 64.512, de 3 de outubro de 2019"
+      ],
+      "pdf_bytes": 87806,
+      "pdf_sha256": "8d6d9a5ffa7b2cffda225cb15a847e313e0b5f047bfe4759ade192af80dbbaba",
+      "source_text_characters": 8661,
+      "source_text_sha256": "5501699f15920e785eb2a70c68de851800f6dc505808c754e9cfcc0d6c07c822",
+      "source_type": "official_html_rendered_pdf"
+    },
+    {
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/2018/decreto-63296-21.03.2018.html",
+      "error": null,
+      "expected_anchor_count": 3,
+      "extracted_characters": 3054,
+      "id": "decreto-63296-2018",
+      "instrument": "Decreto nº 63.296, de 21 de março de 2018",
+      "matched_anchor_count": 3,
+      "missed_anchors": [],
+      "pdf_bytes": 76120,
+      "pdf_sha256": "37729127cfa49eeb0c7df7bf7308b4deb5faa0c9b45dc0d314d1d7949293ceb2",
+      "source_text_characters": 3125,
+      "source_text_sha256": "26a6e581e630ec1e7057c2486e9aa355274cef873156f331c258217cb8be1300",
+      "source_type": "official_html_rendered_pdf"
+    },
+    {
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/2017/decreto-63119-27.12.2017.html",
+      "error": null,
+      "expected_anchor_count": 3,
+      "extracted_characters": 1391,
+      "id": "decreto-63119-2017",
+      "instrument": "Decreto nº 63.119, de 27 de dezembro de 2017",
+      "matched_anchor_count": 3,
+      "missed_anchors": [],
+      "pdf_bytes": 71685,
+      "pdf_sha256": "0a31dea3f26eaddd45a757d32718df8dec5e1257e313747265509f80ebac462e",
+      "source_text_characters": 1438,
+      "source_text_sha256": "e21cd49c6298423ee439118fa64465b4f5c4055dc4685175a7528c46293a0cae",
+      "source_type": "official_html_rendered_pdf"
+    },
+    {
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/2017/decreto-62973-28.11.2017.html",
+      "error": null,
+      "expected_anchor_count": 3,
+      "extracted_characters": 25466,
+      "id": "decreto-62973-2017",
+      "instrument": "Decreto nº 62.973, de 28 de novembro de 2017",
+      "matched_anchor_count": 3,
+      "missed_anchors": [],
+      "pdf_bytes": 1315196,
+      "pdf_sha256": "887dc06c913d4353fa66f3c79c8f7f154ae47be6b27010ed7033916473711f64",
+      "source_text_characters": 25991,
+      "source_text_sha256": "6d6ff6adc8e5b49fd258c345d0e29e35705968016c1864fd5e755976e7a47182",
+      "source_type": "official_html_rendered_pdf"
+    },
+    {
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/2013/decreto-59113-23.04.2013.html",
+      "error": null,
+      "expected_anchor_count": 3,
+      "extracted_characters": 44018,
+      "id": "decreto-59113-2013",
+      "instrument": "Decreto nº 59.113, de 23 de abril de 2013",
+      "matched_anchor_count": 3,
+      "missed_anchors": [],
+      "pdf_bytes": 160968,
+      "pdf_sha256": "87ff89d5fa6b2621a947c17abc4d55d5eaf0ee4e5d6a2efc567c1949e3518429",
+      "source_text_characters": 44026,
+      "source_text_sha256": "446f4559a687b41570b29f7800c27fa0f40bf8de28c049af4f39165309a64dc6",
+      "source_type": "official_html_rendered_pdf"
+    },
+    {
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/2009/decreto-54487-26.06.2009.pdf",
+      "error": null,
+      "expected_anchor_count": 3,
+      "extracted_characters": 14415,
+      "id": "decreto-54487-2009",
+      "instrument": "Decreto nº 54.487, de 26 de junho de 2009",
+      "matched_anchor_count": 3,
+      "missed_anchors": [],
+      "pdf_bytes": 282673,
+      "pdf_sha256": "6eba6ddce9e466e7a83e35b7f0fb6dedfa8b314f86526d55fbe9a2d93b9e45e0",
+      "source_text_characters": null,
+      "source_text_sha256": null,
+      "source_type": "official_native_pdf"
+    },
+    {
+      "document_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/2008/decreto-53205-03.07.2008.html",
+      "error": null,
+      "expected_anchor_count": 3,
+      "extracted_characters": 3622,
+      "id": "decreto-53205-2008",
+      "instrument": "Decreto nº 53.205, de 3 de julho de 2008",
+      "matched_anchor_count": 1,
+      "missed_anchors": [
+        "Decreto nº 53.205, de 3 de julho de 2008",
+        "termelétricas ou co-geradoras de energia"
+      ],
+      "pdf_bytes": 79989,
+      "pdf_sha256": "d71334301dd084bf4e8311fe825522c854029ee5df37c1fb2206c4d653ae25c7",
+      "source_text_characters": 3770,
+      "source_text_sha256": "33576b10b8c09fdeb5b33fbab31647faddebeadff9105c0239069e3ba9cd84fe",
+      "source_type": "official_html_rendered_pdf"
+    }
+  ],
+  "sample_size": 10,
+  "targets_sha256": "b023cb266bea36c3970f70cd339563e8509a1755fe41a1b8633542f7fc64f2f9"
+}

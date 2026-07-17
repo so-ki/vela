@@ -11,9 +11,11 @@ export interface CapabilityPackIdentity {
   version: string
   pack_hash: string
   status: string
+  content_status: 'provisional' | 'expert_verified'
   display_name: string
   description: string
   country: string
+  state: string
   industry: string
   action_type: string
   languages: string[]
@@ -24,9 +26,11 @@ export interface CapabilityPackDisplay {
   version: string
   pack_hash: string
   status: string
+  content_status?: 'provisional' | 'expert_verified'
   display_name: string
   description?: string
   country?: string
+  state?: string
   industry?: string
   action_type?: string
   languages?: string[]
@@ -266,7 +270,9 @@ export interface LegalHit {
   vector_similarity: number
   keyword_overlap: number
   requires_review: boolean
-  citation_status?: 'corpus_verified' | 'weak_grounding' | 'ungrounded'
+  review_status?: 'expert_verified' | 'provisional' | 'pending' | 'quarantined'
+  verification_scope?: string
+  citation_status?: 'excerpt_matched' | 'corpus_verified' | 'weak_grounding' | 'ungrounded'
   grounding_score?: number
   grounded?: boolean
 }
@@ -415,6 +421,8 @@ export interface GroundingReport {
   total_hits?: number
   grounded_hits?: number
   grounding_rate?: number
+  excerpt_consistency_rate?: number
+  verification_scope?: string
   ungrounded_codes?: string[]
   requires_legal_check?: boolean
 }
@@ -622,6 +630,7 @@ export interface DocumentExtractSnapshot {
     stored_name: string
     size: number
     content_type?: string
+    content_screening?: string
     archived_at?: string | null
   }>
 }
@@ -764,7 +773,9 @@ export interface BriefCitation {
   url: string
   match_score: number
   requires_review: boolean
-  citation_status?: 'corpus_verified' | 'weak_grounding' | 'ungrounded'
+  review_status?: 'expert_verified' | 'provisional' | 'pending' | 'quarantined'
+  verification_scope?: string
+  citation_status?: 'excerpt_matched' | 'corpus_verified' | 'weak_grounding' | 'ungrounded'
   grounding_score?: number
   grounded?: boolean
 }
@@ -824,6 +835,10 @@ export interface ReviewItem {
   external_counsel_required?: boolean
   legal_hits?: LegalHit[]
   reviewed_at?: string | null
+  reviewer_id?: number | null
+  reviewer_name?: string | null
+  manual_override?: boolean
+  review_revision?: number | null
   carry_forward?: boolean
   invalidated?: boolean
 }
@@ -832,6 +847,7 @@ export interface ReviewState {
   scenario_id: number
   status: string
   reviewer_name: string
+  reviewer_id?: number | null
   started_at: string
   finalized_at?: string | null
   items: ReviewItem[]
@@ -842,4 +858,8 @@ export interface ReviewState {
   can_export: boolean
   can_return_to_business?: boolean
   version_label?: string | null
+  revision: number
+  last_changed_at?: string | null
+  last_changed_by_id?: number | null
+  last_changed_by_name?: string | null
 }

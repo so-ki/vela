@@ -4,6 +4,7 @@ import { fileURLToPath, URL } from 'node:url'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  const apiProxy = env.VITE_API_PROXY || 'http://127.0.0.1:8000'
 
   return {
     plugins: [vue()],
@@ -17,7 +18,18 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       proxy: {
         '/api': {
-          target: env.VITE_API_PROXY || 'http://127.0.0.1:8000',
+          target: apiProxy,
+          changeOrigin: true,
+        },
+      },
+    },
+    preview: {
+      host: '127.0.0.1',
+      port: 4173,
+      strictPort: true,
+      proxy: {
+        '/api': {
+          target: apiProxy,
           changeOrigin: true,
         },
       },

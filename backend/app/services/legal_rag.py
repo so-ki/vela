@@ -8,11 +8,17 @@ from sqlalchemy.orm import Session
 
 from app.core.chroma_client import _chroma_available
 from app.services.corpus_text_cleaner import excerpt_for_display, text_for_retrieval
-from app.services.legal_ingest import load_corpus
+from app.services.legal_ingest import corpus_review_status, load_corpus, retrievable_corpus_sources
 
 SOURCE_LABELS = {
     "lexml": "LexML Brasil",
     "planalto-legislacao": "Planalto 立法",
+    "alesp": "圣保罗州议会官方立法库",
+    "apexbrasil": "ApexBrasil 官方门户",
+    "gov-br": "Gov.br 官方门户",
+    "investsp": "InvestSP 官方门户",
+    "sefaz-sp": "圣保罗州财政与规划厅官方门户",
+    "campinas": "坎皮纳斯市政府官方门户",
     "stf": "STF 最高法院",
     "stj": "STJ 高等司法法院",
     "trabalho": "劳动与就业部 gov.br",
@@ -48,10 +54,17 @@ def _score_doc(
     return score
 
 
-def _format_hit(doc: dict[str, Any], match_score: float, item_code: str, *, match_threshold: int = 70) -> dict[str, Any]:
+def _format_hit(
+    doc: dict[str, Any],
+    match_score: float,
+    item_code: str,
+    *,
+    match_threshold: int = 70,
+    review_status: str = "pending",
+) -> dict[str, Any]:
     source = doc.get("source", "lexml")
     excerpt_pt, excerpt_zh = excerpt_for_display(doc)
-    requires_review = match_score < match_threshold
+    requires_review = match_score < match_threshold or review_status != "expert_verified"
     return {
         "id": doc["id"],
         "source": source,
@@ -69,6 +82,19 @@ def _format_hit(doc: dict[str, Any], match_score: float, item_code: str, *, matc
         "vector_similarity": 0.0,
         "keyword_overlap": round(match_score / 100, 3),
         "requires_review": requires_review,
+        "review_status": review_status,
+        "verification_scope": doc.get("verification_scope")
+        or (
+            "expert-reviewed source metadata"
+            if review_status == "expert_verified"
+            else "provisional corpus entry"
+        ),
+        "authority": doc.get("authority", ""),
+        "instrument_type": doc.get("instrument_type", ""),
+        "pinpoint": doc.get("pinpoint", ""),
+        "status_as_of": doc.get("status_as_of", ""),
+        "last_verified_at": doc.get("last_verified_at", ""),
+        "official_url": doc.get("official_url") or doc.get("url", ""),
     }
 
 
@@ -86,14 +112,23 @@ def _retrieve_keyword(
     corpus = load_corpus(corpus_path)
     query_tokens = _tokenize(f"{title} {description} {dimension} {item_code}")
     scored: list[tuple[float, dict[str, Any]]] = []
-    for doc in corpus["sources"]:
+    for doc in retrievable_corpus_sources(corpus):
         if doc.get("validity") in ("revogado", "repealed", "revoked"):
             continue
         s = _score_doc(doc, item_code=item_code, dimension=dimension, query_tokens=query_tokens)
         if s >= min_keyword_score:
             scored.append((s, doc))
     scored.sort(key=lambda x: x[0], reverse=True)
-    return [_format_hit(doc, score, item_code, match_threshold=match_threshold) for score, doc in scored[:top_k]]
+    return [
+        _format_hit(
+            doc,
+            score,
+            item_code,
+            match_threshold=match_threshold,
+            review_status=corpus_review_status(corpus, doc),
+        )
+        for score, doc in scored[:top_k]
+    ]
 
 
 def query_corpus_readonly(
@@ -133,7 +168,7 @@ def _retrieve_chroma(
     from app.core.chroma_client import get_legal_collection
 
     corpus = load_corpus(corpus_path)
-    by_id = {d["id"]: d for d in corpus["sources"]}
+    by_id = {d["id"]: d for d in retrievable_corpus_sources(corpus)}
     query_text = f"{title} {description} {dimension}"
     collection = get_legal_collection()
     if collection.count() == 0:
@@ -162,10 +197,20 @@ def _retrieve_chroma(
         base = max(0.0, (1.0 - distance) * 60)
         boost = 35.0 if item_code in codes else 0.0
         full = by_id.get(doc_id, {})
+        if not full:
+            # A stale vector index may still contain a now-quarantined id.
+            # Missing active metadata is therefore fail-closed, never a hit.
+            continue
         if full.get("validity") in ("revogado", "repealed", "revoked"):
             continue
         hits.append(
-            _format_hit(full or {"id": doc_id, **meta}, base + boost, item_code, match_threshold=match_threshold)
+            _format_hit(
+                full,
+                base + boost,
+                item_code,
+                match_threshold=match_threshold,
+                review_status=corpus_review_status(corpus, full),
+            )
         )
 
     hits.sort(key=lambda h: h["match_score"], reverse=True)

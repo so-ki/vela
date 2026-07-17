@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Optional
 
+from app.core.secure_json_store import atomic_write_json, synchronized_json_store
+
 DEVIATIONS_PATH = Path(__file__).resolve().parents[2] / "data" / "playbook_deviations.json"
 MAX_GLOBAL = 200
 
@@ -24,9 +26,41 @@ def _load_global() -> list[dict[str, Any]]:
 
 
 def _save_global(deviations: list[dict[str, Any]]) -> None:
-    DEVIATIONS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(DEVIATIONS_PATH, "w", encoding="utf-8") as f:
-        json.dump({"deviations": deviations[:MAX_GLOBAL]}, f, ensure_ascii=False, indent=2)
+    atomic_write_json(DEVIATIONS_PATH, {"deviations": deviations[:MAX_GLOBAL]})
+
+
+def build_deviation_entry(
+    *,
+    scenario_id: int,
+    project_name: str,
+    code: str,
+    title: str,
+    comment: Optional[str],
+    reviewer_name: str,
+    match_score: float = 0.0,
+    gate_status: str = "",
+) -> dict[str, Any]:
+    return {
+        "id": f"{scenario_id}-{code}-{_utcnow_iso()[:19]}",
+        "scenario_id": scenario_id,
+        "project_name": project_name,
+        "code": code,
+        "title": title,
+        "comment": comment,
+        "reviewer_name": reviewer_name,
+        "match_score": match_score,
+        "gate_status": gate_status,
+        "recorded_at": _utcnow_iso(),
+        "playbook_hint": "累计驳回可反馈至规则包 checklist 或法源 binding 调整",
+    }
+
+
+@synchronized_json_store
+def persist_deviation_entry(entry: dict[str, Any]) -> None:
+    """Persist a previously built entry after the database mutation commits."""
+    global_list = _load_global()
+    global_list.insert(0, entry)
+    _save_global(global_list)
 
 
 def record_deviation(
@@ -40,22 +74,18 @@ def record_deviation(
     match_score: float = 0.0,
     gate_status: str = "",
 ) -> dict[str, Any]:
-    entry = {
-        "id": f"{scenario_id}-{code}-{_utcnow_iso()[:19]}",
-        "scenario_id": scenario_id,
-        "project_name": project_name,
-        "code": code,
-        "title": title,
-        "comment": comment,
-        "reviewer_name": reviewer_name,
-        "match_score": match_score,
-        "gate_status": gate_status,
-        "recorded_at": _utcnow_iso(),
-        "playbook_hint": "累计驳回可反馈至规则包 checklist 或法源 binding 调整",
-    }
-    global_list = _load_global()
-    global_list.insert(0, entry)
-    _save_global(global_list)
+    """Backward-compatible one-shot persistence for non-transactional callers."""
+    entry = build_deviation_entry(
+        scenario_id=scenario_id,
+        project_name=project_name,
+        code=code,
+        title=title,
+        comment=comment,
+        reviewer_name=reviewer_name,
+        match_score=match_score,
+        gate_status=gate_status,
+    )
+    persist_deviation_entry(entry)
     return entry
 
 

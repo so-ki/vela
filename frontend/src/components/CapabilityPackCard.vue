@@ -15,12 +15,17 @@ const props = withDefaults(
 )
 
 const isFrozen = computed(() => props.frozen || props.pack?.status === 'frozen')
-const isVerified = computed(() => isFrozen.value || props.pack?.status === 'active')
+const isOperational = computed(() => isFrozen.value || props.pack?.status === 'active')
 const eyebrow = computed(() =>
-  isFrozen.value ? '已冻结能力包' : isVerified.value ? '当前已验证能力包' : '待重新验证的能力包',
+  isFrozen.value ? '已冻结试点能力包' : isOperational.value ? '当前受控试点能力包' : '待工程复核的能力包',
 )
 const statusLabel = computed(() =>
-  isFrozen.value ? '已冻结' : isVerified.value ? '正式支持' : '待重新验证',
+  isFrozen.value ? '工程配置已冻结' : isOperational.value ? '工程可用' : '待工程复核',
+)
+const boundaryLabel = computed(() =>
+  props.pack?.content_status === 'expert_verified'
+    ? '当前仅覆盖上述场景的受控试点流程；工程状态不等同于正式法律意见。'
+    : '当前仅覆盖上述场景的受控试点流程；法律内容为临时版本，须由巴西执业律师或相关专家逐项复核。',
 )
 </script>
 
@@ -35,16 +40,14 @@ const statusLabel = computed(() =>
       <h2>{{ pack.display_name }}</h2>
       <div class="capability-pack-meta">
         <span>版本 {{ pack.version }}</span>
-        <span class="badge" :class="{ ok: isVerified }">{{ statusLabel }}</span>
+        <span class="badge" :class="{ ok: isOperational }">{{ statusLabel }}</span>
       </div>
       <p v-if="pack.description && !compact" class="muted">{{ pack.description }}</p>
-      <p class="muted capability-pack-boundary">
-        当前 MVP 仅对该能力包提供完整法律协查支持。
-      </p>
+      <p class="muted capability-pack-boundary">{{ boundaryLabel }}</p>
     </template>
     <template v-else>
       <h2>能力包加载失败</h2>
-      <p class="error">无法验证当前正式能力包，已禁止确认与提交，请刷新重试。</p>
+      <p class="error">无法加载当前受控试点能力包，已禁止确认与提交，请刷新重试。</p>
     </template>
     <slot />
   </section>

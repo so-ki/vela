@@ -74,6 +74,7 @@ export function capabilityPackFromCatalog(
     !hasIdentityString(pack.pack_hash) ||
     !hasIdentityString(pack.display_name) ||
     !hasIdentityString(pack.country) ||
+    !hasIdentityString(pack.state) ||
     !hasIdentityString(pack.industry) ||
     !hasIdentityString(pack.action_type) ||
     !Array.isArray(pack.languages)
@@ -132,7 +133,9 @@ export function capabilityPackFromProposal(
     status: matchedCatalog ? 'active' : 'unverified',
     display_name: proposal.labels?.pack || matchedCatalog?.display_name || proposal.pack_id,
     description: matchedCatalog?.description,
+    content_status: matchedCatalog?.content_status,
     country: proposal.labels?.country || proposal.country,
+    state: matchedCatalog?.state || proposal.state,
     industry: proposal.labels?.industry || proposal.industry,
     action_type: proposal.labels?.action_type || proposal.action_type,
     languages: matchedCatalog?.languages,
@@ -158,6 +161,7 @@ export function capabilityPackFromSnapshot(
     status: 'frozen',
     display_name: labels?.pack || snapshot.capability_pack_id,
     country: labels?.country || snapshot.country,
+    state: snapshot.state,
     industry: labels?.industry || snapshot.industry,
     action_type: labels?.action_type || snapshot.action_type,
   }

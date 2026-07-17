@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, Date, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON
 
@@ -12,6 +12,12 @@ from app.core.database import Base
 
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _next_checklist_revision(current: int | None) -> int:
+    """Start new rows at revision 0 and increment every ORM update."""
+
+    return 0 if current is None else current + 1
 
 
 class InvestigationScenario(Base):
@@ -106,7 +112,21 @@ class ComplianceChecklist(Base):
     title: Mapped[str] = mapped_column(String(512), nullable=False)
     version: Mapped[str] = mapped_column(String(16), default="v0.1", nullable=False)
     payload: Mapped[dict] = mapped_column(JSON, nullable=False)
+    revision: Mapped[int] = mapped_column(
+        Integer,
+        default=0,
+        server_default=text("0"),
+        nullable=False,
+    )
     total_items: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
 
     scenario: Mapped[InvestigationScenario] = relationship(back_populates="checklist")
+
+    # SQLAlchemy adds ``AND revision = :previous_revision`` to every ORM
+    # UPDATE.  This protects the entire JSON document even when a legacy call
+    # site assigns ``payload`` directly instead of using an endpoint helper.
+    __mapper_args__ = {
+        "version_id_col": revision,
+        "version_id_generator": _next_checklist_revision,
+    }

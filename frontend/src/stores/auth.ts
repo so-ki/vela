@@ -26,7 +26,8 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = accessToken
     user.value = userData
     try {
-      localStorage.setItem('vela_token', accessToken)
+      localStorage.removeItem('vela_token')
+      sessionStorage.setItem('vela_token', accessToken)
     } catch {
       /* Safari 隐私模式等场景可能禁用 storage */
     }
@@ -37,6 +38,7 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
     try {
       localStorage.removeItem('vela_token')
+      sessionStorage.removeItem('vela_token')
     } catch {
       /* ignore */
     }
@@ -102,7 +104,9 @@ export const useAuthStore = defineStore('auth', () => {
 
 function readStoredToken(): string | null {
   try {
-    return localStorage.getItem('vela_token')
+    const legacyToken = localStorage.getItem('vela_token')
+    if (legacyToken) localStorage.removeItem('vela_token')
+    return sessionStorage.getItem('vela_token')
   } catch {
     return null
   }

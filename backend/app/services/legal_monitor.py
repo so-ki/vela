@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from app.core.secure_json_store import atomic_write_json, synchronized_json_store
 from app.services.legal_ingest import INDEX_FLAG, ingest_corpus, load_corpus
 
 MONITOR_PATH = Path(__file__).resolve().parents[2] / "data" / "legal_monitor.json"
@@ -60,9 +61,7 @@ def _load_state() -> dict[str, Any]:
 
 
 def _save_state(state: dict[str, Any]) -> None:
-    MONITOR_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(MONITOR_PATH, "w", encoding="utf-8") as f:
-        json.dump(state, f, ensure_ascii=False, indent=2)
+    atomic_write_json(MONITOR_PATH, state)
 
 
 def _collect_checklist_codes(payload: dict[str, Any] | None) -> list[str]:
@@ -119,6 +118,7 @@ def compute_corpus_diff(*, prev_snapshot: dict[str, str] | None = None) -> dict[
     }
 
 
+@synchronized_json_store
 def upsert_scenario_subscription(
     scenario_id: int,
     project_name: str,
@@ -182,6 +182,7 @@ def get_monitor_status() -> dict[str, Any]:
     }
 
 
+@synchronized_json_store
 def scan_regulatory_updates(*, force_reindex: bool = False) -> dict[str, Any]:
     corpus = load_corpus()
     state = _load_state()

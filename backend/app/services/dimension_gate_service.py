@@ -6,7 +6,12 @@ import re
 from typing import Any, Optional
 
 from app.models.scenario import InvestigationScenario
-from app.services.legal_ingest import load_corpus
+from app.services.corpus_text_cleaner import excerpt_for_display
+from app.services.legal_ingest import (
+    corpus_review_status,
+    load_corpus,
+    retrievable_corpus_sources,
+)
 from app.services.legal_rag import SOURCE_LABELS
 from app.services.material_review_service import (
     _field_value_from_scenario,
@@ -158,8 +163,10 @@ def _law_preview_for_dimension(
     query_tokens = {t for t in query_tokens if len(t) >= 2}
 
     scored: list[tuple[float, dict[str, Any]]] = []
-    for doc in corpus_data.get("sources", []):
+    for doc in retrievable_corpus_sources(corpus_data):
         if doc.get("dimension") != dimension_id:
+            continue
+        if doc.get("validity") in {"revogado", "repealed", "revoked"}:
             continue
         score = 15.0
         doc_codes = set(doc.get("checklist_codes") or [])
@@ -177,6 +184,8 @@ def _law_preview_for_dimension(
     hits: list[dict[str, Any]] = []
     for score, doc in scored[:top_k]:
         source = doc.get("source", "lexml")
+        review_status = corpus_review_status(corpus_data, doc)
+        _, excerpt_zh = excerpt_for_display(doc)
         hits.append(
             {
                 "id": doc["id"],
@@ -184,8 +193,15 @@ def _law_preview_for_dimension(
                 "title_pt": doc.get("title_pt", ""),
                 "source_label": SOURCE_LABELS.get(source, source),
                 "url": doc.get("url", ""),
-                "excerpt_zh": (doc.get("text_zh") or "")[:200],
+                "excerpt_zh": excerpt_zh[:200],
                 "preview_score": round(min(100.0, score), 1),
+                "review_status": review_status,
+                "requires_review": review_status != "expert_verified",
+                "verification_scope": (
+                    "expert-reviewed source metadata"
+                    if review_status == "expert_verified"
+                    else "provisional corpus entry"
+                ),
             }
         )
     return hits

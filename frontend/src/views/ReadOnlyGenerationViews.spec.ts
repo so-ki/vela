@@ -62,9 +62,9 @@ describe('read-only generated views', () => {
     await flushPromises()
     expect(client.fetchScenario).toHaveBeenCalledOnce()
     expect(Object.keys(client).some((name) => name.toLowerCase().includes('retrieve'))).toBe(false)
-    expect(wrapper.text()).toContain('已冻结能力包')
+    expect(wrapper.text()).toContain('已冻结试点能力包')
     expect(wrapper.text()).toContain('巴西 · 新能源制造 · 绿地设厂')
-    expect(wrapper.text()).toContain('版本 1.0.0')
+    expect(wrapper.text()).toContain('版本 1.3.0')
   })
 
   it('BriefView GET failure never falls back to POST generation', async () => {

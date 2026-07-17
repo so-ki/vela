@@ -7,6 +7,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
 from app.core.database import get_db
+from app.core.config import get_settings, is_instance_organization_member
 from app.core.security import decode_access_token
 from app.core.roles import ROLE_ADMIN, ROLE_BUSINESS, ROLE_LEGAL, require_role
 from app.models.user import User
@@ -28,6 +29,8 @@ def _resolve_user(
     user = db.query(User).filter(User.email == email).first()
     if user is None or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="用户不存在或已停用")
+    if not is_instance_organization_member(user.organization, get_settings()):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="该账户不属于此受控试点实例")
 
     return user
 

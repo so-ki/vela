@@ -9,12 +9,14 @@ import type {
 
 export const TEST_CAPABILITY_PACK: CapabilityPackIdentity = {
   pack_id: 'brazil_new_energy_greenfield',
-  version: '1.0.0',
+  version: '1.3.0',
   pack_hash: 'pack-hash',
   status: 'active',
+  content_status: 'provisional',
   display_name: '巴西 · 新能源制造 · 绿地设厂',
-  description: '正式能力包',
+  description: '受控试点能力包；法律内容临时待专家复核。',
   country: 'BR',
+  state: 'sao_paulo',
   industry: 'new_energy_manufacturing',
   action_type: 'greenfield_plant',
   languages: ['zh-CN', 'pt-BR'],
@@ -156,7 +158,7 @@ export function makeScenario(options: ScenarioFactoryOptions = {}): Scenario {
         acknowledged_by: 1,
         acknowledged_by_name: '演示业务',
         acknowledged_at: '2026-07-14T00:00:00Z',
-        statement_version: 'scope-notice-v1',
+        statement_version: 'scope-notice-v2',
       },
       fit_assessment: {
         result: 'requires_legal_confirmation',

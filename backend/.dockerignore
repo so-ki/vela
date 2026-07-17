@@ -1,7 +1,14 @@
 # Backend build context: default-deny and admit only runtime source artifacts.
 **
-!requirements.txt
-!requirements-rag.txt
+!requirements.lock
+!alembic.ini
+!alembic/
+alembic/**
+!alembic/env.py
+!alembic/script.py.mako
+!alembic/versions/
+alembic/versions/**
+!alembic/versions/*.py
 !app/
 app/**
 !app/__init__.py
@@ -44,6 +51,7 @@ app/capability_packs/brazil_new_energy_greenfield/**
 !scripts/
 scripts/**
 !scripts/container_entrypoint.py
+!scripts/create_user.py
 !scripts/seed_demo_user.py
 
 # Defense in depth for files created underneath an allowed source directory.

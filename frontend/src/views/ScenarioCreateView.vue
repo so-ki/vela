@@ -26,6 +26,7 @@ const catalog = ref<RulesCatalog | null>(null)
 const loading = ref(false)
 const submitting = ref(false)
 const extracting = ref(false)
+const llmConsentForUpload = ref(false)
 const error = ref<string | null>(null)
 const extractBatch = ref<DocumentExtractBatchResult | null>(null)
 const pendingFiles = ref<File[]>([])
@@ -42,6 +43,10 @@ const reviewCustomFields = ref<CustomReviewField[]>([])
 const reviewRowOrder = ref<string[]>([])
 
 const FIELD_LABELS: Record<string, string> = REVIEW_FIELD_LABELS
+const MAX_UPLOAD_FILE_BYTES = 25 * 1024 * 1024
+const MAX_UPLOAD_BATCH_BYTES = 100 * 1024 * 1024
+const MAX_UPLOAD_FILES = 10
+const ALLOWED_UPLOAD_SUFFIXES = ['.txt', '.md', '.docx', '.pdf']
 
 const LEGAL_FIELD_PLACEHOLDERS: Record<string, string> = {
   project_name: 'BYD 坎皮纳斯新能源工厂',
@@ -176,7 +181,7 @@ onMounted(async () => {
     const loadedCatalog = await fetchRulesCatalog()
     catalog.value = isUsableCapabilityCatalog(loadedCatalog) ? loadedCatalog : null
     if (!catalog.value) {
-      error.value = '无法验证当前正式能力包，已禁止确认与提交，请刷新重试'
+      error.value = '无法验证当前受控试点能力包，已禁止确认与提交，请刷新重试'
       return
     }
     if (!auth.isBusiness && !editMode.value) {
@@ -483,7 +488,7 @@ async function buildPayload() {
 
 function collectValidationIssues(): string[] {
   const issues: string[] = []
-  if (!catalogReady.value) issues.push('后端当前正式能力包（请刷新重试）')
+  if (!catalogReady.value) issues.push('后端当前受控试点能力包（请刷新重试）')
   if (auth.isBusiness && !editMode.value && !pendingFiles.value.length) {
     issues.push('投资方案文件')
   }
@@ -521,7 +526,7 @@ function validateForm(target: 'page' | 'modal' = 'page'): boolean {
 function goToMaterialReview() {
   error.value = null
   if (!catalogReady.value) {
-    error.value = '无法验证当前正式能力包，已禁止确认与提交，请刷新重试'
+    error.value = '无法验证当前受控试点能力包，已禁止确认与提交，请刷新重试'
     return
   }
   if (!pendingFiles.value.length) {
@@ -726,7 +731,7 @@ async function runDocumentExtract(files: File[]) {
   error.value = null
   extractFailedNotes.value = []
   try {
-    const batch = await extractDocumentsFromFiles(files)
+    const batch = await extractDocumentsFromFiles(files, llmConsentForUpload.value)
     extractBatch.value = batch
     extractFailedNotes.value = batch.failed
     pendingFiles.value = files
@@ -750,6 +755,26 @@ async function onDocumentSelected(event: Event) {
     if (!merged.some((existing) => existing.name === file.name && existing.size === file.size)) {
       merged.push(file)
     }
+  }
+  const invalidType = merged.find(
+    (file) => !ALLOWED_UPLOAD_SUFFIXES.some((suffix) => file.name.toLowerCase().endsWith(suffix)),
+  )
+  if (invalidType) {
+    error.value = `不支持文件 ${invalidType.name}；仅允许 .txt / .md / .docx / .pdf`
+    return
+  }
+  const oversized = merged.find((file) => file.size > MAX_UPLOAD_FILE_BYTES)
+  if (oversized) {
+    error.value = `${oversized.name} 超过单文件 25MB 上限`
+    return
+  }
+  if (merged.length > MAX_UPLOAD_FILES) {
+    error.value = `单次最多上传 ${MAX_UPLOAD_FILES} 个文件`
+    return
+  }
+  if (merged.reduce((total, file) => total + file.size, 0) > MAX_UPLOAD_BATCH_BYTES) {
+    error.value = '所有文件合计不能超过 100MB'
+    return
   }
   pendingFiles.value = merged
   await runDocumentExtract(merged)
@@ -797,10 +822,10 @@ function shouldHighlightField(fieldPrefix: string): boolean {
       >
         <h2>上传投资方案</h2>
         <p class="muted" v-if="auth.isBusiness && !editMode">
-          支持 <strong>.txt / .md / .docx / .pdf</strong>（每个≤200MB，可上传多个）。上传后系统在后台抽取；<strong>全部文件就绪后</strong>再点「确认并核对」。原始文件将<strong>一并归档</strong>供法务回看。
+          支持 <strong>.txt / .md / .docx / .pdf</strong>（每个≤25MB、最多10个、合计≤100MB）。上传前请先通过贵司终端或 DMS 杀毒；系统会拦截常见主动内容但不替代完整杀毒。<strong>全部文件就绪后</strong>再点「确认并核对」。
         </p>
         <p class="muted" v-else>
-          支持 <strong>.txt / .md / .docx / .pdf</strong>（每个≤200MB，可上传多个）。系统将逐文件抽取事实并合并预填表单；<strong>不会</strong>自动生成法律结论。
+          支持 <strong>.txt / .md / .docx / .pdf</strong>（每个≤25MB、最多10个、合计≤100MB）。系统将逐文件抽取事实并合并预填表单；<strong>不会</strong>自动生成法律结论，也不替代企业杀毒系统。
         </p>
         <div class="doc-upload-row">
           <label class="btn-secondary file-upload-btn">
@@ -819,6 +844,12 @@ function shouldHighlightField(fieldPrefix: string): boolean {
           </span>
           <span class="muted" v-else-if="extracting">正在抽取…</span>
         </div>
+        <label class="llm-upload-consent">
+          <input v-model="llmConsentForUpload" type="checkbox" :disabled="extracting" />
+          <span>
+            仅本次抽取同意将材料内容发送至已配置的官方 LLM Provider（默认不外发；服务端环境 Key 不用于上传材料）
+          </span>
+        </label>
         <ul v-if="pendingFiles.length" class="upload-file-list">
           <li v-for="(file, idx) in pendingFiles" :key="`${file.name}-${file.size}`">
             <span>{{ file.name }}</span>

@@ -4,10 +4,10 @@ Base URL（本地）：`http://127.0.0.1:8000/api/v1`
 
 交互式文档：
 
-- Swagger UI：http://127.0.0.1:8000/docs
+- Swagger UI（仅本地开发）：http://127.0.0.1:8000/docs；生产受控试点不暴露 OpenAPI/Swagger/ReDoc
 - ReDoc：http://127.0.0.1:8000/redoc
 
-认证：除 `/health`、`/auth/login`、`/auth/register`、`/auth/sso/config`、`/export/config` 外，请求头需携带：
+认证：除 `/health`、`/auth/login`、`/auth/register`、`/auth/sso/config` 外，请求头需携带：
 
 ```http
 Authorization: Bearer <JWT>
@@ -25,9 +25,9 @@ Authorization: Bearer <JWT>
 | 4 | POST | `/scenarios/{id}/confirm-scope` | **法务角色**：原子确认场景/维度，冻结 Capability Pack、规则、语料和生成配置快照，并启动唯一 attempt |
 | 5 | GET | `/scenarios/{id}` | 读取已持久化的清单、RAG、简报和 attempt 状态；不得通过读接口隐式生成 |
 | 6 | POST | `/scenarios/{id}/review/init` | 仅基于已有生成结果初始化复核 |
-| 7 | PATCH | `/scenarios/{id}/review/items/{code}` | 更新复核项 |
-| 7b | POST | `/scenarios/{id}/review/return-to-business` | **法务**：退回业务在同一项目补充 |
-| 8 | POST | `/scenarios/{id}/review/finalize` | **法务角色**：定稿 |
+| 7 | PATCH | `/scenarios/{id}/review/items/{code}` | 更新复核项；body 必须回传 `expected_revision` |
+| 7b | POST | `/scenarios/{id}/review/return-to-business` | **法务**：退回业务在同一项目补充；body 必须回传 `expected_revision` |
+| 8 | POST | `/scenarios/{id}/review/finalize?expected_revision={revision}` | **法务角色**：条件定稿 |
 | 8b | POST | `/scenarios/{id}/revise-and-resubmit` | **业务**：补充材料后重新进入 `pending_scope` |
 | 9 | GET | `/scenarios/{id}/export/docx` | **法务角色**：导出 Word（默认法学院《法律研究意见书》） |
 | 9b | GET | `/scenarios/{id}/export/pdf` | **法务角色**：导出 PDF（legacy 协查底稿格式） |
@@ -106,8 +106,8 @@ Authorization: Bearer <JWT>
 
 | 方法 | 路径 |
 |------|------|
-| GET | `/rules/classification` | 兼容读取分类树；不表示存在多个正式能力包 |
-| GET | `/rules/packs` | 兼容读取已注册规则制品；正式能力以 `/capability-packs` 为准 |
+| GET | `/rules/classification` | 兼容读取分类树；不表示存在多个受控试点能力包 |
+| GET | `/rules/packs` | 兼容读取已注册规则制品；受控试点能力以 `/capability-packs` 为准 |
 | GET | `/rules/catalog` | 当前规则包表单/清单配置（可选 `?pack_id=`） |
 | GET | `/rules/demo-template` | BYD 坎皮纳斯投资协查演示 |
 | GET | `/rules/demo-template/mining` | **501** — 矿产协查规则包尚未建设 |

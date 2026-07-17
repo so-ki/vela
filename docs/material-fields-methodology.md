@@ -1,7 +1,7 @@
 # Vela 协查材料字段定义方法论
 
 > 适用对象：产品、法务、规则库维护者  
-> 版本：v1.2 · 对齐业务上传与知情确认、法务确认范围；当前唯一正式能力包为 `brazil_new_energy_greenfield`
+> 版本：v1.2 · 对齐业务上传与知情确认、法务确认范围；当前唯一受控试点能力包为 `brazil_new_energy_greenfield`，法律内容为 provisional
 
 ---
 

@@ -21,7 +21,17 @@ from app.main import create_app
 from app.models.user import User
 from app.schemas.brief import BriefCitationResponse
 from app.schemas.legal import LegalHitResponse
-from scripts.seed_demo_user import DEMO_LEGAL_PROFILE_VERSION, seed_demo_users
+from scripts.seed_demo_user import DEMO_LEGAL_PROFILE_VERSION, _demo_organization, seed_demo_users
+
+
+def test_production_smoke_seed_uses_instance_organization(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("INSTANCE_ORGANIZATION", "Vela controlled smoke")
+    assert _demo_organization({"organization": "untrusted label"}) == "Vela controlled smoke"
+
+    monkeypatch.delenv("INSTANCE_ORGANIZATION")
+    with pytest.raises(RuntimeError):
+        _demo_organization({"organization": "untrusted label"})
 
 
 @pytest.fixture()
@@ -470,7 +480,7 @@ def test_fresh_sqlite_real_mainline_generates_reviews_and_exports(demo_environme
                     "project_name": "坎皮纳斯储能系统组装厂",
                     "description": "拟在巴西圣保罗州建设新能源储能制造绿地工厂并雇佣当地员工。",
                     "scope_acknowledged": True,
-                    "scope_notice_version": "scope-notice-v1",
+                    "scope_notice_version": "scope-notice-v2",
                 },
                 ensure_ascii=False,
             )
@@ -571,18 +581,71 @@ def test_fresh_sqlite_real_mainline_generates_reviews_and_exports(demo_environme
     assert review["status"] == "in_progress"
     assert review["items"]
 
+    # Old clients that omit the revision fail closed instead of silently
+    # overwriting a newer legal decision.
+    assert client.post(
+        f"/api/v1/scenarios/{scenario_id}/review/approve-all",
+        headers=legal_headers,
+    ).status_code == 422
+
+    # The bundled corpus is deliberately provisional: no generated review
+    # item can be S1 until every supporting source is expert_verified.  The
+    # bulk endpoint must therefore fail closed instead of relabelling S2/S3.
+    assert not any(
+        item.get("tier") == "S1"
+        and item.get("gate_status") == "passed"
+        and not item.get("hard_block")
+        for item in review["items"]
+    )
     approve_response = client.post(
         f"/api/v1/scenarios/{scenario_id}/review/approve-all",
         headers=legal_headers,
+        params={"expected_revision": review["revision"]},
     )
-    assert approve_response.status_code == 200, approve_response.text
-    approved = approve_response.json()
+    assert approve_response.status_code == 409, approve_response.text
+    assert approve_response.json()["detail"] == "没有可批量确认的 S1 待审条目"
+    approved = review
+    # Provisional S2/S3 evidence must be confirmed item by item, with a
+    # documented basis for S3.
+    assert approved["pending_count"] > 0
+    missing_item_precondition_checked = False
+    for item in approved["items"]:
+        if item["decision"] != "pending":
+            continue
+        comment = None
+        if item.get("tier") == "S3" or item.get("hard_block"):
+            comment = "演示复核：已核对本地冻结语料与官方链接；正式使用前仍须巴西执业律师确认法源定位。"
+        if not missing_item_precondition_checked:
+            missing = client.patch(
+                f"/api/v1/scenarios/{scenario_id}/review/items/{item['code']}",
+                headers=legal_headers,
+                json={"decision": "approved", "comment": comment},
+            )
+            assert missing.status_code == 422, missing.text
+            missing_item_precondition_checked = True
+        response = client.patch(
+            f"/api/v1/scenarios/{scenario_id}/review/items/{item['code']}",
+            headers=legal_headers,
+            json={
+                "decision": "approved",
+                "comment": comment,
+                "expected_revision": approved["revision"],
+            },
+        )
+        assert response.status_code == 200, response.text
+        approved = response.json()
     assert approved["pending_count"] == 0
     assert approved["can_finalize"] is True
+
+    assert client.post(
+        f"/api/v1/scenarios/{scenario_id}/review/finalize",
+        headers=legal_headers,
+    ).status_code == 422
 
     finalize_response = client.post(
         f"/api/v1/scenarios/{scenario_id}/review/finalize",
         headers=legal_headers,
+        params={"expected_revision": approved["revision"]},
     )
     assert finalize_response.status_code == 200, finalize_response.text
     finalized = finalize_response.json()

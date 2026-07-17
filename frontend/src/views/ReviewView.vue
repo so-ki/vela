@@ -328,7 +328,7 @@ async function onMaterialsReturned() {
 }
 
 async function setDecision(code: string, decision: 'approved' | 'rejected') {
-  if (!scenario.value || isLocked.value) return
+  if (!scenario.value || !review.value || isLocked.value) return
   saving.value = code
   error.value = null
   try {
@@ -336,6 +336,7 @@ async function setDecision(code: string, decision: 'approved' | 'rejected') {
       decision,
       comment: comments.value[code] || undefined,
       external_counsel_required: review.value?.items.find((i) => i.code === code)?.external_counsel_required,
+      expected_revision: review.value.revision,
     })
   } catch (e: unknown) {
     error.value = extractError(e)
@@ -354,6 +355,7 @@ async function saveComment(code: string) {
       decision: item.decision,
       comment: comments.value[code] || undefined,
       external_counsel_required: item.external_counsel_required,
+      expected_revision: review.value.revision,
     })
   } finally {
     saving.value = null
@@ -361,13 +363,14 @@ async function saveComment(code: string) {
 }
 
 async function toggleExternalCounsel(item: ReviewItem, value: boolean) {
-  if (!scenario.value || isLocked.value) return
+  if (!scenario.value || !review.value || isLocked.value) return
   saving.value = item.code
   try {
     review.value = await updateReviewItem(scenario.value.id, item.code, {
       decision: item.decision,
       comment: comments.value[item.code] || undefined,
       external_counsel_required: value,
+      expected_revision: review.value.revision,
     })
   } finally {
     saving.value = null
@@ -375,11 +378,11 @@ async function toggleExternalCounsel(item: ReviewItem, value: boolean) {
 }
 
 async function runApproveAll() {
-  if (!scenario.value || isLocked.value) return
+  if (!scenario.value || !review.value || isLocked.value) return
   saving.value = 'all'
   error.value = null
   try {
-    review.value = await approveAllReview(scenario.value.id)
+    review.value = await approveAllReview(scenario.value.id, review.value.revision)
   } catch (e: unknown) {
     error.value = extractError(e)
   } finally {
@@ -392,7 +395,7 @@ async function runFinalize() {
   finalizing.value = true
   error.value = null
   try {
-    const finalizedReview = await finalizeReview(scenario.value.id)
+    const finalizedReview = await finalizeReview(scenario.value.id, review.value.revision)
     review.value = finalizedReview
     scenario.value.status = `review_${finalizedReview.status}`
   } catch (e: unknown) {
@@ -408,7 +411,11 @@ async function runReturnToBusiness() {
   returning.value = true
   error.value = null
   try {
-    scenario.value = await returnScenarioToBusiness(scenario.value.id, note || undefined)
+    scenario.value = await returnScenarioToBusiness(
+      scenario.value.id,
+      review.value.revision,
+      note || undefined,
+    )
     await router.push({ name: 'dashboard' })
   } catch (e: unknown) {
     error.value = extractError(e)
@@ -579,7 +586,7 @@ function openFullBrief(code: string) {
                 :disabled="saving === 'all'"
                 @click="runApproveAll"
               >
-                全部确认
+                批量确认低风险 S1
               </button>
               <button
                 v-if="!isLocked && review.can_return_to_business"
@@ -690,7 +697,7 @@ function openFullBrief(code: string) {
         <div v-if="scenario.grounding_report" class="quality-report-block">
           <strong>引证 Grounding</strong>
           <span class="badge" :class="scenario.grounding_report.requires_legal_check ? 'warn' : 'ok'">
-            命中率 {{ Math.round((scenario.grounding_report.grounding_rate ?? 1) * 100) }}%
+            摘录一致率 {{ Math.round((scenario.grounding_report.excerpt_consistency_rate ?? scenario.grounding_report.grounding_rate ?? 1) * 100) }}%
           </span>
           <p v-if="scenario.grounding_report.ungrounded_codes?.length" class="muted">
             待核条目：{{ scenario.grounding_report.ungrounded_codes.join('、') }}
@@ -874,9 +881,9 @@ function openFullBrief(code: string) {
                         <span
                           v-if="cite.citation_status"
                           class="badge"
-                          :class="cite.citation_status === 'corpus_verified' ? 'ok' : 'warn'"
+                          :class="cite.citation_status === 'excerpt_matched' || cite.citation_status === 'corpus_verified' ? 'ok' : 'warn'"
                         >
-                          {{ cite.citation_status === 'corpus_verified' ? '已验' : cite.citation_status === 'weak_grounding' ? '弱引证' : '待核对' }}
+                          {{ cite.citation_status === 'excerpt_matched' || cite.citation_status === 'corpus_verified' ? '摘录与本地语料一致' : cite.citation_status === 'weak_grounding' ? '部分相似，须核原文' : '待核对' }}
                           <template v-if="cite.grounding_score"> · {{ Math.round(cite.grounding_score * 100) }}%</template>
                         </span>
                         <a :href="cite.url" target="_blank" rel="noopener" class="hit-link">溯源 ↗</a>
@@ -900,9 +907,9 @@ function openFullBrief(code: string) {
                           <span
                             v-if="hit.citation_status"
                             class="badge"
-                            :class="hit.citation_status === 'corpus_verified' ? 'ok' : 'warn'"
+                            :class="hit.citation_status === 'excerpt_matched' || hit.citation_status === 'corpus_verified' ? 'ok' : 'warn'"
                           >
-                            {{ hit.citation_status === 'corpus_verified' ? 'grounding 已验' : '待核对' }}
+                            {{ hit.citation_status === 'excerpt_matched' || hit.citation_status === 'corpus_verified' ? '摘录与本地语料一致' : '待核对' }}
                           </span>
                         </div>
                         <strong>{{ hit.title_zh || hit.title_pt }}</strong>
@@ -945,6 +952,10 @@ function openFullBrief(code: string) {
                     @blur="saveComment(item.code)"
                   />
                 </label>
+                <p v-if="item.reviewer_name && item.reviewed_at" class="muted external-flag">
+                  最近复核：{{ item.reviewer_name }} · {{ new Date(item.reviewed_at).toLocaleString() }}
+                  <span v-if="item.manual_override"> · 人工覆盖</span>
+                </p>
                 <label class="external-counsel-field" v-if="!isLocked">
                   <input
                     type="checkbox"

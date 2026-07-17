@@ -102,7 +102,7 @@ def run_gap_explanations(
             "agent_step": {"step": "gap_explanation", "status": "skipped", "count": 0},
         }
 
-    if not is_llm_enabled(user_id):
+    if not is_llm_enabled(user_id, task="gap"):
         items = [_template_fallback(t["code"], meta.get(t["code"], {}), t["rationale"]) for t in targets]
         return {
             "items": items,

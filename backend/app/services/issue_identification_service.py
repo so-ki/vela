@@ -68,7 +68,7 @@ def run_issue_identification(
     if not code_map:
         return {"suggestions": [], "agent_step": {"step": "issue_identification", "status": "skipped", "reason": "no codes"}}
 
-    if not is_llm_enabled(user_id):
+    if not is_llm_enabled(user_id, task="issue_id"):
         return {
             "suggestions": [],
             "agent_step": {"step": "issue_identification", "status": "skipped", "reason": "llm_disabled"},

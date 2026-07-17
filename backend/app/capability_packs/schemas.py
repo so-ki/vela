@@ -8,7 +8,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
-MANIFEST_SCHEMA_VERSION = "1.0"
+MANIFEST_SCHEMA_VERSION = "1.1"
 _IDENTIFIER = re.compile(r"^[a-z0-9][a-z0-9._-]{1,127}$")
 _SEMVER = re.compile(r"^\d+\.\d+\.\d+$")
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -57,22 +57,31 @@ class ArtifactReference(StrictModel):
 
 class ArtifactBinding(StrictModel):
     country: str
+    state: str
     industry: str
     action_type: str
 
 
 class RoutingHints(StrictModel):
     country: list[str]
+    state: list[str]
     industry: list[str]
     action_type: list[str]
+    excluded_states: list[str] = Field(default_factory=list)
+    excluded_action_types: list[str] = Field(default_factory=list)
 
-    @field_validator("country", "industry", "action_type")
+    @field_validator("country", "state", "industry", "action_type")
     @classmethod
     def normalize_hints(cls, value: list[str]) -> list[str]:
         normalized = sorted({item.strip() for item in value if item.strip()})
         if not normalized:
             raise ValueError("routing hints 不能为空")
         return normalized
+
+    @field_validator("excluded_states", "excluded_action_types")
+    @classmethod
+    def normalize_exclusions(cls, value: list[str]) -> list[str]:
+        return sorted({item.strip() for item in value if item.strip()})
 
 
 class RetrievalConfig(StrictModel):
@@ -125,9 +134,11 @@ class CapabilityPackManifest(StrictModel):
     pack_id: str
     version: str
     status: Literal["active", "inactive"]
+    content_status: Literal["provisional", "expert_verified"]
     display_name: str
     description: str
     country: str
+    state: str
     industry: str
     action_type: str
     languages: list[str]
@@ -183,7 +194,9 @@ class CapabilityPackManifest(StrictModel):
             "manifest_schema_version": self.manifest_schema_version,
             "pack_id": self.pack_id,
             "version": self.version,
+            "content_status": self.content_status,
             "country": self.country,
+            "state": self.state,
             "industry": self.industry,
             "action_type": self.action_type,
             "languages": sorted(self.languages),
@@ -208,9 +221,11 @@ class CapabilityPackManifest(StrictModel):
             "version": self.version,
             "pack_hash": self.semantic_hash,
             "status": self.status,
+            "content_status": self.content_status,
             "display_name": self.display_name,
             "description": self.description,
             "country": self.country,
+            "state": self.state,
             "industry": self.industry,
             "action_type": self.action_type,
             "languages": list(self.languages),

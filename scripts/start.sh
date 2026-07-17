@@ -45,6 +45,16 @@ trap cleanup EXIT
 
 echo "==> Vela 出海法务平台 — 本地启动"
 
+if ! python3 - <<'PY'
+import sys
+
+raise SystemExit(0 if sys.version_info >= (3, 12) else 1)
+PY
+then
+  echo "REFUSED: 本发布需要 Python 3.12+ 以使用已审计的依赖矩阵。" >&2
+  exit 2
+fi
+
 require_free_port 8000
 require_free_port 5173
 
@@ -55,9 +65,7 @@ if [ ! -d "backend/.venv" ]; then
 fi
 
 echo "==> 安装后端依赖..."
-backend/.venv/bin/pip install -q -r backend/requirements.txt
-echo "==> 安装 RAG 依赖 (ChromaDB)..."
-backend/.venv/bin/pip install -q -r backend/requirements-rag.txt
+backend/.venv/bin/pip install -q -r backend/requirements.lock
 
 if [ ! -f "backend/.env" ]; then
   if [ -f "backend/.env.example" ]; then

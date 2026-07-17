@@ -1,5 +1,6 @@
 """Seed demo business and legal users for local development."""
 
+import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -38,6 +39,15 @@ DEMO_USERS = [
         "role": ROLE_BUSINESS,
     },
 ]
+
+
+def _demo_organization(spec: dict[str, object]) -> str:
+    if os.environ.get("APP_ENV", "").strip().lower() == "production":
+        organization = os.environ.get("INSTANCE_ORGANIZATION", "").strip()
+        if not organization:
+            raise RuntimeError("INSTANCE_ORGANIZATION is required for production smoke seeding")
+        return organization
+    return str(spec["organization"])
 
 
 def _password_matches(user: User, password: str) -> bool:
@@ -91,12 +101,13 @@ def seed_demo_users(db: Session) -> dict[str, User]:
 
     for spec in DEMO_USERS:
         email = str(spec["email"]).lower()
+        organization = _demo_organization(spec)
         user = db.query(User).filter(func.lower(User.email) == email).first()
         if user is None:
             user = User(
                 email=email,
                 full_name=str(spec["full_name"]),
-                organization=str(spec["organization"]),
+                organization=organization,
                 hashed_password=get_password_hash(str(spec["password"])),
                 role=str(spec["role"]),
                 auth_provider="local",
@@ -111,7 +122,7 @@ def seed_demo_users(db: Session) -> dict[str, User]:
             changed = False
             changed |= _set_if_changed(user, "email", email)
             changed |= _set_if_changed(user, "full_name", str(spec["full_name"]))
-            changed |= _set_if_changed(user, "organization", str(spec["organization"]))
+            changed |= _set_if_changed(user, "organization", organization)
             changed |= _set_if_changed(user, "role", str(spec["role"]))
             changed |= _set_if_changed(user, "auth_provider", "local")
             changed |= _set_if_changed(user, "external_subject", None)

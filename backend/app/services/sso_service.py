@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import secrets
+import hashlib
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlencode
@@ -10,8 +11,8 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.roles import ROLE_BUSINESS, ROLE_LEGAL
-from app.core.security import create_access_token, get_password_hash
+from app.core.roles import ROLE_ADMIN, ROLE_BUSINESS, ROLE_LEGAL
+from app.core.security import get_password_hash
 from app.models.user import User
 from app.services.audit import write_audit_log
 from app.services.auth_service import login_user
@@ -52,23 +53,44 @@ async def build_sso_login_url(state: str) -> str:
 
 def _resolve_role(raw_groups: list[str] | None) -> str:
     settings = get_settings()
-    default = settings.sso_default_role if settings.sso_default_role in ("legal", "business", "admin") else ROLE_LEGAL
-    if not raw_groups:
-        return default
-    lowered = [g.lower() for g in raw_groups]
-    if any("admin" in g for g in lowered):
-        return "admin"
-    if any("legal" in g or "法务" in g for g in lowered):
+    groups = {str(group).strip().casefold() for group in (raw_groups or []) if str(group).strip()}
+
+    def configured(value: str) -> set[str]:
+        return {item.strip().casefold() for item in value.split(",") if item.strip()}
+
+    # Privileged roles require an exact, explicitly configured group match.
+    # Substring checks such as "admin-ish" or "LegalOps" are intentionally
+    # rejected because they turn IdP naming accidents into global privilege.
+    if groups & configured(settings.sso_admin_groups):
+        return ROLE_ADMIN
+    if groups & configured(settings.sso_legal_groups):
         return ROLE_LEGAL
-    if any("business" in g or "业务" in g for g in lowered):
+    if groups & configured(settings.sso_business_groups):
         return ROLE_BUSINESS
-    return default
+    return ROLE_BUSINESS
 
 
-def _get_or_create_sso_user(db: Session, *, email: str, full_name: str, subject: str, groups: list[str] | None) -> User:
+def _get_or_create_sso_user(
+    db: Session,
+    *,
+    email: str,
+    full_name: str,
+    issuer: str,
+    subject: str,
+    groups: list[str] | None,
+) -> User:
     settings = get_settings()
     email = email.lower()
-    user = db.query(User).filter(User.email == email).first()
+    if not subject:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="SSO 未返回稳定 subject")
+    binding = "oidc:" + hashlib.sha256(f"{issuer.rstrip('/')}|{subject}".encode("utf-8")).hexdigest()
+    bound_user = db.query(User).filter(User.external_subject == binding).first()
+    email_user = db.query(User).filter(User.email == email).first()
+    if bound_user is not None and bound_user.email != email:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="SSO 身份绑定与邮箱不一致，请联系管理员")
+    if email_user is not None and bound_user is not None and email_user.id != bound_user.id:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="SSO 身份与现有账户冲突")
+    user = bound_user or email_user
     if user is None:
         if not settings.sso_jit_provision:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="SSO 用户未预授权，请联系管理员")
@@ -79,20 +101,26 @@ def _get_or_create_sso_user(db: Session, *, email: str, full_name: str, subject:
             hashed_password=get_password_hash(secrets.token_urlsafe(32)),
             role=_resolve_role(groups),
             auth_provider="sso",
-            external_subject=subject,
+            external_subject=binding,
             disclaimer_accepted=True,
             disclaimer_accepted_at=datetime.now(timezone.utc),
         )
         db.add(user)
         db.commit()
         db.refresh(user)
-        write_audit_log(db, user=user, action="user.sso_provision", detail=f"JIT provision via SSO ({subject})")
+        write_audit_log(db, user=user, action="user.sso_provision", detail="JIT provision via verified SSO")
         return user
 
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="账户已停用")
-    user.auth_provider = user.auth_provider or "sso"
-    user.external_subject = subject
+    if user.auth_provider != "sso":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="该邮箱已绑定非 SSO 账户，禁止自动接管，请联系管理员",
+        )
+    if user.external_subject and user.external_subject != binding:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="SSO subject 与账户永久绑定不一致")
+    user.external_subject = binding
     if not user.full_name and full_name:
         user.full_name = full_name
     db.commit()
@@ -125,10 +153,11 @@ async def exchange_sso_code(db: Session, code: str) -> tuple[str, User]:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="SSO 令牌交换失败")
         token_data = token_resp.json()
         access_token = token_data.get("access_token")
-        id_token_claims = token_data.get("id_token")
         email = token_data.get("email")
         name = token_data.get("name")
         subject = token_data.get("sub")
+        groups: list[str] = []
+        email_verified: Any = token_data.get("email_verified")
 
         if userinfo_endpoint and access_token:
             ui = await client.get(userinfo_endpoint, headers={"Authorization": f"Bearer {access_token}"})
@@ -137,16 +166,26 @@ async def exchange_sso_code(db: Session, code: str) -> tuple[str, User]:
                 email = info.get("email") or email
                 name = info.get("name") or info.get("preferred_username") or name
                 subject = info.get("sub") or subject
+                email_verified = info.get("email_verified", email_verified)
+                raw_groups = info.get(settings.sso_groups_claim, [])
+                if isinstance(raw_groups, list):
+                    groups = [str(group) for group in raw_groups]
+                elif isinstance(raw_groups, str):
+                    groups = [raw_groups]
 
     if not email:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="SSO 未返回 email，无法映射本地账户")
+    if settings.sso_require_verified_email and email_verified is not True:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="SSO 邮箱未通过 IdP 验证")
+    if not subject:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="SSO 未返回稳定 subject")
 
-    groups = None
     user = _get_or_create_sso_user(
         db,
         email=email,
         full_name=name or "",
-        subject=subject or email,
+        issuer=settings.sso_issuer_url,
+        subject=subject,
         groups=groups,
     )
     jwt = login_user(db, user)

@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0",
+  "checked_at": "2026-07-17T06:52:00+08:00",
+  "endpoint": "https://www.lexml.gov.br/urn/<exact-urn>",
+  "method": "HTTP GET against the official LexML resolver; a 200 response whose page title is 'Resolver de URN :: urn não encontrada' is recorded as not_found, not as a successful resolution.",
+  "resolved_source_ids": [
+    "lexml-clt-art-7",
+    "lexml-clt-art-443",
+    "lexml-clt-art-611",
+    "lexml-lc-87-icms",
+    "lexml-lei-10833-iss",
+    "lexml-lei-12305-pnrs",
+    "lexml-lei-12529-cade",
+    "lexml-lei-12651-codigo-florestal",
+    "lexml-lei-13709-lgpd",
+    "lexml-lei-14286-cambio",
+    "lexml-lei-4131-capital-estrangeiro",
+    "lexml-lei-5709-terra-rural",
+    "lexml-lei-6404-capacidade",
+    "lexml-lei-6404-sociedades",
+    "lexml-lei-6938-politica-ambiental",
+    "lexml-lei-8036-fgts",
+    "lexml-lei-9433-agua",
+    "lexml-lei-9605-crimes-ambientais",
+    "lexml-lei-9609-pi"
+  ],
+  "not_found_source_ids": [
+    "lexml-aneel-armazenamento",
+    "lexml-anvisa-produtos-quimicos",
+    "lexml-contran-onibus-eletrico",
+    "lexml-ctn-irpj",
+    "lexml-decreto-3555-transferencia",
+    "lexml-decreto-3822-eia",
+    "lexml-decreto-6854-rde",
+    "lexml-decreto-7488-ex-tarifario",
+    "lexml-ibama-licenciamento",
+    "lexml-inmetro-dec-5440",
+    "lexml-lei-12550-automoveis",
+    "lexml-lei-13429-trab-estrangeiro",
+    "lexml-lei-14097-licenciamento",
+    "lexml-lei-8248-padis",
+    "lexml-nr-10-seguranca",
+    "lexml-nr-12-maquinas",
+    "lexml-procel-eficiencia"
+  ],
+  "limitations": [
+    "Resolution proves identifier availability at the recorded time, not legal validity, semantic applicability, consolidated-text freshness, or expert certification.",
+    "Every not_found source must remain quarantined until replaced and re-audited against an official source."
+  ]
+}

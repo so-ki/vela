@@ -42,7 +42,7 @@ describe('Capability Pack submission boundary', () => {
         project_name: '测试项目',
         country: '', state: '', city: '', industry: '', action_type: '',
         investment_structure: '全资子公司',
-        description: '这是用于验证正式能力包失败关闭行为的项目说明。',
+        description: '这是用于验证受控试点能力包失败关闭行为的项目说明。',
         compliance_dimensions: [],
       },
       extractBatch: null,
@@ -67,6 +67,7 @@ describe('Capability Pack submission boundary', () => {
     await flushPromises()
 
     expect(wrapper.text()).toContain('能力包加载失败')
+    expect(wrapper.text()).toContain('无法加载当前受控试点能力包')
     const acknowledgement = wrapper.find('.scope-acknowledgement input')
     const submit = wrapper.find('.business-review-modal-actions button.btn-primary')
     expect(acknowledgement.attributes('disabled')).toBeDefined()
@@ -144,12 +145,16 @@ describe('Capability Pack submission boundary', () => {
     await flushPromises()
 
     await wrapper.findAll('button').find((button) => button.text() === '完成修改')!.trigger('click')
+    expect(wrapper.text()).toContain('当前受控试点仅覆盖上述场景')
+    expect(wrapper.text()).toContain('法律内容为临时版本')
     await wrapper.get('.scope-acknowledgement input').setValue(true)
     await wrapper.get('.business-review-modal-actions button.btn-primary').trigger('click')
     await flushPromises()
 
     expect(api.submitMaterialsScenario).toHaveBeenCalledWith(
       expect.objectContaining({
+        scope_acknowledged: true,
+        scope_notice_version: 'scope-notice-v2',
         document_extract: expect.objectContaining({
           scan_or_empty: true,
           extraction_warning: '扫描件无法完整抽取',

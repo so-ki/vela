@@ -7,6 +7,7 @@ from typing import Any
 
 import httpx
 
+from app.core.config import get_settings
 from app.services.legal_monitor import compute_corpus_diff, _load_state, _save_state
 
 # 官方 Reg Feed 订阅源 — LexML · Planalto · STF · gov.br（无需 API Key）
@@ -14,7 +15,7 @@ REG_FEED_SOURCES = [
     {
         "id": "planalto-legislacao",
         "label": "Planalto 总统府立法",
-        "url": "http://www4.planalto.gov.br/legislacao/",
+        "url": "https://www4.planalto.gov.br/legislacao/",
         "feed_type": "html",
         "dimensions": ["foreign_investment", "labor", "tax", "environment", "data_compliance"],
         "checklist_codes": [],
@@ -23,7 +24,7 @@ REG_FEED_SOURCES = [
     {
         "id": "stf-portal",
         "label": "STF 联邦最高法院",
-        "url": "http://www.stf.jus.br/",
+        "url": "https://portal.stf.jus.br/",
         "feed_type": "html",
         "dimensions": ["foreign_investment", "labor", "tax", "environment"],
         "checklist_codes": [],
@@ -110,17 +111,21 @@ def _utcnow_iso() -> str:
 
 def _probe_source(url: str, *, timeout: float = 12.0) -> dict[str, Any]:
     try:
-        with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+        with httpx.Client(timeout=timeout, follow_redirects=False, trust_env=False) as client:
             resp = client.head(url)
+            status_code = resp.status_code
+            final_url = str(resp.url)
             if resp.status_code >= 400:
-                resp = client.get(url)
+                with client.stream("GET", url) as streamed:
+                    status_code = streamed.status_code
+                    final_url = str(streamed.url)
             return {
-                "reachable": resp.status_code < 400,
-                "status_code": resp.status_code,
-                "final_url": str(resp.url),
+                "reachable": status_code < 300,
+                "status_code": status_code,
+                "final_url": final_url,
             }
-    except Exception as exc:
-        return {"reachable": False, "status_code": None, "error": str(exc)[:120]}
+    except Exception:
+        return {"reachable": False, "status_code": None, "error": "官方端点请求失败"}
 
 
 def get_reg_feed_status() -> dict[str, Any]:
@@ -179,8 +184,9 @@ def scan_reg_feed(*, force: bool = False) -> dict[str, Any]:
             }
         )
 
+    external_probe_disabled = get_settings().is_production
     unreachable: list[str] = []
-    for src in REG_FEED_SOURCES:
+    for src in ([] if external_probe_disabled else REG_FEED_SOURCES):
         probe = _probe_source(src["url"])
         level = "low" if probe.get("reachable") else "high"
         if not probe.get("reachable"):
@@ -216,4 +222,5 @@ def scan_reg_feed(*, force: bool = False) -> dict[str, Any]:
         "policy_diff": diff,
         "affected_dimensions": _dimensions_from_diff(diff),
         "unreachable_sources": unreachable,
+        "external_probe_disabled": external_probe_disabled,
     }

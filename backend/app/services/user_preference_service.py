@@ -6,12 +6,13 @@ import json
 from pathlib import Path
 from typing import Any, Optional
 
+from app.core.secure_json_store import atomic_write_json, synchronized_json_store
+
 PREFS_DIR = Path(__file__).resolve().parents[2] / "data" / "user_preferences"
 MAX_EVENTS = 300
 
 
 def _prefs_path(user_id: int) -> Path:
-    PREFS_DIR.mkdir(parents=True, exist_ok=True)
     return PREFS_DIR / f"user_{user_id}.json"
 
 
@@ -29,7 +30,6 @@ def _default_prefs(user_id: int) -> dict[str, Any]:
             "enabled": None,
             "provider": "",
             "base_url": "",
-            "api_key": "",
             "default_model": "",
             "task_models": {
                 "extract": "",
@@ -44,26 +44,43 @@ def _default_prefs(user_id: int) -> dict[str, Any]:
     }
 
 
+@synchronized_json_store
 def load_user_preferences(user_id: int) -> dict[str, Any]:
     path = _prefs_path(user_id)
     if not path.exists():
         return _default_prefs(user_id)
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
-    return {**_default_prefs(user_id), **data}
+    # One-way scrub for files written by versions that persisted API keys.
+    # Legacy plaintext credentials are discarded, never imported into memory.
+    llm_settings = dict(data.get("llm_settings") or {})
+    had_legacy_secret = "api_key" in llm_settings
+    llm_settings.pop("api_key", None)
+    data["llm_settings"] = {
+        **_default_prefs(user_id)["llm_settings"],
+        **llm_settings,
+    }
+    merged = {**_default_prefs(user_id), **data}
+    if had_legacy_secret:
+        save_user_preferences(user_id, merged)
+    return merged
 
 
+@synchronized_json_store
 def save_user_preferences(user_id: int, prefs: dict[str, Any]) -> dict[str, Any]:
     from datetime import datetime, timezone
 
     prefs["user_id"] = user_id
     prefs["updated_at"] = datetime.now(timezone.utc).isoformat()
+    llm_settings = dict(prefs.get("llm_settings") or {})
+    llm_settings.pop("api_key", None)
+    prefs["llm_settings"] = llm_settings
     path = _prefs_path(user_id)
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(prefs, f, ensure_ascii=False, indent=2)
+    atomic_write_json(path, prefs)
     return prefs
 
 
+@synchronized_json_store
 def record_review_decision(
     user_id: int,
     *,
@@ -104,6 +121,7 @@ def record_review_decision(
     return save_user_preferences(user_id, prefs)
 
 
+@synchronized_json_store
 def record_match_threshold_choice(user_id: int, threshold: int) -> dict[str, Any]:
     prefs = load_user_preferences(user_id)
     prefs["match_threshold"] = threshold
@@ -112,6 +130,7 @@ def record_match_threshold_choice(user_id: int, threshold: int) -> dict[str, Any
     return save_user_preferences(user_id, prefs)
 
 
+@synchronized_json_store
 def record_retrieval_top_k_choice(user_id: int, top_k: int) -> dict[str, Any]:
     prefs = load_user_preferences(user_id)
     prefs["retrieval_top_k"] = top_k
@@ -134,6 +153,7 @@ def resolve_retrieval_top_k(user_id: Optional[int], requested: Optional[int] = N
     return default
 
 
+@synchronized_json_store
 def record_dimension_selection(user_id: int, dimensions: list[str]) -> dict[str, Any]:
     prefs = load_user_preferences(user_id)
     existing = list(prefs.get("preferred_dimensions") or [])
@@ -180,6 +200,7 @@ def preference_summary(user_id: int) -> dict[str, Any]:
     }
 
 
+@synchronized_json_store
 def record_contract_finding_decision(
     user_id: int,
     *,
@@ -219,32 +240,82 @@ def get_user_llm_settings(user_id: Optional[int]) -> dict[str, Any]:
 
 
 def get_llm_settings_response(user_id: int) -> dict[str, Any]:
-    from app.services.llm_client import PROVIDER_DEFAULTS, mask_api_key_for_response
+    from app.services.llm_client import PROVIDER_DEFAULTS, has_user_api_key
+    from app.core.config import get_settings
+
+    if get_settings().is_production:
+        return {
+            "available": False,
+            "disabled_reason": "生产受控试点已禁用第三方 LLM 外发，系统不会接收 API Key。",
+            "enabled": False,
+            "provider": "",
+            "base_url": "",
+            "api_key_masked": "",
+            "has_api_key": False,
+            "api_key_storage": "disabled",
+            "default_model": "",
+            "task_models": dict(_default_prefs(user_id)["llm_settings"]["task_models"]),
+            "provider_defaults": {},
+        }
 
     cfg = get_user_llm_settings(user_id)
-    key = cfg.get("api_key") or ""
+    has_key = has_user_api_key(user_id)
     return {
+        "available": True,
+        "disabled_reason": None,
         "enabled": cfg.get("enabled"),
         "provider": cfg.get("provider") or "qwen",
         "base_url": cfg.get("base_url") or "",
-        "api_key_masked": mask_api_key_for_response(key) if key else "",
-        "has_api_key": bool(key),
+        "api_key_masked": "********" if has_key else "",
+        "has_api_key": has_key,
+        "api_key_storage": "process_memory_ttl",
         "default_model": cfg.get("default_model") or "",
         "task_models": dict(cfg.get("task_models") or {}),
         "provider_defaults": PROVIDER_DEFAULTS,
     }
 
 
+@synchronized_json_store
 def update_user_llm_settings(user_id: int, updates: dict[str, Any]) -> dict[str, Any]:
+    from app.core.config import get_settings
+    from app.services.llm_client import (
+        LlmSecurityError,
+        clear_user_api_key,
+        store_user_api_key,
+        user_api_key_binding,
+        validate_provider_base_url,
+    )
+
+    if get_settings().is_production:
+        raise LlmSecurityError("生产受控试点不接收 LLM 设置或 API Key")
+
     prefs = load_user_preferences(user_id)
     current = dict(prefs.get("llm_settings") or _default_prefs(user_id)["llm_settings"])
+
+    requested_provider = str(updates.get("provider", current.get("provider") or "qwen")).strip().lower()
+    requested_base = str(updates.get("base_url", current.get("base_url") or "")).strip()
+    canonical_base = validate_provider_base_url(requested_provider, requested_base)
+    binding = user_api_key_binding(user_id)
 
     for key in ("enabled", "provider", "base_url", "default_model"):
         if key in updates and updates[key] is not None:
             current[key] = updates[key]
 
-    if "api_key" in updates and updates["api_key"]:
-        current["api_key"] = str(updates["api_key"]).strip()
+    current["provider"] = requested_provider
+    current["base_url"] = canonical_base
+
+    if updates.get("clear_api_key") is True:
+        clear_user_api_key(user_id)
+    elif "api_key" in updates and str(updates.get("api_key") or "").strip():
+        store_user_api_key(
+            user_id,
+            provider=requested_provider,
+            base_url=canonical_base,
+            api_key=str(updates["api_key"]),
+        )
+    elif binding and binding != (requested_provider, canonical_base):
+        # Never carry an existing secret across a provider/origin change.
+        clear_user_api_key(user_id)
 
     if "task_models" in updates and isinstance(updates["task_models"], dict):
         task_models = dict(current.get("task_models") or {})

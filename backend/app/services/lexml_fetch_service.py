@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import re
 from typing import Any, Optional
+from urllib.parse import quote
 from xml.etree import ElementTree
 
 import httpx
 
-from app.services.legal_ingest import CORPUS_PATH, load_corpus
+from app.core.config import get_settings
+from app.services.legal_ingest import load_corpus
 
 LEXML_URN_API = "https://www.lexml.gov.br/urn"
 LEXML_DOC_API = "https://www.lexml.gov.br/documento"
+MAX_OFFICIAL_RESPONSE_BYTES = 1024 * 1024
 
 
 def _strip_html(text: str) -> str:
@@ -21,24 +24,50 @@ def _strip_html(text: str) -> str:
 
 def fetch_lexml_by_urn(urn: str, *, timeout: float = 30.0) -> dict[str, Any]:
     """Resolve URN via LexML public endpoint; returns best-effort official excerpt."""
+    if get_settings().is_production:
+        return {
+            "status": "disabled",
+            "message": "生产受控试点禁用实时法源外发，请使用版本化本地语料并人工核验",
+        }
     urn = (urn or "").strip()
-    if not urn:
+    if not urn or len(urn) > 500:
         return {"status": "error", "message": "URN 为空"}
 
+    encoded_urn = quote(urn, safe=":;,.+-")
     urls = [
-        f"{LEXML_URN_API}/{urn}",
-        f"{LEXML_DOC_API}?urn={urn}",
+        f"{LEXML_URN_API}/{encoded_urn}",
+        f"{LEXML_DOC_API}?urn={encoded_urn}",
     ]
     last_error = ""
-    with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+    with httpx.Client(timeout=timeout, follow_redirects=False, trust_env=False) as client:
         for url in urls:
             try:
-                resp = client.get(url, headers={"Accept": "application/xml, text/xml, text/html, */*"})
-                if resp.status_code >= 400:
-                    last_error = f"HTTP {resp.status_code}"
-                    continue
-                content_type = resp.headers.get("content-type", "")
-                body = resp.text
+                with client.stream(
+                    "GET",
+                    url,
+                    headers={"Accept": "application/xml, text/xml, text/html"},
+                ) as resp:
+                    if resp.is_redirect:
+                        last_error = "官方端点返回重定向，已拒绝跟随"
+                        continue
+                    if resp.status_code >= 400:
+                        last_error = f"HTTP {resp.status_code}"
+                        continue
+                    declared = int(resp.headers.get("content-length") or 0)
+                    if declared > MAX_OFFICIAL_RESPONSE_BYTES:
+                        last_error = "官方响应超过 1MB 上限"
+                        continue
+                    chunks: list[bytes] = []
+                    total = 0
+                    for chunk in resp.iter_bytes():
+                        total += len(chunk)
+                        if total > MAX_OFFICIAL_RESPONSE_BYTES:
+                            raise ValueError("官方响应超过 1MB 上限")
+                        chunks.append(chunk)
+                    raw = b"".join(chunks)
+                    body = raw.decode(resp.encoding or "utf-8", errors="replace")
+                    content_type = resp.headers.get("content-type", "")
+                    final_url = str(resp.url)
                 if "xml" in content_type or body.strip().startswith("<"):
                     text = _extract_text_from_xml(body)
                 else:
@@ -49,12 +78,12 @@ def fetch_lexml_by_urn(urn: str, *, timeout: float = 30.0) -> dict[str, Any]:
                 return {
                     "status": "ok",
                     "urn": urn,
-                    "url": str(resp.url),
+                    "url": final_url,
                     "text_pt": text[:12000],
-                    "fetched_bytes": len(body),
+                    "fetched_bytes": len(raw),
                 }
-            except Exception as exc:
-                last_error = str(exc)[:200]
+            except Exception:
+                last_error = "LexML 官方端点请求失败或响应不符合安全边界"
 
     return {"status": "error", "urn": urn, "message": last_error or "LexML 请求失败"}
 
@@ -75,8 +104,6 @@ def _extract_text_from_xml(xml_text: str) -> str:
 
 def enrich_corpus_document_from_lexml(doc_id: str, *, persist: bool = True) -> dict[str, Any]:
     """Backtrack corpus entry to LexML official text when URN is available."""
-    import json
-
     corpus = load_corpus()
     doc = next((d for d in corpus.get("sources", []) if d.get("id") == doc_id), None)
     if not doc:
@@ -95,14 +122,15 @@ def enrich_corpus_document_from_lexml(doc_id: str, *, persist: bool = True) -> d
         return {"status": "error", "doc_id": doc_id, **fetched}
 
     previous_len = len(doc.get("text_pt") or "")
-    doc["text_pt"] = fetched["text_pt"]
-    doc["url"] = fetched.get("url") or doc.get("url", "")
-    doc["lexml_synced_at"] = fetched.get("fetched_at")
-
     if persist:
-        with open(CORPUS_PATH, "w", encoding="utf-8") as f:
-            json.dump(corpus, f, ensure_ascii=False, indent=2)
-            f.write("\n")
+        return {
+            "status": "error",
+            "doc_id": doc_id,
+            "message": (
+                "active corpus 为只读内容寻址制品；LexML 结果只能进入候选复核队列，"
+                "不得原地覆盖"
+            ),
+        }
 
     return {
         "status": "ok",
@@ -111,5 +139,11 @@ def enrich_corpus_document_from_lexml(doc_id: str, *, persist: bool = True) -> d
         "previous_length": previous_len,
         "new_length": len(fetched["text_pt"]),
         "official_url": fetched.get("url"),
-        "message": "已从 LexML 官方源更新 text_pt",
+        "candidate": {
+            "doc_id": doc_id,
+            "urn": urn,
+            "official_url": fetched.get("url"),
+            "text_pt": fetched["text_pt"],
+        },
+        "message": "已读取 LexML 官方候选文本，尚未修改 active corpus",
     }

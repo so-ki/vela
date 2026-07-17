@@ -96,7 +96,11 @@ def verify_snippet_in_source(
     min_overlap: float = DEFAULT_MIN_OVERLAP,
     grounded_threshold: float = GROUNDED_THRESHOLD,
 ) -> dict[str, Any]:
-    """Mechanical check that snippet appears in source (exact, substring, or char overlap)."""
+    """Check full normalized excerpt containment in the cited local source.
+
+    Character overlap remains diagnostic only.  It can never make a citation
+    pass, because a correct prefix followed by fabricated text must fail.
+    """
     snip_norm = normalize_text(snippet)
     src_norm = normalize_text(source_text)
 
@@ -106,6 +110,7 @@ def verify_snippet_in_source(
             "grounding_score": 0.0,
             "reason": "摘录为空",
             "citation_status": "ungrounded",
+            "verification_scope": "excerpt_consistency_only",
         }
     if not src_norm:
         return {
@@ -113,23 +118,28 @@ def verify_snippet_in_source(
             "grounding_score": 0.0,
             "reason": "原文为空",
             "citation_status": "ungrounded",
+            "verification_scope": "excerpt_consistency_only",
         }
 
-    # Fast path: exact substring
-    if snip_norm in src_norm or snip_norm[:80] in src_norm:
+    full_excerpt_match = snip_norm in src_norm
+    if full_excerpt_match:
         score = 1.0
-    elif snip_norm[:40] and snip_norm[:40] in src_norm:
-        score = 0.95
     else:
         score = char_overlap(snip_norm[:400], src_norm)
 
-    boilerplate_only = is_boilerplate_phrase(snippet) and score < 0.75
-    grounded = score >= grounded_threshold and not boilerplate_only
+    # Short exact fact anchors (common in Chinese source material) are valid;
+    # only known generic disclaimer phrases are rejected as boilerplate.
+    boilerplate_only = snip_norm in BOILERPLATE_PHRASES or any(
+        phrase in snip_norm and len(snip_norm) <= len(phrase) + 8
+        for phrase in BOILERPLATE_PHRASES
+        if len(phrase) >= 20
+    )
+    grounded = full_excerpt_match and not boilerplate_only
 
     if score >= grounded_threshold and boilerplate_only:
         citation_status = "weak_grounding"
     elif grounded:
-        citation_status = "corpus_verified"
+        citation_status = "excerpt_matched"
     elif score >= grounded_threshold * 0.7:
         citation_status = "weak_grounding"
     else:
@@ -139,22 +149,24 @@ def verify_snippet_in_source(
     if not grounded:
         if boilerplate_only:
             reason = "摘录主要为通用套话，须法务核对原文"
-        elif score < min_overlap:
-            reason = "摘录与原文匹配度不足，须法务核对"
+        elif not full_excerpt_match:
+            reason = "完整摘录未在本地语料原文中找到；相似前缀或部分重合不能通过"
         else:
-            reason = "摘录与原文匹配度不足，须法务核对"
+            reason = "摘录仅为通用套话，不能作为证据锚点"
 
     return {
         "grounded": grounded,
         "grounding_score": round(score, 3),
         "reason": reason,
         "citation_status": citation_status,
+        "verification_scope": "excerpt_consistency_only",
+        "full_excerpt_match": full_excerpt_match,
     }
 
 
 def citation_status_from_score(score: float, *, grounded: bool, boilerplate_only: bool = False) -> str:
     if grounded and not boilerplate_only:
-        return "corpus_verified"
+        return "excerpt_matched"
     if score >= GROUNDED_THRESHOLD * 0.7:
         return "weak_grounding"
     return "ungrounded"

@@ -95,6 +95,10 @@ const canRetryScope = computed(
 )
 
 async function downloadArchivedFile(storedName: string, filename: string) {
+  const accepted = window.confirm(
+    '原始文件仅通过格式、压缩结构和常见主动内容筛查，未做完整杀毒或内容净化。请确认文件已通过贵司终端/DMS安全扫描，并在隔离查看器中打开。',
+  )
+  if (!accepted) return
   await downloadScenarioMaterialFile(props.scenario.id, storedName, filename)
 }
 
@@ -404,6 +408,7 @@ function conflictValueSummary(conflict: { sources: Array<{ value: string }> }): 
       <div class="review-gate-material-column">
         <div v-if="archivedFiles.length" class="archived-files-block panel">
           <h3>归档方案文件</h3>
+          <p class="warn-note">未做完整杀毒扫描；下载前须经贵司终端或 DMS 安全扫描。</p>
           <ul class="archived-files-list">
             <li v-for="file in archivedFiles" :key="file.id">
               <button type="button" class="btn-link sm" @click="downloadArchivedFile(file.stored_name, file.filename)">

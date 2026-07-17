@@ -63,7 +63,7 @@ def build() -> None:
         "当前 Registry 只有一个正式 Capability Pack：brazil_new_energy_greenfield（巴西 · 新能源制造 · 绿地设厂）。"
         "测试 fixture 不代表国家、行业或法律能力，也不进入生产 Registry 或发布制品。",
     )
-    _para(doc, "技术栈：前端 Vue 3 + Pinia；后端 FastAPI + SQLAlchemy；开发库 SQLite；法源索引 Chroma；可选 LLM 润色。", bold=False)
+    _para(doc, "技术栈：前端 Vue 3 + Pinia；后端 FastAPI + SQLAlchemy；开发库 SQLite；确定性关键词法源检索；可选 LLM 润色。", bold=False)
 
     _heading(doc, "二、角色与权限")
     _bullets(

@@ -13,7 +13,7 @@ BIZ=$(login biz@demo.vela)
 LEGAL=$(login legal@demo.vela)
 
 SUB=$(curl -sf -X POST "$API/scenarios/submit-materials" -H "Authorization: Bearer $BIZ" \
-  -F 'payload={"project_name":"增量协查测试工厂","description":"计划在巴西建设新能源制造工厂并分期雇佣当地员工。","scope_acknowledged":true,"scope_notice_version":"scope-notice-v1"}' \
+  -F 'payload={"project_name":"增量协查测试工厂","description":"计划在巴西圣保罗州绿地设厂，新建新能源制造工厂并分期雇佣当地员工。","scope_acknowledged":true,"scope_notice_version":"scope-notice-v2"}' \
   -F 'files=@scripts/fixtures/sample_storage_project.txt')
 SID=$(echo "$SUB" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
 PROPOSAL_HASH=$(echo "$SUB" | python3 -c "import sys,json; print(json.load(sys.stdin)['scenario_scope']['proposed']['proposal_hash'])")

@@ -89,3 +89,23 @@ def migrate_sqlite_generation_attempt_columns() -> None:
     with engine.begin() as conn:
         for stmt in statements:
             conn.execute(text(stmt))
+
+
+def migrate_sqlite_checklist_revision_column() -> None:
+    """Backfill optimistic-lock state in pre-Alembic local SQLite databases."""
+
+    if not str(engine.url).startswith("sqlite"):
+        return
+    inspector = inspect(engine)
+    if "compliance_checklists" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("compliance_checklists")}
+    if "revision" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE compliance_checklists "
+                "ADD COLUMN revision INTEGER DEFAULT 0 NOT NULL"
+            )
+        )

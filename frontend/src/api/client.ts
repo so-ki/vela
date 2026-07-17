@@ -24,7 +24,7 @@ function parseContentDisposition(header?: string): string | null {
 }
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('vela_token')
+  const token = sessionStorage.getItem('vela_token')
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -57,7 +57,6 @@ export async function register(payload: {
   full_name: string
   organization?: string
   accept_disclaimer: boolean
-  role: 'legal' | 'business'
 }): Promise<User> {
   const { data } = await api.post<User>('/auth/register', payload)
   return data
@@ -137,11 +136,14 @@ export async function retryInvestigationPack(scenarioId: number): Promise<Scenar
 }
 
 export interface LlmSettings {
+  available: boolean
+  disabled_reason?: string | null
   enabled: boolean | null
   provider: string
   base_url: string
   api_key_masked: string
   has_api_key: boolean
+  api_key_storage?: 'process_memory_ttl'
   default_model: string
   task_models: {
     extract: string
@@ -160,6 +162,11 @@ export async function fetchLlmSettings(): Promise<LlmSettings> {
 
 export async function patchLlmSettings(payload: Record<string, unknown>): Promise<LlmSettings> {
   const { data } = await api.patch('/llm/settings', payload)
+  return data
+}
+
+export async function clearLlmApiKey(): Promise<LlmSettings> {
+  const { data } = await api.delete('/llm/settings/api-key')
   return data
 }
 
@@ -239,20 +246,25 @@ export interface DocumentExtractBatchResult {
   conflicts?: ExtractFieldConflict[]
 }
 
-export async function extractDocumentFromFile(file: File): Promise<DocumentExtractResult> {
+export async function extractDocumentFromFile(file: File, llmConsent = false): Promise<DocumentExtractResult> {
   const form = new FormData()
   form.append('file', file)
+  form.append('llm_consent', String(llmConsent))
   const { data } = await api.post<DocumentExtractResult>('/scenarios/extract-document', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
   return data
 }
 
-export async function extractDocumentsFromFiles(files: File[]): Promise<DocumentExtractBatchResult> {
+export async function extractDocumentsFromFiles(
+  files: File[],
+  llmConsent = false,
+): Promise<DocumentExtractBatchResult> {
   const form = new FormData()
   for (const file of files) {
     form.append('files', file)
   }
+  form.append('llm_consent', String(llmConsent))
   const { data } = await api.post<DocumentExtractBatchResult>('/scenarios/extract-documents', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
@@ -295,8 +307,15 @@ export async function downloadScenarioMaterialFile(
   URL.revokeObjectURL(url)
 }
 
-export async function returnScenarioToBusiness(scenarioId: number, note?: string) {
-  const { data } = await api.post(`/scenarios/${scenarioId}/review/return-to-business`, { note: note || null })
+export async function returnScenarioToBusiness(
+  scenarioId: number,
+  expectedRevision: number,
+  note?: string,
+) {
+  const { data } = await api.post(`/scenarios/${scenarioId}/review/return-to-business`, {
+    note: note || null,
+    expected_revision: expectedRevision,
+  })
   return data
 }
 
@@ -350,19 +369,28 @@ export async function fetchReview(scenarioId: number) {
 export async function updateReviewItem(
   scenarioId: number,
   itemCode: string,
-  payload: { decision: string; comment?: string; external_counsel_required?: boolean },
+  payload: {
+    decision: string
+    comment?: string
+    external_counsel_required?: boolean
+    expected_revision: number
+  },
 ) {
   const { data } = await api.patch(`/scenarios/${scenarioId}/review/items/${itemCode}`, payload)
   return data
 }
 
-export async function finalizeReview(scenarioId: number) {
-  const { data } = await api.post(`/scenarios/${scenarioId}/review/finalize`)
+export async function finalizeReview(scenarioId: number, expectedRevision: number) {
+  const { data } = await api.post(`/scenarios/${scenarioId}/review/finalize`, undefined, {
+    params: { expected_revision: expectedRevision },
+  })
   return data
 }
 
-export async function approveAllReview(scenarioId: number) {
-  const { data } = await api.post(`/scenarios/${scenarioId}/review/approve-all`)
+export async function approveAllReview(scenarioId: number, expectedRevision: number) {
+  const { data } = await api.post(`/scenarios/${scenarioId}/review/approve-all`, undefined, {
+    params: { expected_revision: expectedRevision },
+  })
   return data
 }
 

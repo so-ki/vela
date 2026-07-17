@@ -32,7 +32,7 @@ from app.services.scenario_pipeline import _safe_audit, mark_generation_failed, 
 from app.services.scenario_scope_service import acquire_generation_lease, build_proposed_scenario_scope
 from app.services.scenario_service import create_scenario_materials_only
 from app.services.legal_agent_service import run_investigation_agent
-from app.services.rule_engine import ScenarioInput, generate_checklist
+from app.services.rule_engine import ScenarioInput, generate_checklist, get_demo_scenario_template
 from app.services.legal_rag import retrieve_for_checklist
 from app.services.brief_generator import generate_brief
 
@@ -61,8 +61,8 @@ def db_factory(tmp_path):
 
 def payload(**updates) -> BusinessSubmitRequest:
     data = {
-        "project_name": "巴西新能源工厂",
-        "description": "计划建设新能源制造工厂并雇佣当地员工。",
+        "project_name": "巴西圣保罗州新能源绿地工厂",
+        "description": "计划在巴西圣保罗州绿地设厂，新建新能源制造工厂并雇佣当地员工。",
         "scope_acknowledged": True,
     }
     data.update(updates)
@@ -98,9 +98,40 @@ def test_business_ack_and_authoritative_proposal(db_factory):
             build_proposed_scenario_scope(payload(scope_acknowledged=False), business)
         scope = build_proposed_scenario_scope(payload(), business)
         assert scope["proposed"]["rules_pack_id"] == "brazil_new_energy"
+        assert scope["proposed"]["state"] == "sao_paulo"
         assert scope["proposed"]["action_type"] == "greenfield_plant"
-        with pytest.raises(ValueError, match="当前支持"):
+        with pytest.raises(ValueError, match="受控试点"):
             build_proposed_scenario_scope(payload(country="mexico"), business)
+
+
+def test_demo_template_explicitly_evidences_the_frozen_greenfield_scope(db_factory):
+    template = get_demo_scenario_template()
+    template.pop("compliance_dimensions", None)
+    request = BusinessSubmitRequest(
+        **template,
+        scope_acknowledged=True,
+        scope_notice_version="scope-notice-v2",
+    )
+    with db_factory() as db:
+        scope = build_proposed_scenario_scope(request, db.get(User, 1))
+    assert scope["proposed"]["pack_id"] == "brazil_new_energy_greenfield"
+    assert "绿地设厂" in request.description
+
+
+def test_business_city_is_preserved_instead_of_defaulting_to_first_rules_city(db_factory):
+    with db_factory() as db:
+        business = db.get(User, 1)
+        scope = build_proposed_scenario_scope(payload(city="sorocaba"), business)
+
+    assert scope["proposed"]["state"] == "sao_paulo"
+    assert scope["proposed"]["city"] == "sorocaba"
+
+
+def test_rio_city_field_is_conflict_evidence_and_cannot_be_rewritten(db_factory):
+    with db_factory() as db:
+        business = db.get(User, 1)
+        with pytest.raises(ValueError, match="受控试点"):
+            build_proposed_scenario_scope(payload(city="Rio de Janeiro"), business)
 
 
 def test_same_concurrent_confirmation_gets_one_attempt(db_factory):
@@ -613,7 +644,10 @@ def test_real_asgi_routes_fail_closed_and_demo_is_isolated(db_factory):
     demo_rows = client.get("/api/v1/demo/scenarios").json()
     assert {row["id"] for row in demo_rows} == {demo_id}
     assert client.post(f"/api/v1/scenarios/{demo_id}/review/init").status_code == 404
-    assert client.post(f"/api/v1/scenarios/{demo_id}/review/finalize").status_code == 404
+    assert client.post(
+        f"/api/v1/scenarios/{demo_id}/review/finalize",
+        params={"expected_revision": 0},
+    ).status_code == 404
     assert client.get(f"/api/v1/scenarios/{demo_id}/export/audit-bundle").status_code == 404
     assert client.get(f"/api/v1/scenarios/{demo_id}/export/docx").status_code == 404
     assert client.get(f"/api/v1/scenarios/{demo_id}/export/pdf").status_code == 404

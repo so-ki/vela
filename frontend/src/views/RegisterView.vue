@@ -13,7 +13,6 @@ const form = ref({
   password: '',
   full_name: '',
   organization: '',
-  role: 'legal' as 'legal' | 'business',
   accept_disclaimer: false,
 })
 const loading = ref(false)
@@ -41,7 +40,6 @@ async function handleSubmit() {
       password: form.value.password,
       full_name: form.value.full_name,
       organization: form.value.organization || undefined,
-      role: form.value.role,
       accept_disclaimer: true,
     })
     await auth.login(form.value.email, form.value.password)
@@ -59,34 +57,17 @@ async function handleSubmit() {
     <div class="auth-card wide">
       <div class="auth-header">
         <h1>注册账户</h1>
-        <p>选择账户类型并完成注册；请先阅读下方条款并<strong>手动勾选</strong>同意后方可注册</p>
+        <p>开放注册仅创建业务协同账户；法务与管理员账户须由部署管理员预先开通。请先阅读下方条款并<strong>手动勾选</strong>同意后方可注册。</p>
       </div>
 
       <div v-if="registrationClosed" class="disclaimer-preview">
-        <p>当前环境已关闭开放注册。请使用企业 SSO 登录，或联系管理员开通账户。</p>
+        <p>当前环境已关闭开放注册。请联系部署管理员开通账户。</p>
         <p class="auth-footer">
           <RouterLink to="/login">返回登录</RouterLink>
         </p>
       </div>
 
       <form v-else @submit.prevent="handleSubmit" class="auth-form">
-        <fieldset class="role-choice">
-          <legend>账户类型</legend>
-          <label class="role-choice-option">
-            <input v-model="form.role" type="radio" value="legal" />
-            <span class="role-choice-body">
-              <strong>法务账户</strong>
-              <span class="muted">确认协查范围、Gate A、清单复核、定稿与导出</span>
-            </span>
-          </label>
-          <label class="role-choice-option">
-            <input v-model="form.role" type="radio" value="business" />
-            <span class="role-choice-body">
-              <strong>业务账户</strong>
-              <span class="muted">提交投资方案、核对抽取结果、补充材料</span>
-            </span>
-          </label>
-        </fieldset>
         <div class="form-row">
           <label>
             <span>姓名</span>

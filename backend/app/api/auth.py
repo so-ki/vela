@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import secrets
+import time
 from typing import Optional
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -20,6 +21,8 @@ from app.services.sso_service import build_sso_login_url, exchange_sso_code, sso
 
 router = APIRouter(prefix="/auth", tags=["认证"])
 
+_SSO_STATE_TTL_SECONDS = 600
+_SSO_STATE_MAX_ENTRIES = 10_000
 _SSO_STATES: dict[str, float] = {}
 
 
@@ -40,8 +43,16 @@ def sso_config():
 
 @router.get("/sso/login")
 async def sso_login():
+    if not get_settings().sso_configured:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="SSO 未配置")
+    now = time.monotonic()
+    for existing, expires_at in list(_SSO_STATES.items()):
+        if expires_at <= now:
+            _SSO_STATES.pop(existing, None)
+    while len(_SSO_STATES) >= _SSO_STATE_MAX_ENTRIES:
+        _SSO_STATES.pop(next(iter(_SSO_STATES)))
     state = secrets.token_urlsafe(24)
-    _SSO_STATES[state] = 1.0
+    _SSO_STATES[state] = now + _SSO_STATE_TTL_SECONDS
     url = await build_sso_login_url(state)
     return RedirectResponse(url)
 
@@ -55,11 +66,11 @@ async def sso_callback(
 ):
     settings = get_settings()
     if error:
-        target = f"{settings.frontend_url}/login?sso_error={error}"
+        target = f"{settings.frontend_url}/login?{urlencode({'sso_error': error})}"
         return RedirectResponse(target)
-    if not code or not state or state not in _SSO_STATES:
+    expires_at = _SSO_STATES.pop(state, None) if state else None
+    if not code or expires_at is None or expires_at <= time.monotonic():
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="无效的 SSO 回调参数")
-    _SSO_STATES.pop(state, None)
 
     token, user = await exchange_sso_code(db, code)
     params = urlencode(
@@ -80,9 +91,11 @@ def register(payload: UserRegister, db: Session = Depends(get_db)):
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(payload: UserLogin, db: Session = Depends(get_db)):
+def login(payload: UserLogin, response: Response, db: Session = Depends(get_db)):
     user = authenticate_user(db, payload.email, payload.password)
     token = login_user(db, user)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
     return TokenResponse(access_token=token, user=UserResponse.model_validate(user))
 
 
