@@ -32,6 +32,16 @@ DOCKER_TARGETS = (
     ("docker/Dockerfile.postgres.prod", "."),
 )
 
+PRODUCTION_SMOKE_SEED_COMMAND = (
+    '"${COMPOSE[@]}" exec -T backend env PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/app \\\n'
+    "  python -c 'import sys; from scripts.container_entrypoint import "
+    "configure_database_url; configure_database_url(); "
+    'path = "/app/scripts/seed_demo_user.py"; '
+    'exec(compile(sys.stdin.read(), path, "exec"), '
+    '{"__name__": "__main__", "__file__": path})\' \\\n'
+    '  < "$ROOT/backend/scripts/seed_demo_user.py"'
+)
+
 FORBIDDEN_PREFIXES = (
     ".git/",
     "data/",
@@ -626,6 +636,8 @@ def check_docker() -> None:
     compose = (ROOT / "docker-compose.prod.yml").read_text(encoding="utf-8")
     dev_compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
     entrypoint = (ROOT / "backend/scripts/container_entrypoint.py").read_text(encoding="utf-8")
+    create_user = (ROOT / "backend/scripts/create_user.py").read_text(encoding="utf-8")
+    demo_seed = (ROOT / "backend/scripts/seed_demo_user.py").read_text(encoding="utf-8")
     vite_config = (ROOT / "frontend/vite.config.ts").read_text(encoding="utf-8")
     ci_workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
     prod_smoke = (ROOT / "scripts/prod_smoke.sh").read_text(encoding="utf-8")
@@ -678,9 +690,7 @@ def check_docker() -> None:
         errors.append("production Compose smoke 未以模块方式运行 migration check")
     if '"${COMPOSE[@]}" cp ' in prod_smoke:
         errors.append("production Compose smoke 不得向只读容器根文件系统复制测试脚本")
-    if 'exec -T backend env PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/app python -' not in prod_smoke or (
-        '< "$ROOT/backend/scripts/seed_demo_user.py"' not in prod_smoke
-    ):
+    if PRODUCTION_SMOKE_SEED_COMMAND not in prod_smoke:
         errors.append("production Compose smoke 未通过标准输入向只读后端注入一次性测试脚本")
     if "COPY alembic.ini ./" not in prod_dockerfile or "COPY alembic ./alembic" not in prod_dockerfile:
         errors.append("production image 未携带 Alembic 配置与迁移")
@@ -702,6 +712,18 @@ def check_docker() -> None:
         errors.append("production compose 不得直接拼接 DATABASE_URL")
     if 'quote(database_password, safe="")' not in entrypoint:
         errors.append("production entrypoint 未 URL-encode 数据库密码")
+    if (
+        "from scripts.container_entrypoint import configure_database_url" not in create_user
+        or "configure_database_url()" not in create_user
+    ):
+        errors.append("production user provisioning 未复用 fail-closed 数据库配置")
+    if (
+        'db.get_bind().dialect.name != "postgresql"' not in demo_seed
+        or "production smoke seeding requires PostgreSQL" not in demo_seed
+        or demo_seed.index('db.get_bind().dialect.name != "postgresql"')
+        > demo_seed.index("init_db()")
+    ):
+        errors.append("production demo seed 未在任何数据库初始化前 fail-closed 限制 PostgreSQL")
     if '_required("SECRET_KEY")' not in entrypoint or "is_weak_secret(secret_key, min_length=32" not in entrypoint:
         errors.append("production entrypoint 未 fail-closed 校验 SECRET_KEY")
     if '_required("POSTGRES_PASSWORD")' not in entrypoint:

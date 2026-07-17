@@ -50,6 +50,19 @@ def test_production_database_password_is_url_encoded(monkeypatch: pytest.MonkeyP
     )
 
 
+def test_production_user_cli_preserves_explicit_database_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    explicit = "postgresql+psycopg2://operator@database.example/vela"
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setenv("POSTGRES_PASSWORD", "different-container-password-2026!")
+    monkeypatch.setenv("DATABASE_URL", explicit)
+
+    create_user._configure_database_url()
+
+    assert create_user.os.environ["DATABASE_URL"] == explicit
+
+
 def test_production_user_is_bound_to_instance_organization(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("APP_ENV", "production")
     monkeypatch.setenv("INSTANCE_ORGANIZATION", "试点企业")

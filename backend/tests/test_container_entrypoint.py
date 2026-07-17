@@ -81,6 +81,8 @@ def test_production_entrypoint_rejects_missing_or_weak_secret(
         "vela_change_me",
         "replace-with-strong-password",
         "p" * 20,
+        " leading-whitespace-password-2026!",
+        "trailing-whitespace-password-2026! ",
     ],
 )
 def test_production_entrypoint_rejects_missing_or_weak_database_password(
@@ -127,6 +129,53 @@ def test_production_entrypoint_url_encodes_database_password(
         )
     ]
     assert executed and executed[0][0] == "gunicorn"
+
+
+def test_exec_process_can_configure_the_same_production_database_url(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _production_env(monkeypatch)
+    monkeypatch.setenv("POSTGRES_PASSWORD", "exec-password@%:/ value")
+
+    configured = container_entrypoint.configure_database_url()
+
+    assert configured == (
+        "postgresql+psycopg2://vela:exec-password%40%25%3A%2F%20value@db:5432/vela"
+    )
+    assert os.environ["DATABASE_URL"] == configured
+
+
+def test_exec_process_configures_url_before_database_module_import() -> None:
+    env = os.environ.copy()
+    env.update(
+        {
+            "APP_ENV": "production",
+            "POSTGRES_PASSWORD": "exec-password@%:/ value",
+        }
+    )
+    env.pop("DATABASE_URL", None)
+    result = subprocess.run(
+        [
+            os.sys.executable,
+            "-c",
+            (
+                "from scripts.container_entrypoint import configure_database_url; "
+                "configure_database_url(); "
+                "from app.core.database import settings; "
+                "print(settings.database_url)"
+            ),
+        ],
+        cwd=BACKEND_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == (
+        "postgresql+psycopg2://vela:exec-password%40%25%3A%2F%20value@db:5432/vela"
+    )
 
 
 def test_migration_mode_exits_before_starting_web(

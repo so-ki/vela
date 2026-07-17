@@ -137,7 +137,8 @@ fi
 echo "==> provision disposable smoke users"
 # Keep the production image seed-free and its root filesystem read-only: the
 # disposable smoke helper is streamed from the trusted checkout over stdin.
-"${COMPOSE[@]}" exec -T backend env PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/app python - \
+"${COMPOSE[@]}" exec -T backend env PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/app \
+  python -c 'import sys; from scripts.container_entrypoint import configure_database_url; configure_database_url(); path = "/app/scripts/seed_demo_user.py"; exec(compile(sys.stdin.read(), path, "exec"), {"__name__": "__main__", "__file__": path})' \
   < "$ROOT/backend/scripts/seed_demo_user.py"
 
 echo "==> PostgreSQL migration head and model drift"

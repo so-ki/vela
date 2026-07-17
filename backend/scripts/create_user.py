@@ -14,11 +14,12 @@ import os
 import re
 import sys
 from pathlib import Path
-from urllib.parse import quote
 
 
 APP_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(APP_ROOT))
+
+from scripts.container_entrypoint import configure_database_url
 
 ALLOWED_ROLES = ("business", "legal", "admin")
 COMMON_PASSWORDS = {
@@ -30,17 +31,11 @@ COMMON_PASSWORDS = {
 
 
 def _configure_database_url() -> None:
-    if os.environ.get("DATABASE_URL", "").strip():
-        return
-    if os.environ.get("APP_ENV", "").strip().lower() != "production":
-        return
-    password = os.environ.get("POSTGRES_PASSWORD", "").strip()
-    if not password:
-        raise RuntimeError("POSTGRES_PASSWORD is required to provision a production user")
-    os.environ["DATABASE_URL"] = (
-        "postgresql+psycopg2://vela:"
-        f"{quote(password, safe='')}@db:5432/vela"
-    )
+    if (
+        os.environ.get("APP_ENV", "").strip().lower() == "production"
+        and not os.environ.get("DATABASE_URL", "").strip()
+    ):
+        configure_database_url()
 
 
 def _validate_password(password: str) -> None:

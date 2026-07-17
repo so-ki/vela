@@ -15,6 +15,7 @@ import app.services.legal_rag as legal_rag
 import app.services.material_file_storage as material_file_storage
 import app.services.playbook_deviation_service as playbook_deviation_service
 import app.services.user_preference_service as user_preference_service
+import scripts.seed_demo_user as seed_demo_user
 from app.core.database import Base, get_db
 from app.core.security import get_password_hash, verify_password
 from app.main import create_app
@@ -32,6 +33,39 @@ def test_production_smoke_seed_uses_instance_organization(monkeypatch: pytest.Mo
     monkeypatch.delenv("INSTANCE_ORGANIZATION")
     with pytest.raises(RuntimeError):
         _demo_organization({"organization": "untrusted label"})
+
+
+def test_production_seed_entrypoint_rejects_non_postgresql(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class SQLiteDialect:
+        name = "sqlite"
+
+    class SQLiteBind:
+        dialect = SQLiteDialect()
+
+    class SQLiteSession:
+        def get_bind(self) -> SQLiteBind:
+            return SQLiteBind()
+
+        def close(self) -> None:
+            pass
+
+    monkeypatch.setenv("APP_ENV", "production")
+    monkeypatch.setattr(
+        seed_demo_user,
+        "init_db",
+        lambda: pytest.fail("production seed must fail before initializing SQLite"),
+    )
+    monkeypatch.setattr(seed_demo_user, "SessionLocal", SQLiteSession)
+    monkeypatch.setattr(
+        seed_demo_user,
+        "seed_demo_users",
+        lambda _db: pytest.fail("production seed must fail before mutating SQLite"),
+    )
+
+    with pytest.raises(RuntimeError, match="requires PostgreSQL"):
+        seed_demo_user.seed()
 
 
 @pytest.fixture()

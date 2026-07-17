@@ -103,6 +103,8 @@ def test_packaged_release_contains_every_static_check_docker_dependency() -> Non
         "docker/nginx.conf",
         "backend/scripts/__init__.py",
         "backend/scripts/container_entrypoint.py",
+        "backend/scripts/create_user.py",
+        "backend/scripts/seed_demo_user.py",
         "frontend/vite.config.ts",
         "scripts/prod_smoke.sh",
     }
@@ -124,5 +126,4 @@ def test_production_smoke_streams_seed_into_read_only_backend() -> None:
     content = (release_safety.ROOT / "scripts/prod_smoke.sh").read_text(encoding="utf-8")
 
     assert '"${COMPOSE[@]}" cp ' not in content
-    assert 'exec -T backend env PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/app python -' in content
-    assert '< "$ROOT/backend/scripts/seed_demo_user.py"' in content
+    assert release_safety.PRODUCTION_SMOKE_SEED_COMMAND in content

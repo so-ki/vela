@@ -23,6 +23,33 @@ def _required(name: str) -> str:
     return value
 
 
+def configure_database_url() -> str:
+    """Set the production PostgreSQL URL in the current process.
+
+    Docker exec processes do not inherit environment mutations made by PID 1,
+    so administrative and smoke commands must call this before importing the
+    application database module.
+    """
+
+    if os.environ.get("APP_ENV", "").strip().lower() != "production":
+        raise RuntimeError("production database configuration requires APP_ENV=production")
+
+    database_password = _required("POSTGRES_PASSWORD")
+    if database_password != os.environ["POSTGRES_PASSWORD"]:
+        raise RuntimeError("POSTGRES_PASSWORD must not start or end with whitespace")
+    if is_weak_secret(database_password, min_length=16, min_unique=6) or (
+        database_password.lower() in DEFAULT_OR_WEAK_DATABASE_PASSWORDS
+    ):
+        raise RuntimeError(
+            "POSTGRES_PASSWORD must be a diverse, non-default value of at least 16 characters"
+        )
+    encoded_password = quote(database_password, safe="")
+    os.environ["DATABASE_URL"] = (
+        f"postgresql+psycopg2://vela:{encoded_password}@db:5432/vela"
+    )
+    return os.environ["DATABASE_URL"]
+
+
 def _run_migrations() -> None:
     subprocess.run(
         [
@@ -87,17 +114,7 @@ def main() -> int:
             "SECRET_KEY must be a diverse, non-default value of at least 32 characters"
         )
 
-    database_password = _required("POSTGRES_PASSWORD")
-    if is_weak_secret(database_password, min_length=16, min_unique=6) or (
-        database_password.lower() in DEFAULT_OR_WEAK_DATABASE_PASSWORDS
-    ):
-        raise RuntimeError(
-            "POSTGRES_PASSWORD must be a diverse, non-default value of at least 16 characters"
-        )
-    encoded_password = quote(database_password, safe="")
-    os.environ["DATABASE_URL"] = (
-        f"postgresql+psycopg2://vela:{encoded_password}@db:5432/vela"
-    )
+    configure_database_url()
 
     mode = os.environ.get("VELA_ENTRYPOINT_MODE", "web").strip().lower()
     if mode not in {"check", "migrate", "web"}:

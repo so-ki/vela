@@ -157,10 +157,19 @@ def seed_demo_users(db: Session) -> dict[str, User]:
 
 
 def seed() -> None:
-    init_db()
     db = SessionLocal()
     try:
-        seed_demo_users(db)
+        if os.environ.get("APP_ENV", "").strip().lower() == "production" and (
+            db.get_bind().dialect.name != "postgresql"
+        ):
+            raise RuntimeError("production smoke seeding requires PostgreSQL")
+        init_db()
+        users = seed_demo_users(db)
+        if os.environ.get("APP_ENV", "").strip().lower() == "production":
+            for spec in DEMO_USERS:
+                email = str(spec["email"]).lower()
+                if not _password_matches(users[email], str(spec["password"])):
+                    raise RuntimeError(f"production smoke password verification failed: {email}")
     finally:
         db.close()
 
