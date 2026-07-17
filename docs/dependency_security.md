@@ -9,6 +9,17 @@
 - 漏洞扫描器：PyPA `pip-audit` 2.10.1
 - 最后审计日期：2026-07-17
 
+## 生产容器基线
+
+- 生产后端基础镜像：Docker Official Image `python:3.12.13-alpine3.24@sha256:6d43704baacd1bfbe7c295d7f13079d5d8104ed33568873133f8fc69980419df`（多架构 manifest）。
+- 生产安装使用 `--only-binary=:all:`；完整锁文件已对 CPython 3.12 的 musllinux 1.1/1.2 x86_64 轮子做下载预检，不允许在运行镜像内临时编译依赖。
+- 生产镜像不安装 `curl`、编译器或包管理器扩展；Compose 健康检查改用 Python 标准库。
+- GitHub Actions 继续以 Trivy 0.70.0 对 High/Critical 漏洞执行 `ignore-unfixed: false` 的阻断策略，不接受通过全局忽略未修复漏洞来制造绿色结果。
+
+此前浮动的 `python:3.12-slim` 在 2026-07-17 的 `--pull` 构建中解析为 Debian 13.6，Trivy 命中 36 个无可用修复版本的系统级 High/Critical CVE（33/3），主要来自 Perl、curl、util-linux、ncurses 与 gzip。由于相应 Debian 版本没有修复包，`apt upgrade` 不能消除风险；因此改为更小且仍受支持的 Alpine 3.24 基线，并移除应用不需要的 curl。最终结论仍以远端生产镜像、SBOM、PostgreSQL 迁移和完整 Compose 冒烟门同时通过为准。
+
+摘要固定用于保证本 RC 的基础层可复现，不代表永久停留在该摘要。维护期应至少每周检查 Docker Official Image 的新摘要，以独立 PR 更新，并重新执行完整 Trivy、SBOM、PostgreSQL 迁移和 Compose 冒烟门。
+
 | 直接依赖 | 已审计版本 | 说明 |
 |---|---:|---|
 | FastAPI | 0.139.0 | 与 Starlette 1.3.1 同组验证 |

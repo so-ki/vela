@@ -624,6 +624,17 @@ def check_docker() -> None:
     entrypoint = (ROOT / "backend/scripts/container_entrypoint.py").read_text(encoding="utf-8")
     vite_config = (ROOT / "frontend/vite.config.ts").read_text(encoding="utf-8")
     ci_workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    if not prod_dockerfile.startswith(
+        "FROM python:3.12.13-alpine3.24@sha256:"
+        "6d43704baacd1bfbe7c295d7f13079d5d8104ed33568873133f8fc69980419df\n"
+    ):
+        errors.append("production backend 未固定到已审计的 Python 3.12 / Alpine 3.24 基线")
+    if "pip install --no-cache-dir --only-binary=:all: -r requirements.lock" not in prod_dockerfile:
+        errors.append("production backend 未强制仅安装预编译 wheel")
+    if "apt-get" in prod_dockerfile or "curl" in prod_dockerfile:
+        errors.append("production backend 不得引入 Debian 包管理器或 curl 运行时依赖")
+    if "addgroup -S vela" not in prod_dockerfile or "adduser -S -D -H -h /app -G vela vela" not in prod_dockerfile:
+        errors.append("production backend 未使用 Alpine 非 root 账号")
     if "ENV SEED_DEMO_USERS" in prod_dockerfile:
         errors.append("production image 不得暴露固定口令 demo seed 开关")
     if "seed_demo_user.py" in prod_dockerfile:
@@ -656,6 +667,10 @@ def check_docker() -> None:
         errors.append("production entrypoint 未 fail-closed 校验数据库密码")
     if "127.0.0.1:${HTTP_PORT:-8080}:8080" not in compose:
         errors.append("production compose 默认 HTTP bind address 未限制在 loopback")
+    if "http.client.HTTPConnection('127.0.0.1', 8000, timeout=4)" not in compose:
+        errors.append("production backend 健康检查未使用镜像内置 Python 标准库")
+    if '["CMD", "curl"' in compose:
+        errors.append("production backend 健康检查不得要求 curl")
     frontend_block = compose.split("\n  frontend:\n", 1)[-1].split("\nvolumes:\n", 1)[0]
     for marker, message in (
         ("read_only: true", "production frontend 根文件系统未设为只读"),

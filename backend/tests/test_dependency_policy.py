@@ -45,11 +45,27 @@ def test_runtime_lock_contains_every_direct_pin() -> None:
 
 
 def test_backend_images_use_the_python_312_audited_matrix() -> None:
-    for relative_path in (
-        "docker/Dockerfile.backend",
-        "docker/Dockerfile.backend.prod",
-    ):
-        content = (REPOSITORY_ROOT / relative_path).read_text(encoding="utf-8")
-        assert content.startswith("FROM python:3.12-slim\n")
-        assert "pip install --no-cache-dir -r requirements.lock" in content
-        assert "requirements-rag.txt" not in content
+    development = (REPOSITORY_ROOT / "docker/Dockerfile.backend").read_text(
+        encoding="utf-8"
+    )
+    production = (REPOSITORY_ROOT / "docker/Dockerfile.backend.prod").read_text(
+        encoding="utf-8"
+    )
+
+    assert development.startswith("FROM python:3.12-slim\n")
+    assert "pip install --no-cache-dir -r requirements.lock" in development
+
+    assert production.startswith(
+        "FROM python:3.12.13-alpine3.24@sha256:"
+        "6d43704baacd1bfbe7c295d7f13079d5d8104ed33568873133f8fc69980419df\n"
+    )
+    assert "pip install --no-cache-dir --only-binary=:all: -r requirements.lock" in production
+    assert "apt-get" not in production
+    assert "curl" not in production
+    assert "groupadd" not in production
+    assert "useradd" not in production
+    assert "addgroup -S vela" in production
+    assert "adduser -S -D -H -h /app -G vela vela" in production
+
+    assert "requirements-rag.txt" not in development
+    assert "requirements-rag.txt" not in production

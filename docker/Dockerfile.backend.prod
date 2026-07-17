@@ -1,11 +1,9 @@
-FROM python:3.12-slim
+FROM python:3.12.13-alpine3.24@sha256:6d43704baacd1bfbe7c295d7f13079d5d8104ed33568873133f8fc69980419df
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
-
 COPY requirements.lock ./
-RUN pip install --no-cache-dir -r requirements.lock
+RUN pip install --no-cache-dir --only-binary=:all: -r requirements.lock
 
 COPY alembic.ini ./
 COPY alembic ./alembic
@@ -21,7 +19,7 @@ COPY app/capability_packs/__init__.py app/capability_packs/loader.py app/capabil
 COPY app/capability_packs/brazil_new_energy_greenfield ./app/capability_packs/brazil_new_energy_greenfield
 COPY scripts/container_entrypoint.py scripts/create_user.py ./scripts/
 
-RUN groupadd --system vela && useradd --system --gid vela --home-dir /app vela && \
+RUN addgroup -S vela && adduser -S -D -H -h /app -G vela vela && \
     mkdir -p /app/data && chown -R vela:vela /app/data
 
 ENV APP_ENV=production
