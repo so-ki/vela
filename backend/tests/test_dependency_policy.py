@@ -81,11 +81,16 @@ def test_production_postgres_replaces_the_scanner_flagged_gosu_binary() -> None:
         "57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777\n"
     )
     assert "apk add --no-cache su-exec=0.3-r0" in content
+    assert "test -x /sbin/su-exec" in content
     assert "rm -f /usr/local/bin/gosu /usr/local/bin/su-exec" in content
-    assert "ln -s /sbin/su-exec /usr/local/bin/gosu" in content
-    assert "ln -s /sbin/su-exec /usr/local/bin/su-exec" in content
-    assert 'test "$(readlink -f /usr/local/bin/gosu)" = \'/sbin/su-exec\'' in content
-    assert 'test "$(readlink -f /usr/local/bin/su-exec)" = \'/sbin/su-exec\'' in content
-    assert 'test "$(gosu postgres id -u)" = \'70\'' in content
-    assert 'test "$(gosu postgres id -g)" = \'70\'' in content
+    assert "ln -s /sbin/su-exec" not in content
+    assert 'test "$(grep -Fc \'exec gosu postgres' in content
+    assert "sed -i 's|exec gosu postgres" in content
+    assert 'test "$(grep -Fc \'exec /sbin/su-exec postgres' in content
+    assert "! grep -Fq 'exec gosu postgres" in content
+    assert 'bash -n "$entrypoint"' in content
+    assert "test ! -e /usr/local/bin/gosu && test ! -L /usr/local/bin/gosu" in content
+    assert "test ! -e /usr/local/bin/su-exec && test ! -L /usr/local/bin/su-exec" in content
+    assert 'test "$(/sbin/su-exec postgres id -u)" = \'70\'' in content
+    assert 'test "$(/sbin/su-exec postgres id -g)" = \'70\'' in content
     assert "'/var/lib/postgresql'" in content

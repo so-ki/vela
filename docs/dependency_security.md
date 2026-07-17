@@ -12,14 +12,14 @@
 ## 生产容器基线
 
 - 生产后端基础镜像：Docker Official Image `python:3.12.13-alpine3.24@sha256:6d43704baacd1bfbe7c295d7f13079d5d8104ed33568873133f8fc69980419df`（多架构 manifest）。
-- 生产数据库基础镜像：Docker Official Image `postgres:16.14-alpine3.24@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777`；包装层用 Alpine 官方 `su-exec=0.3-r0` 替换上游 `gosu 1.19` Go 二进制，同时保留官方 entrypoint 的降权调用约定。
+- 生产数据库基础镜像：Docker Official Image `postgres:16.14-alpine3.24@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777`；包装层用 Alpine 官方 `su-exec=0.3-r0` 替换上游 `gosu 1.19` Go 二进制，并将固定摘要内 entrypoint 的唯一降权调用精确改写为 `/sbin/su-exec`。
 - 生产安装使用 `--only-binary=:all:`；完整锁文件已对 CPython 3.12 的 musllinux 1.1/1.2 x86_64 轮子做下载预检，不允许在运行镜像内临时编译依赖。
 - 生产镜像不安装 `curl`、编译器或包管理器扩展；Compose 健康检查改用 Python 标准库。
 - GitHub Actions 继续以 Trivy 0.70.0 对 High/Critical 漏洞执行 `ignore-unfixed: false` 的阻断策略，不接受通过全局忽略未修复漏洞来制造绿色结果。
 
 此前浮动的 `python:3.12-slim` 在 2026-07-17 的 `--pull` 构建中解析为 Debian 13.6，Trivy 命中 36 个无可用修复版本的系统级 High/Critical CVE（33/3），主要来自 Perl、curl、util-linux、ncurses 与 gzip。由于相应 Debian 版本没有修复包，`apt upgrade` 不能消除风险；因此改为更小且仍受支持的 Alpine 3.24 基线，并移除应用不需要的 curl。最终结论仍以远端生产镜像、SBOM、PostgreSQL 迁移和完整 Compose 冒烟门同时通过为准。
 
-同轮复验中，后端与前端镜像扫描已经通过；官方 PostgreSQL 镜像的 Alpine 系统包也是 0 命中，但 `/usr/local/bin/gosu` 使用 Go 1.24.6 构建，命中 15 个均已有修复版本的 High/Critical Go 标准库 CVE（14/1）。官方容器镜像规范明确允许以 `gosu` 或 `su-exec` 在 entrypoint 中降权；因此包装层删除该 Go 二进制，以 Alpine main 仓库的极小 C 实现 `su-exec` 在相同路径提供 `user[:group] command ...` 调用。数据库最终镜像仍必须重新通过严格扫描、SBOM 与实际初始化/迁移/冒烟，不能仅凭等价接口放行。
+同轮复验中，后端与前端镜像扫描已经通过；官方 PostgreSQL 镜像的 Alpine 系统包也是 0 命中，但 `/usr/local/bin/gosu` 使用 Go 1.24.6 构建，命中 15 个均已有修复版本的 High/Critical Go 标准库 CVE（14/1）。官方容器镜像规范明确允许以 `gosu` 或 `su-exec` 在 entrypoint 中降权；因此包装层删除该 Go 二进制，以 Alpine main 仓库的极小 C 实现 `su-exec` 提供相同的 `user[:group] command ...` 调用。第一次尝试在原路径重建符号链接时，真实构建探针全部通过，但 Trivy 分层分析仍把该路径关联到基础层的旧 Go 元数据；最终方案不再复用该路径，而是对固定摘要内的唯一 entrypoint 调用做 fail-closed 精确替换。数据库最终镜像仍必须重新通过严格扫描、SBOM 与实际初始化/迁移/冒烟，不能仅凭等价接口放行。
 
 摘要固定用于保证本 RC 的基础层可复现，不代表永久停留在该摘要。维护期应至少每周检查 Docker Official Image 的新摘要，以独立 PR 更新，并重新执行完整 Trivy、SBOM、PostgreSQL 迁移和 Compose 冒烟门。
 

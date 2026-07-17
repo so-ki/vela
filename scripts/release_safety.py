@@ -645,17 +645,23 @@ def check_docker() -> None:
         errors.append("production PostgreSQL 未固定到已审计的官方多架构摘要")
     for marker in (
         "apk add --no-cache su-exec=0.3-r0",
+        "test -x /sbin/su-exec",
         "rm -f /usr/local/bin/gosu /usr/local/bin/su-exec",
-        "ln -s /sbin/su-exec /usr/local/bin/gosu",
-        "ln -s /sbin/su-exec /usr/local/bin/su-exec",
-        'test "$(readlink -f /usr/local/bin/gosu)" = \'/sbin/su-exec\'',
-        'test "$(readlink -f /usr/local/bin/su-exec)" = \'/sbin/su-exec\'',
-        'test "$(gosu postgres id -u)" = \'70\'',
-        'test "$(gosu postgres id -g)" = \'70\'',
+        'test "$(grep -Fc \'exec gosu postgres',
+        "sed -i 's|exec gosu postgres",
+        'test "$(grep -Fc \'exec /sbin/su-exec postgres',
+        "! grep -Fq 'exec gosu postgres",
+        'bash -n "$entrypoint"',
+        "test ! -e /usr/local/bin/gosu && test ! -L /usr/local/bin/gosu",
+        "test ! -e /usr/local/bin/su-exec && test ! -L /usr/local/bin/su-exec",
+        'test "$(/sbin/su-exec postgres id -u)" = \'70\'',
+        'test "$(/sbin/su-exec postgres id -g)" = \'70\'',
         "'/var/lib/postgresql'",
     ):
         if marker not in postgres_prod_dockerfile:
             errors.append(f"production PostgreSQL 缺少 gosu 替换控制：{marker}")
+    if "ln -s /sbin/su-exec" in postgres_prod_dockerfile:
+        errors.append("production PostgreSQL 不得重建会保留旧 Go 元数据的 gosu 路径")
     if "ENV SEED_DEMO_USERS" in prod_dockerfile:
         errors.append("production image 不得暴露固定口令 demo seed 开关")
     if "seed_demo_user.py" in prod_dockerfile:
