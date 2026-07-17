@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, update
+from sqlalchemy import create_engine, event, update
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.orm.attributes import flag_modified
 
@@ -46,6 +46,13 @@ def db_factory(tmp_path):
         f"sqlite:///{tmp_path / 'scope.db'}",
         connect_args={"check_same_thread": False, "timeout": 10},
     )
+
+    @event.listens_for(engine, "connect")
+    def _enable_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     Base.metadata.create_all(engine)
     factory = sessionmaker(bind=engine, expire_on_commit=False)
     with factory() as db:

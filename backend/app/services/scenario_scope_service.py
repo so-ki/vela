@@ -624,6 +624,10 @@ def acquire_generation_lease(db: Session, scenario: InvestigationScenario, user:
         db.refresh(scenario)
         return acquire_generation_lease(db, scenario, user, **request)
     db.add(input_record)
+    # These mappers intentionally have no mutable ORM relationship. Flush the
+    # immutable input first so PostgreSQL (and SQLite with FK checks enabled)
+    # can enforce the attempt's generation_input_id dependency deterministically.
+    db.flush()
     db.add(attempt)
     db.commit()
     db.refresh(scenario)
