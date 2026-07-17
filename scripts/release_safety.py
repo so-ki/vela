@@ -29,6 +29,7 @@ DOCKER_TARGETS = (
     ("docker/Dockerfile.backend.prod", "backend"),
     ("docker/Dockerfile.frontend", "frontend"),
     ("docker/Dockerfile.frontend.prod", "."),
+    ("docker/Dockerfile.postgres.prod", "."),
 )
 
 FORBIDDEN_PREFIXES = (
@@ -193,6 +194,7 @@ EXPLICIT_RUNTIME_FILES = (
     "docker/Dockerfile.backend.prod",
     "docker/Dockerfile.frontend",
     "docker/Dockerfile.frontend.prod",
+    "docker/Dockerfile.postgres.prod",
     "docker/nginx.conf",
 )
 
@@ -618,6 +620,7 @@ def check_docker() -> None:
 
     prod_dockerfile = (ROOT / "docker/Dockerfile.backend.prod").read_text(encoding="utf-8")
     frontend_prod_dockerfile = (ROOT / "docker/Dockerfile.frontend.prod").read_text(encoding="utf-8")
+    postgres_prod_dockerfile = (ROOT / "docker/Dockerfile.postgres.prod").read_text(encoding="utf-8")
     nginx_config = (ROOT / "docker/nginx.conf").read_text(encoding="utf-8")
     compose = (ROOT / "docker-compose.prod.yml").read_text(encoding="utf-8")
     dev_compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
@@ -635,6 +638,24 @@ def check_docker() -> None:
         errors.append("production backend 不得引入 Debian 包管理器或 curl 运行时依赖")
     if "addgroup -S vela" not in prod_dockerfile or "adduser -S -D -H -h /app -G vela vela" not in prod_dockerfile:
         errors.append("production backend 未使用 Alpine 非 root 账号")
+    if not postgres_prod_dockerfile.startswith(
+        "FROM postgres:16.14-alpine3.24@sha256:"
+        "57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777\n"
+    ):
+        errors.append("production PostgreSQL 未固定到已审计的官方多架构摘要")
+    for marker in (
+        "apk add --no-cache su-exec=0.3-r0",
+        "rm -f /usr/local/bin/gosu /usr/local/bin/su-exec",
+        "ln -s /sbin/su-exec /usr/local/bin/gosu",
+        "ln -s /sbin/su-exec /usr/local/bin/su-exec",
+        'test "$(readlink -f /usr/local/bin/gosu)" = \'/sbin/su-exec\'',
+        'test "$(readlink -f /usr/local/bin/su-exec)" = \'/sbin/su-exec\'',
+        'test "$(gosu postgres id -u)" = \'70\'',
+        'test "$(gosu postgres id -g)" = \'70\'',
+        "'/var/lib/postgresql'",
+    ):
+        if marker not in postgres_prod_dockerfile:
+            errors.append(f"production PostgreSQL 缺少 gosu 替换控制：{marker}")
     if "ENV SEED_DEMO_USERS" in prod_dockerfile:
         errors.append("production image 不得暴露固定口令 demo seed 开关")
     if "seed_demo_user.py" in prod_dockerfile:
@@ -667,6 +688,10 @@ def check_docker() -> None:
         errors.append("production entrypoint 未 fail-closed 校验数据库密码")
     if "127.0.0.1:${HTTP_PORT:-8080}:8080" not in compose:
         errors.append("production compose 默认 HTTP bind address 未限制在 loopback")
+    if "dockerfile: docker/Dockerfile.postgres.prod" not in compose:
+        errors.append("production compose 未使用已扫描的 PostgreSQL 包装镜像")
+    if "image: postgres:" in compose:
+        errors.append("production compose 不得绕过已扫描的 PostgreSQL 包装镜像")
     if "http.client.HTTPConnection('127.0.0.1', 8000, timeout=4)" not in compose:
         errors.append("production backend 健康检查未使用镜像内置 Python 标准库")
     if '["CMD", "curl"' in compose:
@@ -716,7 +741,13 @@ def check_docker() -> None:
         errors.append("Vite dev proxy 未读取 VITE_API_PROXY")
     if "production-compose-smoke:" not in ci_workflow or "bash scripts/prod_smoke.sh" not in ci_workflow:
         errors.append("CI 缺少真实生产镜像、PostgreSQL migration 与 Compose smoke")
+    if "docker build --pull -f docker/Dockerfile.postgres.prod -t vela-postgres:ci ." not in ci_workflow:
+        errors.append("CI 未构建已移除扫描命中 gosu 的 PostgreSQL 镜像")
+    if ci_workflow.count("image-ref: vela-postgres:ci") < 2:
+        errors.append("CI 未对最终 PostgreSQL 包装镜像执行漏洞扫描和 SBOM")
     prod_smoke = (ROOT / "scripts/prod_smoke.sh").read_text(encoding="utf-8")
+    if "db_pid1_uid=" not in prod_smoke or "/proc/1/status" not in prod_smoke:
+        errors.append("production Compose smoke 未验证 PostgreSQL PID 1 已降权")
     if "npm run test:e2e" not in prod_smoke or "playwright install --with-deps chromium" not in ci_workflow:
         errors.append("生产 Compose smoke 未用真实浏览器覆盖构建后的 SPA 登录路径")
     if "VELA_ENTRYPOINT_MODE=check" not in prod_smoke:

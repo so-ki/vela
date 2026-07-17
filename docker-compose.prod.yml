@@ -2,6 +2,10 @@ x-backend-build: &backend-build
   context: ./backend
   dockerfile: ../docker/Dockerfile.backend.prod
 
+x-postgres-build: &postgres-build
+  context: .
+  dockerfile: docker/Dockerfile.postgres.prod
+
 x-database-environment: &database-environment
   APP_ENV: production
   SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
@@ -9,7 +13,7 @@ x-database-environment: &database-environment
 
 services:
   db:
-    image: postgres:16-alpine
+    build: *postgres-build
     environment:
       POSTGRES_USER: vela
       POSTGRES_PASSWORD: "${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}"

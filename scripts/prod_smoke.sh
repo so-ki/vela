@@ -120,6 +120,11 @@ assert_container_hardening() {
 echo "==> container least privilege"
 assert_container_hardening backend /app/.vela-rootfs-probe
 assert_container_hardening frontend /usr/share/nginx/html/.vela-rootfs-probe
+db_pid1_uid="$("${COMPOSE[@]}" exec -T db sh -c "awk '/^Uid:/ {print \$2}' /proc/1/status")"
+if [ "$db_pid1_uid" != "70" ]; then
+  echo "FAIL: PostgreSQL PID 1 未按官方 entrypoint 降权为 UID 70" >&2
+  exit 1
+fi
 
 echo "==> provision disposable smoke users"
 "${COMPOSE[@]}" cp backend/scripts/seed_demo_user.py backend:/tmp/seed_demo_user.py

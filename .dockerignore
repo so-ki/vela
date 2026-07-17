@@ -19,6 +19,7 @@ frontend/src/test/
 !docker/
 docker/**
 !docker/Dockerfile.frontend.prod
+!docker/Dockerfile.postgres.prod
 !docker/nginx.conf
 
 # Never admit generated, local, or secret-bearing files through an allowed tree.

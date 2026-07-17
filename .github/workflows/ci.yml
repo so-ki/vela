@@ -112,7 +112,7 @@ jobs:
           mkdir -p security-artifacts
           docker build --pull -f docker/Dockerfile.backend.prod -t vela-backend:ci backend
           docker build --pull -f docker/Dockerfile.frontend.prod -t vela-frontend:ci .
-          docker pull postgres:16-alpine
+          docker build --pull -f docker/Dockerfile.postgres.prod -t vela-postgres:ci .
       - name: Scan backend image for high and critical vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
@@ -146,7 +146,7 @@ jobs:
       - name: Scan PostgreSQL image for high and critical vulnerabilities
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: postgres:16-alpine
+          image-ref: vela-postgres:ci
           format: table
           scanners: vuln
           severity: CRITICAL,HIGH
@@ -155,7 +155,7 @@ jobs:
       - name: Generate PostgreSQL CycloneDX SBOM
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: postgres:16-alpine
+          image-ref: vela-postgres:ci
           format: cyclonedx
           output: security-artifacts/postgres.cdx.json
       - name: Build and exercise the isolated production stack

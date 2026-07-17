@@ -99,6 +99,7 @@ def test_packaged_release_contains_every_static_check_docker_dependency() -> Non
         "docker/Dockerfile.backend.prod",
         "docker/Dockerfile.frontend",
         "docker/Dockerfile.frontend.prod",
+        "docker/Dockerfile.postgres.prod",
         "docker/nginx.conf",
         "backend/scripts/container_entrypoint.py",
         "frontend/vite.config.ts",

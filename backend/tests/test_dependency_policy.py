@@ -69,3 +69,23 @@ def test_backend_images_use_the_python_312_audited_matrix() -> None:
 
     assert "requirements-rag.txt" not in development
     assert "requirements-rag.txt" not in production
+
+
+def test_production_postgres_replaces_the_scanner_flagged_gosu_binary() -> None:
+    content = (REPOSITORY_ROOT / "docker/Dockerfile.postgres.prod").read_text(
+        encoding="utf-8"
+    )
+
+    assert content.startswith(
+        "FROM postgres:16.14-alpine3.24@sha256:"
+        "57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777\n"
+    )
+    assert "apk add --no-cache su-exec=0.3-r0" in content
+    assert "rm -f /usr/local/bin/gosu /usr/local/bin/su-exec" in content
+    assert "ln -s /sbin/su-exec /usr/local/bin/gosu" in content
+    assert "ln -s /sbin/su-exec /usr/local/bin/su-exec" in content
+    assert 'test "$(readlink -f /usr/local/bin/gosu)" = \'/sbin/su-exec\'' in content
+    assert 'test "$(readlink -f /usr/local/bin/su-exec)" = \'/sbin/su-exec\'' in content
+    assert 'test "$(gosu postgres id -u)" = \'70\'' in content
+    assert 'test "$(gosu postgres id -g)" = \'70\'' in content
+    assert "'/var/lib/postgresql'" in content

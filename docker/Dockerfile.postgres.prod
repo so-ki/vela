@@ -1,0 +1,15 @@
+FROM postgres:16.14-alpine3.24@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+
+# The upstream image ships gosu 1.19, built with Go 1.24.6. Replace that
+# scanner-flagged Go binary with Alpine's tiny C implementation. su-exec accepts
+# the same `user[:group] command ...` form used by the upstream entrypoint.
+RUN set -eux; \
+    apk add --no-cache su-exec=0.3-r0; \
+    rm -f /usr/local/bin/gosu /usr/local/bin/su-exec; \
+    ln -s /sbin/su-exec /usr/local/bin/gosu; \
+    ln -s /sbin/su-exec /usr/local/bin/su-exec; \
+    test "$(readlink -f /usr/local/bin/gosu)" = '/sbin/su-exec'; \
+    test "$(readlink -f /usr/local/bin/su-exec)" = '/sbin/su-exec'; \
+    test "$(gosu postgres id -u)" = '70'; \
+    test "$(gosu postgres id -g)" = '70'; \
+    test "$(gosu postgres sh -c 'printf %s "$HOME"')" = '/var/lib/postgresql'
