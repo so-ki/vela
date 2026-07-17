@@ -239,6 +239,14 @@ def _semantic_errors(experiment: dict[str, Any]) -> list[str]:
     if experiment.get("runtime_integration") is not False:
         errors.append("runtime_integration: evidence experiment must not enter runtime")
     disclaimer = str(experiment.get("disclaimer") or "")
+    limitations = [str(item) for item in (experiment.get("limitations") or [])]
+    if "作废为现行法证据" not in disclaimer or not any(
+        "69.120/2024" in item and "作废为现行法证据" in item for item in limitations
+    ):
+        errors.append(
+            "invalidation_notice: stale Decreto nº 8.468/1976 claims must remain explicitly invalidated"
+        )
+    disclaimer = str(experiment.get("disclaimer") or "")
     if "不构成巴西法律意见" not in disclaimer:
         errors.append("disclaimer: must state that the experiment is not Brazilian legal advice")
     if "巴西执业律师" not in disclaimer:

@@ -345,6 +345,14 @@ async function setDecision(code: string, decision: 'approved' | 'rejected') {
   }
 }
 
+function requiresApprovalBasis(item: ReviewItem) {
+  return item.tier === 'S3' || !!item.hard_block
+}
+
+function approvalBasisReady(item: ReviewItem) {
+  return !requiresApprovalBasis(item) || (comments.value[item.code] || '').trim().length >= 20
+}
+
 async function saveComment(code: string) {
   if (!scenario.value || isLocked.value || !review.value) return
   const item = review.value.items.find((i) => i.code === code)
@@ -822,6 +830,8 @@ function openFullBrief(code: string) {
                     </span>
                     <span v-if="item.carry_forward && item.decision === 'approved'" class="badge ok sm">沿用</span>
                     <span v-if="item.invalidated" class="badge warn sm">材料变更</span>
+                    <span v-if="item.tier" class="badge warn sm">{{ item.tier }}</span>
+                    <span v-if="item.hard_block" class="badge rejected sm">硬阻断</span>
                   </div>
                   <h3>{{ item.title }}</h3>
                 </div>
@@ -924,7 +934,8 @@ function openFullBrief(code: string) {
                       <button
                         type="button"
                         class="btn-secondary sm"
-                        :disabled="saving === item.code"
+                        :disabled="saving === item.code || !approvalBasisReady(item)"
+                        :title="!approvalBasisReady(item) ? '请先填写至少 20 字的覆盖依据、法源定位或外部律师意见' : ''"
                         @click="setDecision(item.code, 'approved')"
                       >
                         确认本条
@@ -944,14 +955,17 @@ function openFullBrief(code: string) {
                   </div>
                 </template>
                 <label class="comment-field">
-                  <span>批注</span>
+                  <span>{{ requiresApprovalBasis(item) ? '复核依据（必填，至少 20 字）' : '批注' }}</span>
                   <input
                     v-model="comments[item.code]"
                     :disabled="isLocked"
-                    placeholder="可选：补充复核意见"
+                    :placeholder="requiresApprovalBasis(item) ? '填写覆盖依据、法源定位或外部律师意见' : '可选：补充复核意见'"
                     @blur="saveComment(item.code)"
                   />
                 </label>
+                <p v-if="!isLocked && requiresApprovalBasis(item) && !approvalBasisReady(item)" class="muted external-flag">
+                  此条为 S3/硬阻断，确认前必须填写至少 20 字的人工覆盖依据。
+                </p>
                 <p v-if="item.reviewer_name && item.reviewed_at" class="muted external-flag">
                   最近复核：{{ item.reviewer_name }} · {{ new Date(item.reviewed_at).toLocaleString() }}
                   <span v-if="item.manual_override"> · 人工覆盖</span>

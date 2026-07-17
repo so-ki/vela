@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 from pathlib import Path
 from typing import Any, Optional
 
@@ -10,6 +12,23 @@ from app.core.secure_json_store import atomic_write_json
 CORPUS_PATH = Path(__file__).resolve().parents[1] / "data" / "brazil_legal_corpus.json"
 INDEX_FLAG = Path(__file__).resolve().parents[2] / "data" / "legal_index.json"
 RETRIEVABLE_REVIEW_STATUSES = frozenset({"expert_verified", "provisional"})
+CONTROLLED_EVIDENCE_POLICY = "verified_claims_only"
+CONTROLLED_EVIDENCE_GRADES = frozenset({"official_excerpt", "official_pinpoint_summary"})
+REQUIRED_CONTROLLED_EVIDENCE_FIELDS = (
+    "authority",
+    "instrument_type",
+    "pinpoint",
+    "status_as_of",
+    "last_verified_at",
+    "official_url",
+    "content_hash",
+    "content_hash_scope",
+    "evidence_grade",
+    "verification_scope",
+    "text_pt",
+)
+_SHA256 = re.compile(r"^[0-9a-f]{64}$")
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def load_corpus(corpus_path: Path | str | None = None) -> dict[str, Any]:
@@ -30,12 +49,66 @@ def corpus_review_status(corpus: dict[str, Any], doc: dict[str, Any]) -> str:
     return "pending"
 
 
-def retrievable_corpus_sources(corpus: dict[str, Any]) -> list[dict[str, Any]]:
+def declared_retrievable_corpus_sources(corpus: dict[str, Any]) -> list[dict[str, Any]]:
     return [
         doc
         for doc in corpus.get("sources", [])
         if corpus_review_status(corpus, doc) in RETRIEVABLE_REVIEW_STATUSES
     ]
+
+
+def controlled_evidence_errors(doc: dict[str, Any]) -> list[str]:
+    """Validate the local, auditable evidence envelope for a claim source.
+
+    ``content_hash`` is deliberately scoped to the stored ``text_pt`` claim
+    summary.  It detects local corpus drift; it does not claim to hash or
+    certify the mutable remote page.
+    """
+
+    errors: list[str] = []
+    missing = [
+        field
+        for field in REQUIRED_CONTROLLED_EVIDENCE_FIELDS
+        if not str(doc.get(field) or "").strip()
+    ]
+    errors.extend(f"missing:{field}" for field in missing)
+
+    if doc.get("evidence_grade") not in CONTROLLED_EVIDENCE_GRADES:
+        errors.append("invalid:evidence_grade")
+    if doc.get("content_hash_scope") != "text_pt":
+        errors.append("invalid:content_hash_scope")
+
+    content_hash = str(doc.get("content_hash") or "").strip().lower()
+    text_pt = str(doc.get("text_pt") or "")
+    if content_hash and not _SHA256.fullmatch(content_hash):
+        errors.append("invalid:content_hash_format")
+    elif content_hash and hashlib.sha256(text_pt.encode("utf-8")).hexdigest() != content_hash:
+        errors.append("mismatch:content_hash")
+
+    for field in ("status_as_of", "last_verified_at"):
+        value = str(doc.get(field) or "").strip()
+        if value and not _ISO_DATE.fullmatch(value):
+            errors.append(f"invalid:{field}")
+
+    for field in ("url", "official_url"):
+        value = str(doc.get(field) or "").strip()
+        if not value.startswith("https://"):
+            errors.append(f"invalid:{field}_https")
+
+    if str(doc.get("validity") or "").strip().lower() != "vigente":
+        errors.append("invalid:validity")
+    if str(doc.get("review_status") or "").strip().lower() == "provisional" and (
+        doc.get("requires_expert_review") is not True
+    ):
+        errors.append("invalid:requires_expert_review")
+    return sorted(set(errors))
+
+
+def retrievable_corpus_sources(corpus: dict[str, Any]) -> list[dict[str, Any]]:
+    declared = declared_retrievable_corpus_sources(corpus)
+    if corpus.get("retrieval_policy") != CONTROLLED_EVIDENCE_POLICY:
+        return declared
+    return [doc for doc in declared if not controlled_evidence_errors(doc)]
 
 
 def _save_index_flag(payload: dict[str, Any]) -> None:

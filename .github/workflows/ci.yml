@@ -89,9 +89,9 @@ jobs:
           bash scripts/check_release_boundaries.sh /tmp/vela-capability-pack-mvp.zip
 
   production-compose-smoke:
-    name: Production images, PostgreSQL migration, and smoke
+    name: Production images, SBOM/CVE gate, PostgreSQL migration, and smoke
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
@@ -107,6 +107,57 @@ jobs:
         run: npx playwright install --with-deps chromium
       - name: Verify Docker Compose runtime
         run: docker compose version
+      - name: Build production images for security evidence
+        run: |
+          mkdir -p security-artifacts
+          docker build --pull -f docker/Dockerfile.backend.prod -t vela-backend:ci backend
+          docker build --pull -f docker/Dockerfile.frontend.prod -t vela-frontend:ci .
+          docker pull postgres:16-alpine
+      - name: Scan backend image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: vela-backend:ci
+          format: table
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: false
+          exit-code: "1"
+      - name: Generate backend CycloneDX SBOM
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: vela-backend:ci
+          format: cyclonedx
+          output: security-artifacts/backend.cdx.json
+      - name: Scan frontend image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: vela-frontend:ci
+          format: table
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: false
+          exit-code: "1"
+      - name: Generate frontend CycloneDX SBOM
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: vela-frontend:ci
+          format: cyclonedx
+          output: security-artifacts/frontend.cdx.json
+      - name: Scan PostgreSQL image for high and critical vulnerabilities
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: postgres:16-alpine
+          format: table
+          scanners: vuln
+          severity: CRITICAL,HIGH
+          ignore-unfixed: false
+          exit-code: "1"
+      - name: Generate PostgreSQL CycloneDX SBOM
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: postgres:16-alpine
+          format: cyclonedx
+          output: security-artifacts/postgres.cdx.json
       - name: Build and exercise the isolated production stack
         env:
           VELA_SMOKE_PORT: "18089"
@@ -114,8 +165,10 @@ jobs:
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: ${{ !cancelled() }}
         with:
-          name: production-ui-smoke-report
-          path: frontend/playwright-report/
+          name: production-security-and-smoke-evidence
+          path: |
+            security-artifacts/*.cdx.json
+            frontend/playwright-report/
           if-no-files-found: ignore
           retention-days: 14
 
@@ -126,7 +179,6 @@ jobs:
     env:
       APP_ENV: test
       DATABASE_URL: sqlite:////tmp/vela-e2e.db
-      SECRET_KEY: ci-only-ephemeral-secret-key-00000000000000000000
       CORPUS_AGENT_ENABLED: "false"
       LLM_POLISH_ENABLED: "false"
     steps:
@@ -142,6 +194,7 @@ jobs:
           python -m pip install -r backend/requirements.lock
       - name: Run API golden path against a clean database
         run: |
+          export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
           python backend/scripts/seed_demo_user.py
           python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 >/tmp/vela-e2e.log 2>&1 &
           server_pid=$!

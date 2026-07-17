@@ -82,7 +82,7 @@ backend/.venv/bin/python backend/scripts/seed_demo_user.py
 # Frontend
 if [ ! -d "frontend/node_modules" ]; then
   echo "==> 安装前端依赖..."
-  (cd frontend && npm install)
+  (cd frontend && npm ci)
 fi
 
 echo ""

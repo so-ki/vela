@@ -86,7 +86,7 @@ verify_demo_identity "$TOKEN" legal@demo.vela legal true \
 verify_demo_identity "$BIZ" biz@demo.vela business false \
   && ok "business demo ready (Playbook not required)" || bad "business demo auth/onboarding"
 
-log "2. Capability Pack catalog (Brazil São Paulo greenfield v1.3.0 provisional)"
+log "2. Capability Pack catalog (Brazil São Paulo greenfield v1.3.1 provisional)"
 PACK=$(curl_t "$CURL_MAX" "$API/capability-packs/catalog" -H "$(auth_header "$TOKEN")")
 echo "$PACK" | python3 -c "
 import sys, json
@@ -95,7 +95,7 @@ assert d.get('pack',{}).get('id')=='brazil_new_energy', d
 assert d.get('rules_pack_id')=='brazil_new_energy', d
 cap=d.get('capability_pack') or {}
 assert cap.get('pack_id')=='brazil_new_energy_greenfield', d
-assert cap.get('version')=='1.3.0', cap
+assert cap.get('version')=='1.3.1', cap
 assert cap.get('state')=='sao_paulo', cap
 assert cap.get('content_status')=='provisional', cap
 assert cap.get('status')=='active', cap
@@ -146,7 +146,7 @@ d=json.load(sys.stdin)
 assert d.get('status')=='pending_scope', d
 proposal=(d.get('scenario_scope') or {}).get('proposed') or {}
 assert proposal.get('pack_id')=='brazil_new_energy_greenfield', proposal
-assert proposal.get('pack_version')=='1.3.0', proposal
+assert proposal.get('pack_version')=='1.3.1', proposal
 assert len(proposal.get('pack_hash',''))==64, proposal
 print('status:', d['status'])
 " && ok "business submit materials" || bad "business submit materials"
@@ -157,7 +157,7 @@ import sys, json
 d=json.load(sys.stdin)
 snapshot=(d.get('scenario_scope') or {}).get('snapshot') or {}
 assert snapshot.get('capability_pack_id')=='brazil_new_energy_greenfield', snapshot
-assert snapshot.get('capability_pack_version')=='1.3.0', snapshot
+assert snapshot.get('capability_pack_version')=='1.3.1', snapshot
 assert snapshot.get('rules_artifact_id')=='brazil_new_energy', snapshot
 assert snapshot.get('corpus_artifact_id')=='brazil_legal_corpus', snapshot
 assert snapshot.get('retrieval_config'), snapshot

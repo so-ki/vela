@@ -1,6 +1,6 @@
 # GitHub 上传与邀请测试者
 
-本地仓库已初始化并完成首次提交（**不含** `backend/.env` 与 API Key）。
+本地仓库已初始化并完成提交（**不含** `backend/.env` 与 API Key）。当前远端可见性必须在 GitHub 设置页单独核验；本文档不把“计划设为私有”写成“已经私有”。
 
 ## 一、在 GitHub 创建私有仓库
 
@@ -16,7 +16,7 @@
 将 `<你的GitHub用户名>` 换成你的账号：
 
 ```bash
-cd /Users/kys/test/vela-platform
+cd <本地仓库路径>
 
 git remote add origin https://github.com/<你的GitHub用户名>/vela-platform.git
 git branch -M main

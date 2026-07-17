@@ -15,14 +15,18 @@ from typing import Any
 from urllib.parse import urlparse
 
 from app.services.legal_ingest import (
+    CONTROLLED_EVIDENCE_POLICY,
     CORPUS_PATH,
+    controlled_evidence_errors,
     corpus_review_status,
+    declared_retrievable_corpus_sources,
     load_corpus,
     retrievable_corpus_sources,
 )
 from app.services.legal_rag import _retrieve_keyword
 
 DEFAULT_CASES_PATH = Path(__file__).resolve().parents[2] / "evals" / "legal_quality_gate_v1.jsonl"
+DEFAULT_RULES_PATH = Path(__file__).resolve().parents[1] / "rules" / "brazil_new_energy.json"
 DEFAULT_RESOLUTION_EVIDENCE_PATH = (
     Path(__file__).resolve().parents[2] / "evals" / "legal_source_resolution_v1.json"
 )
@@ -34,6 +38,7 @@ REQUIRED_GA_FIELDS = (
     "official_url",
     "content_hash",
 )
+UNSUPPORTED_COMPOSITE_PREFIXES = ("jusbrasil-guide-",)
 
 SOURCE_HOST_ALLOWLIST: dict[str, frozenset[str]] = {
     "alesp": frozenset({"www.al.sp.gov.br"}),
@@ -132,12 +137,23 @@ def evaluate_legal_quality(
     corpus_path: Path | str = CORPUS_PATH,
     cases_path: Path | str = DEFAULT_CASES_PATH,
     resolution_evidence_path: Path | str = DEFAULT_RESOLUTION_EVIDENCE_PATH,
+    rules_path: Path | str = DEFAULT_RULES_PATH,
     top_k: int = 3,
 ) -> dict[str, Any]:
     corpus_path = Path(corpus_path)
     corpus = load_corpus(corpus_path)
     sources = list(corpus.get("sources") or [])
+    declared_retrievable = declared_retrievable_corpus_sources(corpus)
     retrievable = retrievable_corpus_sources(corpus)
+    evidence_envelope_errors = [
+        {"source_id": str(doc.get("id") or ""), "errors": controlled_evidence_errors(doc)}
+        for doc in declared_retrievable
+        if controlled_evidence_errors(doc)
+    ]
+    evidence_filtered_ids = sorted(
+        {str(doc.get("id") or "") for doc in declared_retrievable}
+        - {str(doc.get("id") or "") for doc in retrievable}
+    )
     status_counts = Counter(corpus_review_status(corpus, doc) for doc in sources)
     resolution_evidence = load_resolution_evidence(resolution_evidence_path)
     host_integrity_errors = source_host_integrity_errors(sources)
@@ -157,9 +173,15 @@ def evaluate_legal_quality(
         for doc in retrievable
         if str(doc.get("id")) in not_found_source_ids
     )
+    unsupported_composite_retrievable_ids = sorted(
+        str(doc.get("id"))
+        for doc in retrievable
+        if str(doc.get("id") or "").startswith(UNSUPPORTED_COMPOSITE_PREFIXES)
+    )
 
     case_results: list[dict[str, Any]] = []
     forbidden_hits = 0
+    unexpected_source_hits = 0
     zero_hit_cases = 0
     expected_source_miss_cases = 0
     for case in load_eval_cases(cases_path):
@@ -176,9 +198,12 @@ def evaluate_legal_quality(
         min_hits = max(1, int(case.get("min_hits", 1)))
         expected_ids = sorted(set(case.get("expected_source_ids") or []))
         expected_hits = sorted(set(ids) & set(expected_ids))
+        allowed_ids = sorted(set(case.get("allowed_source_ids") or []))
+        unexpected_hits = sorted(set(ids) - set(allowed_ids)) if allowed_ids else []
         enough_hits = len(ids) >= min_hits
         expected_source_hit = not expected_ids or bool(expected_hits)
         forbidden_hits += len(forbidden)
+        unexpected_source_hits += len(unexpected_hits)
         zero_hit_cases += int(not enough_hits)
         expected_source_miss_cases += int(not expected_source_hit)
         case_results.append(
@@ -189,9 +214,39 @@ def evaluate_legal_quality(
                 "minimum_hits": min_hits,
                 "expected_source_ids": expected_ids,
                 "expected_source_hits": expected_hits,
-                "passed": not forbidden and enough_hits and expected_source_hit,
+                "allowed_source_ids": allowed_ids,
+                "unexpected_source_hits": unexpected_hits,
+                "passed": (
+                    not forbidden
+                    and not unexpected_hits
+                    and enough_hits
+                    and expected_source_hit
+                ),
             }
         )
+
+    rules = json.loads(Path(rules_path).read_text(encoding="utf-8"))
+    checklist_results: list[dict[str, Any]] = []
+    for item in rules.get("checklist_items") or []:
+        hits = _retrieve_keyword(
+            item_code=str(item["id"]),
+            dimension=str(item["dimension"]),
+            title=str(item.get("title") or ""),
+            description=str(item.get("description") or ""),
+            top_k=top_k,
+            corpus_path=corpus_path,
+        )
+        checklist_results.append(
+            {
+                "item_code": str(item["id"]),
+                "retrieved_source_ids": [str(hit.get("id")) for hit in hits],
+            }
+        )
+    checklist_zero_hit_ids = [
+        result["item_code"]
+        for result in checklist_results
+        if not result["retrieved_source_ids"]
+    ]
 
     quarantined_retrievable = [
         doc.get("id")
@@ -212,12 +267,18 @@ def evaluate_legal_quality(
 
     controlled_pilot_passed = bool(
         corpus.get("content_status") == "provisional"
+        and corpus.get("default_review_status") == "pending"
+        and corpus.get("retrieval_policy") == CONTROLLED_EVIDENCE_POLICY
+        and not evidence_envelope_errors
+        and not evidence_filtered_ids
         and forbidden_hits == 0
+        and unexpected_source_hits == 0
         and zero_hit_cases == 0
         and expected_source_miss_cases == 0
         and not quarantined_retrievable
         and not resolution_audit_missing_ids
         and not unresolved_retrievable_ids
+        and not unsupported_composite_retrievable_ids
         and not host_integrity_errors
         and all(result["passed"] for result in case_results)
         and all(corpus_review_status(corpus, doc) in {"provisional", "expert_verified"} for doc in retrievable)
@@ -229,8 +290,10 @@ def evaluate_legal_quality(
         and not non_expert_retrievable
         and not resolution_audit_missing_ids
         and not unresolved_retrievable_ids
+        and not unsupported_composite_retrievable_ids
         and not host_integrity_errors
         and forbidden_hits == 0
+        and unexpected_source_hits == 0
         and zero_hit_cases == 0
         and expected_source_miss_cases == 0
         and all(result["passed"] for result in case_results)
@@ -241,10 +304,22 @@ def evaluate_legal_quality(
         "corpus_version": corpus.get("version"),
         "content_status": corpus.get("content_status", "undeclared"),
         "source_count": len(sources),
+        "declared_retrievable_count": len(declared_retrievable),
         "retrievable_count": len(retrievable),
+        "retrieval_policy": corpus.get("retrieval_policy", "legacy_status_only"),
+        "evidence_envelope_error_count": len(evidence_envelope_errors),
+        "evidence_envelope_errors": evidence_envelope_errors,
+        "evidence_filtered_ids": evidence_filtered_ids,
         "status_counts": dict(sorted(status_counts.items())),
         "known_wrong_cases": len(case_results),
+        "checklist_item_count": len(checklist_results),
+        "checklist_items_with_hits": len(checklist_results) - len(checklist_zero_hit_ids),
+        "checklist_hit_count": sum(
+            len(result["retrieved_source_ids"]) for result in checklist_results
+        ),
+        "checklist_zero_hit_ids": checklist_zero_hit_ids,
         "forbidden_hit_at_k": forbidden_hits,
+        "unexpected_source_hit_count": unexpected_source_hits,
         "zero_hit_cases": zero_hit_cases,
         "expected_source_miss_cases": expected_source_miss_cases,
         "quarantined_retrievable_ids": quarantined_retrievable,
@@ -254,6 +329,7 @@ def evaluate_legal_quality(
         "resolution_not_found_count": len(resolver_source_ids & not_found_source_ids),
         "resolution_audit_missing_ids": resolution_audit_missing_ids,
         "unresolved_retrievable_ids": unresolved_retrievable_ids,
+        "unsupported_composite_retrievable_ids": unsupported_composite_retrievable_ids,
         "source_host_integrity_error_count": len(host_integrity_errors),
         "source_host_integrity_errors": host_integrity_errors,
         "expert_verified_count": len(expert_sources),
@@ -264,6 +340,7 @@ def evaluate_legal_quality(
         "limitations": [
             "摘录一致性不等于法律结论正确性、时点有效性或个案适用性",
             "当前 provisional 语料必须由法务逐项复核，不能自动成为正式法律意见",
+            "checklist 命中仅表示候选法源覆盖；零命中项必须显式转为研究缺口，不能补写结论",
             "LexML URN 可解析性只证明标识符存在，不证明法条时点、语义适用或整合文本新鲜度",
             "general_availability_passed 仅能由巴西法律专家认证语料与完整定位元数据解锁",
         ],

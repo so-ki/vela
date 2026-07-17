@@ -120,7 +120,7 @@ describe('LegalMaterialGatePanel frozen behavior', () => {
 
     expect(wrapper.text()).toContain('已冻结试点能力包')
     expect(wrapper.text()).toContain('巴西 · 新能源制造 · 绿地设厂')
-    expect(wrapper.text()).toContain('版本 1.3.0')
+    expect(wrapper.text()).toContain('版本 1.3.1')
     const retry = wrapper.find('button.btn-primary')
     expect(retry.attributes('disabled')).toBeUndefined()
     await retry.trigger('click')

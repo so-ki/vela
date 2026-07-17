@@ -2,7 +2,7 @@
 
 ## 结论
 
-已形成 **exactly 10 张**、可机器校验的 provisional 规则卡。每张卡都分别保留：
+已形成 **exactly 10 张**、可机器校验的历史 provisional 规则卡。2026-07-17 的后续时点核验确认：其中引用 Decreto nº 8.468/1976 arts. 57–58 的法条轨没有整合 Decreto 47.397/2002、62.973/2017、63.119/2017 与 69.120/2024 的改写、增补和废止，因此整批卡片**仅保留作抽取方法审计，已作废为现行法证据，不得进入检索或生产规则**。每张卡都分别保留：
 
 - `statute_forward`：从 AL-SP 官方法规条文向前拆解许可触发、阶段和所需事实；
 - `form_reverse`：从 CETESB 官方申请指引与服务入口反推在线流程实际暴露的身份、既有许可、企业和物业字段。
@@ -14,7 +14,7 @@
 - [10 张规则卡数据](../../backend/evals/rule_cards/brazil_sp_environment_dual_track_v0.1.json)
 - [JSON Schema Draft 2020-12](../../backend/evals/rule_cards/rule_card_experiment.schema.json)
 - [无新增依赖的结构与交叉引用验证器](../../backend/evals/rule_cards/validate_rule_cards.py)
-- 正向与篡改反向测试保留在开发树 `backend/tests/test_rule_card_experiment.py`（发布包按策略不携带测试源码）
+- 正向与篡改反向测试保留在开发树 `backend/tests/test_rule_card_experiment.py`（发布包不携带该开发测试源码；唯一例外是发布自验所需的前端 production smoke spec）
 
 在仓库 `backend` 目录运行：
 
@@ -30,7 +30,7 @@ pytest -q tests/test_rule_card_experiment.py
 截至 2026-07-17，本实验只把下列可直接核验的官方页面用于规则主张：
 
 1. AL-SP 官方整合文本：[Lei nº 997/1976](https://www.al.sp.gov.br/repositorio/legislacao/lei/1976/compilacao-lei-997-31.05.1976.html)，使用 Art. 5º、§§ 1º–4º 与 Art. 6º。
-2. AL-SP 官方文本：[Decreto nº 8.468/1976](https://www.al.sp.gov.br/repositorio/legislacao/decreto/1976/decreto-8468-08.09.1976.html)，使用 Art. 57, II 与 Art. 58, II–IV。
+2. 历史实验输入（现行法证据已作废）：AL-SP 的 [Decreto nº 8.468/1976 原始页面](https://www.al.sp.gov.br/repositorio/legislacao/decreto/1976/decreto-8468-08.09.1976.html)曾用于 Art. 57, II 与 Art. 58, II–IV；后续核验发现未整合 [Decreto 47.397/2002](https://www.al.sp.gov.br/repositorio/legislacao/decreto/2002/decreto-47397-04.12.2002.html)、[62.973/2017](https://www.al.sp.gov.br/repositorio/legislacao/decreto/2017/decreto-62973-28.11.2017.html)、[63.119/2017](https://www.al.sp.gov.br/repositorio/legislacao/decreto/2017/decreto-63119-27.12.2017.html)及 [69.120/2024](https://www.al.sp.gov.br/repositorio/legislacao/decreto/2024/decreto-69120-09.12.2024.html)，不得再据此作现行结论。
 3. CETESB 官方指引：[Dúvidas sobre o Portal de Licenciamento Ambiental — PLA](https://cetesb.sp.gov.br/licenciamentoambiental/duvidas-sobre-o-portal-de-licenciamento-ambiental-pla/)，只采用 FAQ 可直接核验的账号、CNPJ、既有许可证、MCE 校验、CCIR、matrícula/transcrição、占有文件、地址和坐标字段。
 4. CETESB 官方服务入口：[e-CETESB Portal de Serviços](https://e.cetesb.sp.gov.br/portal-servicos-frontend/)，只证明在线服务入口存在，不反推页面未公开的字段或许可结论。
 

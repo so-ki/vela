@@ -9,7 +9,7 @@ import type {
 
 export const TEST_CAPABILITY_PACK: CapabilityPackIdentity = {
   pack_id: 'brazil_new_energy_greenfield',
-  version: '1.3.0',
+  version: '1.3.1',
   pack_hash: 'pack-hash',
   status: 'active',
   content_status: 'provisional',

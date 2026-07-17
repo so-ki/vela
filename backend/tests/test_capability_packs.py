@@ -75,7 +75,7 @@ def test_production_registry_loads_formal_brazil_pack() -> None:
 
     assert pack.is_test_fixture is False
     assert pack.manifest.pack_id == FORMAL_PACK_ID
-    assert pack.manifest.version == "1.3.0"
+    assert pack.manifest.version == "1.3.1"
     assert pack.manifest.content_status == "provisional"
     assert pack.manifest.status == "active"
     assert pack.manifest.country == "BR"

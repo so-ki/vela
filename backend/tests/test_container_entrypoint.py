@@ -124,6 +124,56 @@ def test_migration_mode_exits_before_starting_web(
     assert migrations and migrations[0][-2:] == ["upgrade", "head"]
 
 
+def test_check_mode_asserts_head_and_schema_drift_without_mutating_database(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _production_env(monkeypatch)
+    monkeypatch.setenv("VELA_ENTRYPOINT_MODE", "check")
+    checks: list[str] = []
+    subprocess_calls: list[list[str]] = []
+    monkeypatch.setattr(
+        container_entrypoint,
+        "_assert_database_at_heads",
+        lambda: checks.append("heads"),
+    )
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda command, *, cwd=None, check: subprocess_calls.append(command),
+    )
+    monkeypatch.setattr(
+        os,
+        "execvp",
+        lambda _program, _command: pytest.fail("web must not start in check mode"),
+    )
+
+    assert container_entrypoint.main() == 0
+    assert checks == ["heads"]
+    assert len(subprocess_calls) == 1
+    assert subprocess_calls[0][-1] == "check"
+    assert "upgrade" not in subprocess_calls[0]
+
+
+def test_check_mode_rejects_database_behind_head(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _production_env(monkeypatch)
+    monkeypatch.setenv("VELA_ENTRYPOINT_MODE", "check")
+    monkeypatch.setattr(
+        container_entrypoint,
+        "_assert_database_at_heads",
+        lambda: (_ for _ in ()).throw(RuntimeError("database migration heads do not match")),
+    )
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda *_args, **_kwargs: pytest.fail("drift check must not run when head check fails"),
+    )
+
+    with pytest.raises(RuntimeError, match="migration heads"):
+        container_entrypoint.main()
+
+
 def test_migration_failure_prevents_web_start(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

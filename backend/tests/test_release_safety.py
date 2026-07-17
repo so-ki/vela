@@ -70,11 +70,38 @@ def test_internal_markdown_link_validator_allows_packaged_and_external_targets()
 def test_release_allowlist_keeps_reproducible_experiment_evidence() -> None:
     files = release_safety._collect_package_files()
     expected = {
+        ".github/workflows/ci.yml",
+        "backend/evals/legal_quality_gate_v1.jsonl",
         "backend/evals/state_metadata_coverage_v1.json",
         "backend/evals/ingestion_qa_v3.json",
         "backend/evals/rule_cards/brazil_sp_environment_dual_track_v0.1.json",
         "backend/scripts/run_state_metadata_coverage.py",
         "backend/scripts/run_ingestion_qa.py",
         "backend/scripts/render_official_pages_to_pdf.mjs",
+    }
+    assert expected <= files.keys()
+
+
+def test_packaged_release_contains_every_static_check_docker_dependency() -> None:
+    """The ZIP must be independently auditable, not only buildable in the repo."""
+
+    files = release_safety._collect_package_files()
+    expected = {
+        ".github/workflows/ci.yml",
+        ".dockerignore",
+        "backend/.dockerignore",
+        "frontend/.dockerignore",
+        "frontend/e2e/production-smoke.spec.ts",
+        "frontend/playwright.config.ts",
+        "docker-compose.yml",
+        "docker-compose.prod.yml",
+        "docker/Dockerfile.backend",
+        "docker/Dockerfile.backend.prod",
+        "docker/Dockerfile.frontend",
+        "docker/Dockerfile.frontend.prod",
+        "docker/nginx.conf",
+        "backend/scripts/container_entrypoint.py",
+        "frontend/vite.config.ts",
+        "scripts/prod_smoke.sh",
     }
     assert expected <= files.keys()

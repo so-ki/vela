@@ -93,6 +93,12 @@ FORBIDDEN_RELEASE_PREFIXES = {
 FORBIDDEN_ALWAYS_FILES = {
     "backend/app/data/corpus_pending_review.json",
 }
+# This browser test is part of the production release verification path rather
+# than a development test suite.  It is intentionally shipped so prod_smoke.sh
+# remains runnable after extracting the release ZIP.
+ALLOWED_RELEASE_TEST_FILES = {
+    "frontend/e2e/production-smoke.spec.ts",
+}
 SECRET_PATTERNS = (
     (
         "private-key",
@@ -144,6 +150,10 @@ ROOT_FILES = (
 )
 
 EXPLICIT_RUNTIME_FILES = (
+    # The packaged release-boundary checker reads the pinned CI workflow to
+    # verify the real Docker/PostgreSQL smoke job.  Keep that evidence with the
+    # release so an independent recipient can rerun check-docker after unzip.
+    ".github/workflows/ci.yml",
     "backend/.dockerignore",
     "backend/alembic.ini",
     "backend/requirements.lock",
@@ -175,6 +185,8 @@ EXPLICIT_RUNTIME_FILES = (
     "frontend/index.html",
     "frontend/package-lock.json",
     "frontend/package.json",
+    "frontend/playwright.config.ts",
+    "frontend/e2e/production-smoke.spec.ts",
     "frontend/tsconfig.json",
     "frontend/vite.config.ts",
     "docker/Dockerfile.backend",
@@ -218,6 +230,7 @@ PACKAGE_SUFFIXES = {
     ".css",
     ".html",
     ".json",
+    ".jsonl",
     ".mako",
     ".md",
     ".mjs",
@@ -293,7 +306,11 @@ def _path_violations(relative: str, *, release: bool) -> list[str]:
         lower_normalized.startswith(prefix.lower()) for prefix in FORBIDDEN_RELEASE_PREFIXES
     ):
         violations.append("protected-release-exclusion")
-    if release and (lower_normalized.endswith(".spec.ts") or lower_normalized.endswith(".test.ts")):
+    if (
+        release
+        and (lower_normalized.endswith(".spec.ts") or lower_normalized.endswith(".test.ts"))
+        and lower_normalized not in {path.lower() for path in ALLOWED_RELEASE_TEST_FILES}
+    ):
         violations.append("test-source")
     return violations
 
@@ -617,6 +634,8 @@ def check_docker() -> None:
         errors.append("production image 未携带 Alembic 配置与迁移")
     if '"alembic"' not in entrypoint or '"upgrade"' not in entrypoint or '"head"' not in entrypoint:
         errors.append("production entrypoint 未在 Web 启动前执行 Alembic upgrade head")
+    if 'mode == "check"' not in entrypoint or '"check"' not in entrypoint:
+        errors.append("production entrypoint 缺少只读 migration head / schema drift 检查模式")
     if "VELA_ENTRYPOINT_MODE: migrate" not in compose:
         errors.append("production compose 缺少一次性 migration service")
     if "service_completed_successfully" not in compose:
@@ -685,8 +704,27 @@ def check_docker() -> None:
     prod_smoke = (ROOT / "scripts/prod_smoke.sh").read_text(encoding="utf-8")
     if "npm run test:e2e" not in prod_smoke or "playwright install --with-deps chromium" not in ci_workflow:
         errors.append("生产 Compose smoke 未用真实浏览器覆盖构建后的 SPA 登录路径")
-    if re.search(r"uses:\s+actions/(?:checkout|setup-python|setup-node)@v\d", ci_workflow):
-        errors.append("CI 官方 Actions 仍使用可移动 major tag，必须固定到完整 commit SHA")
+    if "VELA_ENTRYPOINT_MODE=check" not in prod_smoke:
+        errors.append("生产 Compose smoke 未在真实 PostgreSQL 上断言 migration head 与 schema drift")
+    if 'VELA_API="http://127.0.0.1:${SMOKE_PORT}/api/v1" bash scripts/verify_e2e.sh' not in prod_smoke:
+        errors.append("生产 Compose smoke 未在真实 PostgreSQL 上执行完整业务/法务 API 金路径")
+    action_references = re.findall(r"(?m)^\s*(?:-\s+)?uses:\s+([^\s#]+)", ci_workflow)
+    unpinned_actions = sorted(
+        reference
+        for reference in action_references
+        if not reference.startswith("./")
+        and not re.fullmatch(r"[^@\s]+@[0-9a-f]{40}", reference)
+    )
+    if unpinned_actions:
+        errors.append(
+            "CI 外部 Actions 必须固定到完整 commit SHA：" + ", ".join(unpinned_actions)
+        )
+    if "aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25" not in ci_workflow:
+        errors.append("CI 缺少固定 SHA 的 Trivy v0.36.0 容器安全扫描")
+    if ci_workflow.count("format: cyclonedx") < 3:
+        errors.append("CI 未为 backend/frontend/PostgreSQL 生产镜像生成 CycloneDX SBOM")
+    if ci_workflow.count("severity: CRITICAL,HIGH") < 3 or ci_workflow.count('exit-code: "1"') < 3:
+        errors.append("CI 未对 backend/frontend/PostgreSQL 镜像 fail-closed 拦截 High/Critical 漏洞")
 
     if "backend/app/data/corpus_pending_review.json" in all_candidates:
         errors.append("pending corpus 出现在 Docker COPY 候选")
@@ -699,6 +737,10 @@ def check_docker() -> None:
         raise BoundaryError(f"Docker/release boundary check failed ({len(errors)} errors)")
     print("OK excluded from Docker candidates: pending corpus and Capability Pack test fixtures")
     print("OK actual Docker contexts exclude secrets, runtime data, caches, and backend tests")
+    print(
+        "OK GitHub Actions SHA pins: "
+        f"{len(action_references)} uses, {len(set(action_references))} unique references"
+    )
 
 
 def _collect_package_files() -> dict[str, bytes]:

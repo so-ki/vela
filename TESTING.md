@@ -4,7 +4,7 @@
 
 ## 获取代码
 
-仓库为 **Private（私有）**。请确认账号已被添加为 Collaborator，然后：
+受控试点仓库在推送本 RC 前必须确认为 **Private（私有）**。不要仅凭本文档假定远端已经私有；请先在 GitHub 设置页核验可见性，并确认账号已被添加为 Collaborator，然后：
 
 ```bash
 git clone https://github.com/<你的组织或用户名>/vela-platform.git
@@ -15,7 +15,7 @@ cd vela-platform
 
 - macOS / Linux / Windows（WSL 推荐）
 - Python 3.12+
-- Node.js 20+（CI 使用 22）
+- Node.js 24 LTS（CI 使用 24）
 - 可选：通义千问 API Key（启用 LLM 润色）
 
 ## 快速启动
@@ -85,10 +85,7 @@ chmod +x scripts/verify_e2e.sh
 
 ## 样本文件
 
-仓库根目录含预生成 Word 样本（无需 API Key 也可查看效果）：
-
-- `BYD坎皮纳斯_协查底稿_样本.docx`
-- `BYD坎皮纳斯_协查底稿_LLM润色.docx`
+发布 ZIP 不携带预生成 Word 样本，避免把未经本轮复核的静态输出误当成当前结果。请按黄金路径完成法务定稿后，从运行中的系统导出 Word/PDF；没有完成定稿时不得用历史样本替代验收证据。
 
 ## 常见问题
 

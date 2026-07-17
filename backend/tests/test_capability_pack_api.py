@@ -209,7 +209,7 @@ def test_catalog_api_returns_only_the_formal_brazil_pack(db_factory):
         assert catalog_response.status_code == 200, catalog_response.text
         catalog = catalog_response.json()
         assert catalog["capability_pack"]["pack_id"] == FORMAL_PACK_ID
-        assert catalog["capability_pack"]["version"] == "1.3.0"
+        assert catalog["capability_pack"]["version"] == "1.3.1"
         assert catalog["capability_pack"]["content_status"] == "provisional"
         assert catalog["capability_pack"]["status"] == "active"
         assert catalog["rules_artifact"]["artifact_id"] == "brazil_new_energy"

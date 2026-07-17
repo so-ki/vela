@@ -28,6 +28,8 @@ def test_current_dual_track_experiment_passes_all_gates(experiment, schema):
     assert [card["rule_id"] for card in experiment["cards"]] == EXPECTED_CARD_IDS
     assert experiment["summary"]["card_count"] == 10
     assert sum(experiment["summary"]["difference_type_counts"].values()) == 10
+    assert "作废为现行法证据" in experiment["disclaimer"]
+    assert any("69.120/2024" in item for item in experiment["limitations"])
 
 
 def test_all_cards_are_provisional_non_production_and_have_two_untimed_tracks(experiment):
@@ -89,6 +91,10 @@ def test_schema_freezes_exactly_ten_cards_and_draft_2020_12(schema):
                 {"official_url": value["excluded_sources"][0]["url"]}
             ),
             "excluded source must not be cited",
+        ),
+        (
+            lambda value: value.update({"disclaimer": "这是一个没有失效告警的历史实验说明文本。"}),
+            "invalidation_notice",
         ),
     ],
 )

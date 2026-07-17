@@ -830,6 +830,8 @@ export interface ReviewItem {
   dimension_name: string
   gate_status: string
   match_score: number
+  tier?: string
+  hard_block?: boolean
   decision: string
   comment?: string | null
   external_counsel_required?: boolean
@@ -857,6 +859,7 @@ export interface ReviewState {
   can_finalize: boolean
   can_export: boolean
   can_return_to_business?: boolean
+  s3_finalize_blocked?: boolean
   version_label?: string | null
   revision: number
   last_changed_at?: string | null

@@ -39,6 +39,44 @@ def _run_migrations() -> None:
     )
 
 
+def _assert_database_at_heads() -> None:
+    """Fail unless the connected database is exactly at every migration head."""
+
+    from alembic.config import Config
+    from alembic.runtime.migration import MigrationContext
+    from alembic.script import ScriptDirectory
+    from sqlalchemy import create_engine
+
+    config = Config(str(ALEMBIC_CONFIG))
+    expected_heads = set(ScriptDirectory.from_config(config).get_heads())
+    engine = create_engine(_required("DATABASE_URL"))
+    try:
+        with engine.connect() as connection:
+            current_heads = set(MigrationContext.configure(connection).get_current_heads())
+    finally:
+        engine.dispose()
+    if current_heads != expected_heads:
+        raise RuntimeError(
+            "database migration heads do not match the packaged Alembic heads: "
+            f"current={sorted(current_heads)} expected={sorted(expected_heads)}"
+        )
+
+
+def _run_schema_drift_check() -> None:
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "alembic",
+            "-c",
+            str(ALEMBIC_CONFIG),
+            "check",
+        ],
+        cwd=APP_ROOT,
+        check=True,
+    )
+
+
 def main() -> int:
     if os.environ.get("APP_ENV", "").strip().lower() != "production":
         raise RuntimeError("production image requires APP_ENV=production")
@@ -62,8 +100,13 @@ def main() -> int:
     )
 
     mode = os.environ.get("VELA_ENTRYPOINT_MODE", "web").strip().lower()
-    if mode not in {"migrate", "web"}:
-        raise RuntimeError("VELA_ENTRYPOINT_MODE must be either migrate or web")
+    if mode not in {"check", "migrate", "web"}:
+        raise RuntimeError("VELA_ENTRYPOINT_MODE must be check, migrate, or web")
+
+    if mode == "check":
+        _assert_database_at_heads()
+        _run_schema_drift_check()
+        return 0
 
     # Alembic is the only production DDL path.  A standalone web container
     # performs the same idempotent upgrade as the compose migration gate.

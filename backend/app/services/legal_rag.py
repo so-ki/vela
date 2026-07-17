@@ -28,10 +28,61 @@ SOURCE_LABELS = {
     "jusbrasil": "Jusbrasil 案例索引",
 }
 
+# Generic function words and citation boilerplate are not legal subject matter.
+# Without this filter, a shared token such as ``lei`` can turn the dimension's
+# 20-point prior into a false candidate (20 + 8 >= the 25-point floor).
+_RETRIEVAL_STOPWORDS = {
+    "a",
+    "as",
+    "art",
+    "article",
+    "articles",
+    "artigo",
+    "artigos",
+    "arts",
+    "com",
+    "da",
+    "das",
+    "de",
+    "do",
+    "dos",
+    "e",
+    "em",
+    "for",
+    "in",
+    "law",
+    "laws",
+    "lei",
+    "leis",
+    "na",
+    "nas",
+    "no",
+    "nos",
+    "nº",
+    "n°",
+    "número",
+    "numero",
+    "o",
+    "of",
+    "on",
+    "os",
+    "para",
+    "por",
+    "que",
+    "sem",
+    "the",
+    "to",
+    "um",
+    "uma",
+    "with",
+    "without",
+    "and",
+}
+
 
 def _tokenize(text: str) -> set[str]:
     parts = re.split(r"[\s,、/\.]+", text.lower())
-    return {p for p in parts if len(p) >= 2}
+    return {p for p in parts if len(p) >= 2 and p not in _RETRIEVAL_STOPWORDS}
 
 
 def _score_doc(

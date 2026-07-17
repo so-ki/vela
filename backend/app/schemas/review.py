@@ -53,6 +53,8 @@ class ReviewItemResponse(BaseModel):
     dimension_name: str
     gate_status: str
     match_score: float
+    tier: str = ""
+    hard_block: bool = False
     decision: str
     comment: Optional[str] = None
     external_counsel_required: bool = False
@@ -80,6 +82,7 @@ class ReviewResponse(BaseModel):
     can_finalize: bool
     can_export: bool
     can_return_to_business: bool = False
+    s3_finalize_blocked: bool = False
     version_label: Optional[str] = None
     revision: int = 0
     last_changed_at: Optional[datetime] = None
