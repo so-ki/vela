@@ -18,9 +18,21 @@
 - 生产镜像不安装 `curl`、编译器或包管理器扩展；Compose 健康检查改用 Python 标准库。
 - GitHub Actions 继续以 Trivy 0.70.0 对 High/Critical 漏洞执行 `ignore-unfixed: false` 的阻断策略，不接受通过全局忽略未修复漏洞来制造绿色结果。
 
-此前浮动的 `python:3.12-slim` 在 2026-07-17 的 `--pull` 构建中解析为 Debian 13.6，Trivy 命中 36 个无可用修复版本的系统级 High/Critical CVE（33/3），主要来自 Perl、curl、util-linux、ncurses 与 gzip。由于相应 Debian 版本没有修复包，`apt upgrade` 不能消除风险；因此改为更小且仍受支持的 Alpine 3.24 基线，并移除应用不需要的 curl。最终结论仍以远端生产镜像、SBOM、PostgreSQL 迁移和完整 Compose 冒烟门同时通过为准。
+此前浮动的 `python:3.12-slim` 在 2026-07-17 的 `--pull` 构建中解析为 Debian 13.6，Trivy 命中 36 个无可用修复版本的系统级 High/Critical CVE（33/3），主要来自 Perl、curl、util-linux、ncurses 与 gzip。由于相应 Debian 版本没有修复包，`apt upgrade` 不能消除风险；因此改为更小且仍受支持的 Alpine 3.24 基线，并移除应用不需要的 curl。冻结代码基线 `9ed0de1419096263943945e689e07cacb491aaa5` 的 [push CI 29553941192](https://github.com/so-ki/vela/actions/runs/29553941192) 与 [草稿 PR CI 29553943620](https://github.com/so-ki/vela/actions/runs/29553943620) 已分别通过远端生产镜像、SBOM、PostgreSQL 迁移和完整 Compose 冒烟门。
 
-同轮复验中，后端与前端镜像扫描已经通过；官方 PostgreSQL 镜像的 Alpine 系统包也是 0 命中，但 `/usr/local/bin/gosu` 使用 Go 1.24.6 构建，命中 15 个均已有修复版本的 High/Critical Go 标准库 CVE（14/1）。官方容器镜像规范明确允许以 `gosu` 或 `su-exec` 在 entrypoint 中降权；因此包装层删除该 Go 二进制，以 Alpine main 仓库的极小 C 实现 `su-exec` 提供相同的 `user[:group] command ...` 调用。第一次尝试在原路径重建符号链接时，真实构建探针全部通过，但 Trivy 分层分析仍把该路径关联到基础层的旧 Go 元数据；最终方案不再复用该路径，而是对固定摘要内的唯一 entrypoint 调用做 fail-closed 精确替换。数据库最终镜像仍必须重新通过严格扫描、SBOM 与实际初始化/迁移/冒烟，不能仅凭等价接口放行。
+同轮复验中，后端与前端镜像扫描已经通过；官方 PostgreSQL 镜像的 Alpine 系统包也是 0 命中，但 `/usr/local/bin/gosu` 使用 Go 1.24.6 构建，命中 15 个均已有修复版本的 High/Critical Go 标准库 CVE（14/1）。官方容器镜像规范明确允许以 `gosu` 或 `su-exec` 在 entrypoint 中降权；因此包装层删除该 Go 二进制，以 Alpine main 仓库的极小 C 实现 `su-exec` 提供相同的 `user[:group] command ...` 调用。第一次尝试在原路径重建符号链接时，真实构建探针全部通过，但 Trivy 分层分析仍把该路径关联到基础层的旧 Go 元数据；最终方案不再复用该路径，而是对固定摘要内的唯一 entrypoint 调用做 fail-closed 精确替换。最终数据库镜像已在上述两次 CI 中重新通过严格扫描、SBOM、官方 entrypoint 初始化、Alembic 迁移、最小权限探针和完整应用烟测；没有以接口等价推断替代运行证据。
+
+## 远端供应链证据
+
+截至 2026-07-17，两次独立 GitHub-hosted Runner 均成功完成以下门禁：
+
+- 后端、前端和 PostgreSQL 三张生产镜像从固定摘要重新构建；
+- Trivy 对三张镜像执行 `CRITICAL,HIGH`、`ignore-unfixed: false`、`exit-code: 1` 扫描并全部通过；
+- 三张镜像分别生成 CycloneDX JSON SBOM，并与生产烟测报告作为短期 CI 证据上传；
+- 后端与前端应用容器在只读根文件系统、非 root、零 capability 与 `no-new-privileges` 条件下启动；PostgreSQL 由官方 entrypoint 将 PID 1 降权为 UID 70，持久数据写入独立命名卷；
+- PostgreSQL 从空库执行 Alembic 到 `20260717_0002`，随后完成 schema drift 检查、双角色 API 黄金路径和 Playwright 登录烟测。
+
+CI 工件只保留 14 天；长期发布记录以本文件、固定提交、运行编号、最终 RC ZIP 与其 SHA-256 旁车为准。需要长期保留 SBOM 时，应在过期前将工件转存到受控制品库。
 
 摘要固定用于保证本 RC 的基础层可复现，不代表永久停留在该摘要。维护期应至少每周检查 Docker Official Image 的新摘要，以独立 PR 更新，并重新执行完整 Trivy、SBOM、PostgreSQL 迁移和 Compose 冒烟门。
 

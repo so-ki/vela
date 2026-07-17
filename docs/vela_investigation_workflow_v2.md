@@ -70,7 +70,7 @@ flowchart TB
 - `brazil_new_energy_greenfield`
 - 展示名称：巴西 · 新能源制造 · 绿地设厂
 - 绑定规则制品：`brazil_new_energy` v2.9
-- 绑定语料制品：`brazil_legal_corpus` v1.9
+- 绑定语料制品：`brazil_legal_corpus` v1.13（82 条审计记录；11 条 provisional 可检索，71 条默认隔离）
 
 测试 fixture 不代表国家、行业或法律能力，也不进入生产 Registry 或发布制品。
 

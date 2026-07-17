@@ -317,7 +317,7 @@ vela-platform/
 |----|------|------|
 | 正式 Capability Pack | **`brazil_new_energy_greenfield`**：巴西 · 新能源制造 · 绿地设厂；规则制品 v2.9 | 经法律内容审核后再增加独立能力包 |
 | 法域与动作 | 巴西单国 · 绿地设厂 | 其他国家、并购或扩建尚未上线 |
-| 法源库 | **70+ 条**精选语料（v1.9 已清洗 HTML）+ 确定性关键词检索 | `backend/scripts/propose_corpus_entry.py` + `data/corpus_pending_review.json` 人工审核 |
+| 法源库 | `brazil_legal_corpus` **v1.13**：82 条审计记录中仅 11 条 provisional 可检索，71 条 pending/quarantined 默认拒绝；确定性关键词检索 | `backend/scripts/propose_corpus_entry.py` + `data/corpus_pending_review.json` 人工审核 |
 | 核查项定位 | 冻结 snapshot + 规则触发 + 可选受限 LLM（不得扩展维度或议题） | 随后续独立 Capability Pack 验证扩展 |
 | 法规监测 | 手动扫描 + 提醒列表 | 自动爬虫 + 订阅推送 |
 | 导出 | Word 法学院意见书 + PDF legacy 底稿 | 律所 `.docx` 样张加载、PDF 与 Word 统一 |

@@ -6,12 +6,14 @@
 
 本地冻结验收支持以下范围：单客户、单独部署、私网或本机回环访问、受管账号、受管终端/DMS 已扫描的内部材料，以及法务逐项复核后导出。第二家客户、外部不可信上传、第三方 LLM 外发、生产 SSO、跨租户共享部署或无人复核自动决策均不在本 RC 范围内。
 
-远端最终放行条件尚未满足：必须先把 GitHub 仓库设为 Private，并由 GitHub Actions 的 `production-compose-smoke` 完成三张生产镜像的 CVE/SBOM 门、真实 Docker + PostgreSQL 迁移一致性与完整金路径。该检查未通过前，只能称“本地验收通过的 RC”，不能称“已部署可用”。
+远端 RC 工程放行条件已经满足：GitHub 仓库已设为 Private；冻结代码基线 `9ed0de1419096263943945e689e07cacb491aaa5` 的 [push CI 29553941192](https://github.com/so-ki/vela/actions/runs/29553941192) 与 [草稿 PR CI 29553943620](https://github.com/so-ki/vela/actions/runs/29553943620) 均为成功。两次运行都完成了三张生产镜像的 High/Critical CVE 阻断、CycloneDX SBOM、真实 Docker + PostgreSQL 迁移、完整业务/法务 API 黄金路径与 Playwright 浏览器烟测。这一结果只放行受控试点 RC，不表示已经替客户部署，也不改变非 GA、非正式法律意见的边界。
 
 ## 冻结制品标识
 
 | 制品 | 版本/哈希 |
 |---|---|
+| 冻结代码基线 | `9ed0de1419096263943945e689e07cacb491aaa5` |
+| GitHub Actions 证据 | push `29553941192`；draft PR `29553943620`；均为 `success` |
 | Capability Pack | `brazil_new_energy_greenfield` `1.3.1` |
 | Pack semantic hash | `dd26e226ea600fd05e23d6141dab8a051881b3ed3723abcf718ddf3bc81e808b` |
 | 规则制品 | `brazil_new_energy` `2.9` |
@@ -32,7 +34,7 @@
 |---|---|
 | Python 3.12.13 全新环境安装 | `requirements.lock` 含 45 条跨平台声明，本环境激活 43 条，兼容检查通过 |
 | Python 依赖安全 | `pip-audit` 无已知漏洞 |
-| 后端全量 | `258 passed`；3 条来自第三方库的弃用警告 |
+| 后端全量 | `269 passed`；3 条来自第三方库的弃用警告 |
 | 安全/并发/发布重点回归 | 通过 |
 | 前端 Node 24.13.0 / npm 11.6.2 | 锁文件安装；`npm audit` 为 0 |
 | 前端组件与构建 | `20 passed`；TypeScript 与 Vite 生产构建通过（152 modules） |
@@ -42,7 +44,7 @@
 | 法律质量门 | controlled pilot 通过；GA 按设计失败 |
 | 发布边界 | Docker context/COPY allowlist、密钥与路径扫描通过 |
 | 发布包可复现性 | 从 ZIP 解压后可独立重跑边界检查并重新构建；两次 ZIP 字节级 SHA-256 一致 |
-| 供应链 | 17/17 个外部 Action 调用（5 个唯一引用）固定到完整 40 位提交 SHA；后端、前端和 PostgreSQL 镜像均配置 High/Critical CVE 阻断与 CycloneDX SBOM，远端执行结果待放行 |
+| 供应链 | 17/17 个外部 Action 调用（5 个唯一引用）固定到完整 40 位提交 SHA；后端、前端和 PostgreSQL 三张生产镜像均通过 High/Critical CVE 阻断并生成 CycloneDX SBOM；push 与 PR 两次远端运行均成功 |
 | 静态质量 | Python compile、Shell、YAML、`git diff --check` 全部通过 |
 
 法律质量门覆盖 82 条语料记录：仅 11 条具备明确官方定位、时点、审查范围和本地摘要哈希的 `provisional` 条目可召回；49 条已明确 `quarantined`，22 条因默认拒绝策略保持 `pending`。11 个已知错源测试的禁用源命中、允许来源白名单之外的额外命中、零命中、声明的预期法源漏召回、证据封套错误与运行时过滤差异均为 0。30 张 checklist 中 17 张至少有候选命中、13 张零命中（共 20 个候选命中）；零命中会保留为研究缺口，不允许系统补写法律结论。36 条有解析审计证据的 LexML 来源中 19 条可解析、17 条无法解析；这些 legacy 记录不因“可解析”自动恢复检索。当前专家认证数为 0，因此这一结果只证明回归门和错误隔离按设计工作，不证明法律完整覆盖、法律结论正确、法条时点有效或个案适用。
@@ -72,7 +74,7 @@
 
 以下条件必须全部满足并留档：
 
-1. GitHub 仓库已设为 Private；冻结分支经 PR 审核，所有 Actions 绿色，尤其是 `production-compose-smoke`。
+1. GitHub 仓库已设为 Private，草稿 PR 的所有 Actions 已绿色，尤其是 `production-compose-smoke`；正式合并或试点部署前仍须由授权审阅者完成人工 PR 审核并留存批准记录。
 2. 使用全新 PostgreSQL，或仅使用已有 `alembic_version` 且完成迁移演练的数据库；禁止对未知旧库直接 `stamp head`。
 3. 外层 TLS 只开放 443，配置 HSTS，并按真实客户端 IP 对登录入口限流；Compose 端口继续只绑定 127.0.0.1。
 4. 随机 `SECRET_KEY`、数据库密码和备份密钥由客户密钥管理系统提供，不进入仓库、镜像或发布 ZIP。
@@ -91,6 +93,6 @@
 - **不是 30 项法律覆盖完成。** 当前只有 17/30 checklist 至少有 provisional 候选命中，13/30 被明确保留为零命中研究缺口；命中本身也不等于适用或结论成立。
 - **不是多租户 SaaS。** 单客户组织边界是本 RC 的硬前提；多租户、第二客户或共享数据库需要重新设计与验收。
 - **不是生产 SSO/LLM 版本。** OIDC 与第三方模型外发均在生产 fail-closed；启用前必须单独完成安全、隐私与数据处理评估。
-- **依赖与基础镜像仍需持续维护。** Python/npm 版本已锁定并审计，GitHub Actions 已固定 SHA；Python lock 尚未携带 wheel hashes，基础镜像尚未固定 OCI digest，后续供应链迭代应补齐并重新验证多架构构建。
+- **依赖与基础镜像仍需持续维护。** Python/npm 版本已锁定并审计，GitHub Actions 已固定 SHA，四个生产基础镜像引用已固定 OCI digest；Python lock 尚未携带逐 wheel 哈希。固定摘要只是本 RC 的时点基线，后续仍须定期更新摘要并重新执行多架构构建、三镜像 CVE/SBOM 与完整生产烟测。
 
 工程治理基线参考 [NIST AI RMF Generative AI Profile](https://www.nist.gov/publications/artificial-intelligence-risk-management-framework-generative-artificial-intelligence)、[OWASP LLM Top 10](https://genai.owasp.org/llm-top-10/) 与 [OWASP Secrets Management Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Secrets_Management_Cheat_Sheet.html)。法律/RAG 评估方法参考 [LegalBench](https://arxiv.org/abs/2308.11462)、[LawBench](https://arxiv.org/abs/2309.16289) 与 [RAGChecker](https://arxiv.org/abs/2408.08067)。这些参考仅用于工程与评估方法，不构成对巴西法律内容的背书。
