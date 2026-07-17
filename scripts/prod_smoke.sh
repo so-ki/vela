@@ -25,6 +25,13 @@ ENV_FILE=""
 COMPOSE=()
 
 cleanup() {
+  local status=$?
+  trap - EXIT
+  if [ "$status" -ne 0 ] && [ "${#COMPOSE[@]}" -gt 0 ]; then
+    echo "==> 失败证据：Compose 状态与末尾日志" >&2
+    "${COMPOSE[@]}" ps --all >&2 || true
+    "${COMPOSE[@]}" logs --no-color --tail=200 >&2 || true
+  fi
   if [ "${#COMPOSE[@]}" -gt 0 ]; then
     echo "==> 清理隔离 smoke 项目 ${PROJECT_NAME}..."
     "${COMPOSE[@]}" down -v --remove-orphans >/dev/null 2>&1 || true
@@ -32,6 +39,7 @@ cleanup() {
   if [ -n "$ENV_FILE" ]; then
     rm -f "$ENV_FILE"
   fi
+  exit "$status"
 }
 trap cleanup EXIT
 

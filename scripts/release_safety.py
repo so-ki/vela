@@ -754,6 +754,8 @@ def check_docker() -> None:
     prod_smoke = (ROOT / "scripts/prod_smoke.sh").read_text(encoding="utf-8")
     if "db_pid1_uid=" not in prod_smoke or "/proc/1/status" not in prod_smoke:
         errors.append("production Compose smoke 未验证 PostgreSQL PID 1 已降权")
+    if "logs --no-color --tail=200" not in prod_smoke or "ps --all" not in prod_smoke:
+        errors.append("production Compose smoke 失败时未保留服务状态与末尾日志")
     if "npm run test:e2e" not in prod_smoke or "playwright install --with-deps chromium" not in ci_workflow:
         errors.append("生产 Compose smoke 未用真实浏览器覆盖构建后的 SPA 登录路径")
     if "VELA_ENTRYPOINT_MODE=check" not in prod_smoke:

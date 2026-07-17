@@ -106,3 +106,14 @@ def test_packaged_release_contains_every_static_check_docker_dependency() -> Non
         "scripts/prod_smoke.sh",
     }
     assert expected <= files.keys()
+
+
+def test_production_smoke_preserves_failure_evidence_before_cleanup() -> None:
+    content = (release_safety.ROOT / "scripts/prod_smoke.sh").read_text(encoding="utf-8")
+
+    assert "local status=$?" in content
+    assert "ps --all >&2 || true" in content
+    assert "logs --no-color --tail=200 >&2 || true" in content
+    assert content.index("logs --no-color --tail=200") < content.index(
+        "down -v --remove-orphans"
+    )
