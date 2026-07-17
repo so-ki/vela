@@ -15,11 +15,21 @@ COPY --chown=nginx:nginx --from=build /app/dist /usr/share/nginx/html
 COPY --chown=nginx:nginx docker/nginx.conf /etc/nginx/conf.d/default.conf
 RUN set -eux; \
     main_config='/etc/nginx/nginx.conf'; \
-    test "$(grep -Fc 'pid /var/run/nginx.pid;' "$main_config")" = '1'; \
-    sed -i 's|pid /var/run/nginx.pid;|pid /tmp/nginx.pid;|' "$main_config"; \
-    test "$(grep -Fc 'pid /tmp/nginx.pid;' "$main_config")" = '1'; \
-    ! grep -Fq 'pid /var/run/nginx.pid;' "$main_config"; \
-    nginx -t
+    server_config='/etc/nginx/conf.d/default.conf'; \
+    old_pid_pattern='^[[:space:]]*pid[[:space:]]+/run/nginx\.pid;[[:space:]]*$'; \
+    new_pid_pattern='^[[:space:]]*pid[[:space:]]+/tmp/nginx\.pid;[[:space:]]*$'; \
+    test "$(grep -Ec "$old_pid_pattern" "$main_config")" = '1'; \
+    sed -Ei "s|$old_pid_pattern|pid /tmp/nginx.pid;|" "$main_config"; \
+    test "$(grep -Ec "$new_pid_pattern" "$main_config")" = '1'; \
+    ! grep -Eq "$old_pid_pattern" "$main_config"; \
+    test "$(grep -Fc 'proxy_pass http://backend:8000/api/;' "$server_config")" = '1'; \
+    server_config_sha256="$(sha256sum "$server_config")"; \
+    cp -p "$server_config" /tmp/default.conf.runtime; \
+    sed -i 's|proxy_pass http://backend:8000/api/;|proxy_pass http://127.0.0.1:8000/api/;|' "$server_config"; \
+    nginx -t; \
+    mv /tmp/default.conf.runtime "$server_config"; \
+    test "$(sha256sum "$server_config")" = "$server_config_sha256"; \
+    test "$(grep -Fc 'proxy_pass http://backend:8000/api/;' "$server_config")" = '1'
 
 USER nginx
 EXPOSE 8080

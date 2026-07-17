@@ -111,7 +111,16 @@ def test_production_frontend_pins_bases_and_defines_pid_once() -> None:
         "FROM nginx:1.30.4-alpine@sha256:"
         "59d10bca5c674965ef4ff884715000dd60ef5567c36663523f108eec8e4105d4\n"
     ) in content
-    assert "sed -i 's|pid /var/run/nginx.pid;|pid /tmp/nginx.pid;|'" in content
+    assert "old_pid_pattern='^[[:space:]]*pid[[:space:]]+/run/nginx\\.pid;[[:space:]]*$'" in content
+    assert 'test "$(grep -Ec "$old_pid_pattern" "$main_config")" = \'1\'' in content
+    assert 'sed -Ei "s|$old_pid_pattern|pid /tmp/nginx.pid;|"' in content
+    assert 'test "$(grep -Ec "$new_pid_pattern" "$main_config")" = \'1\'' in content
+    assert 'server_config_sha256="$(sha256sum "$server_config")"' in content
+    assert 'cp -p "$server_config" /tmp/default.conf.runtime' in content
+    assert "proxy_pass http://127.0.0.1:8000/api/;" in content
+    assert 'mv /tmp/default.conf.runtime "$server_config"' in content
+    assert 'test "$(sha256sum "$server_config")" = "$server_config_sha256"' in content
+    assert content.count("proxy_pass http://backend:8000/api/;") == 3
     assert "nginx -t" in content
     assert 'CMD ["nginx", "-g", "daemon off;"]' in content
     assert "daemon off; pid " not in content

@@ -737,11 +737,18 @@ def check_docker() -> None:
     ) not in frontend_prod_dockerfile:
         errors.append("production frontend runtime 未固定到已审计的 Nginx 1.30.4 Alpine 摘要")
     for marker in (
-        "test \"$(grep -Fc 'pid /var/run/nginx.pid;' \"$main_config\")\" = '1'",
-        "sed -i 's|pid /var/run/nginx.pid;|pid /tmp/nginx.pid;|'",
-        "test \"$(grep -Fc 'pid /tmp/nginx.pid;' \"$main_config\")\" = '1'",
-        "! grep -Fq 'pid /var/run/nginx.pid;'",
+        "old_pid_pattern='^[[:space:]]*pid[[:space:]]+/run/nginx\\.pid;[[:space:]]*$'",
+        "test \"$(grep -Ec \"$old_pid_pattern\" \"$main_config\")\" = '1'",
+        'sed -Ei "s|$old_pid_pattern|pid /tmp/nginx.pid;|"',
+        "test \"$(grep -Ec \"$new_pid_pattern\" \"$main_config\")\" = '1'",
+        "! grep -Eq \"$old_pid_pattern\"",
+        "test \"$(grep -Fc 'proxy_pass http://backend:8000/api/;' \"$server_config\")\" = '1'",
+        'server_config_sha256="$(sha256sum "$server_config")"',
+        'cp -p "$server_config" /tmp/default.conf.runtime',
+        "sed -i 's|proxy_pass http://backend:8000/api/;|proxy_pass http://127.0.0.1:8000/api/;|'",
         "nginx -t",
+        'mv /tmp/default.conf.runtime "$server_config"',
+        'test "$(sha256sum "$server_config")" = "$server_config_sha256"',
         'CMD ["nginx", "-g", "daemon off;"]',
     ):
         if marker not in frontend_prod_dockerfile:
