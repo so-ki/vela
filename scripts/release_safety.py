@@ -175,6 +175,7 @@ EXPLICIT_RUNTIME_FILES = (
     "backend/app/rules/index.json",
     "backend/scripts/migrate_sqlite.py",
     "backend/scripts/propose_corpus_entry.py",
+    "backend/scripts/__init__.py",
     "backend/scripts/container_entrypoint.py",
     "backend/scripts/create_user.py",
     "backend/scripts/render_official_pages_to_pdf.mjs",
@@ -627,6 +628,7 @@ def check_docker() -> None:
     entrypoint = (ROOT / "backend/scripts/container_entrypoint.py").read_text(encoding="utf-8")
     vite_config = (ROOT / "frontend/vite.config.ts").read_text(encoding="utf-8")
     ci_workflow = (ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    prod_smoke = (ROOT / "scripts/prod_smoke.sh").read_text(encoding="utf-8")
     if not prod_dockerfile.startswith(
         "FROM python:3.12.13-alpine3.24@sha256:"
         "6d43704baacd1bfbe7c295d7f13079d5d8104ed33568873133f8fc69980419df\n"
@@ -666,8 +668,14 @@ def check_docker() -> None:
         errors.append("production image 不得暴露固定口令 demo seed 开关")
     if "seed_demo_user.py" in prod_dockerfile:
         errors.append("production image 不得携带固定口令 demo seed 脚本")
-    if 'CMD ["python", "scripts/container_entrypoint.py"]' not in prod_dockerfile:
+    if 'CMD ["python", "-m", "scripts.container_entrypoint"]' not in prod_dockerfile:
         errors.append("production image 未使用 fail-closed Python entrypoint")
+    if "COPY scripts/__init__.py scripts/container_entrypoint.py scripts/create_user.py ./scripts/" not in prod_dockerfile:
+        errors.append("production image 未把 entrypoint 作为可导入模块打包")
+    if "python scripts/container_entrypoint.py" in prod_smoke:
+        errors.append("production Compose smoke 不得以破坏 app 导入路径的文件方式运行 entrypoint")
+    if "python -m scripts.container_entrypoint" not in prod_smoke:
+        errors.append("production Compose smoke 未以模块方式运行 migration check")
     if "COPY alembic.ini ./" not in prod_dockerfile or "COPY alembic ./alembic" not in prod_dockerfile:
         errors.append("production image 未携带 Alembic 配置与迁移")
     if '"alembic"' not in entrypoint or '"upgrade"' not in entrypoint or '"head"' not in entrypoint:
@@ -751,7 +759,6 @@ def check_docker() -> None:
         errors.append("CI 未构建已移除扫描命中 gosu 的 PostgreSQL 镜像")
     if ci_workflow.count("image-ref: vela-postgres:ci") < 2:
         errors.append("CI 未对最终 PostgreSQL 包装镜像执行漏洞扫描和 SBOM")
-    prod_smoke = (ROOT / "scripts/prod_smoke.sh").read_text(encoding="utf-8")
     if "db_pid1_uid=" not in prod_smoke or "/proc/1/status" not in prod_smoke:
         errors.append("production Compose smoke 未验证 PostgreSQL PID 1 已降权")
     if "logs --no-color --tail=200" not in prod_smoke or "ps --all" not in prod_smoke:

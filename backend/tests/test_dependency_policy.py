@@ -69,6 +69,8 @@ def test_backend_images_use_the_python_312_audited_matrix() -> None:
 
     assert "requirements-rag.txt" not in development
     assert "requirements-rag.txt" not in production
+    assert 'CMD ["python", "-m", "scripts.container_entrypoint"]' in production
+    assert "python scripts/container_entrypoint.py" not in production
 
 
 def test_production_postgres_replaces_the_scanner_flagged_gosu_binary() -> None:

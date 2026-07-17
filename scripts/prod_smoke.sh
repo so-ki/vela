@@ -139,7 +139,7 @@ echo "==> provision disposable smoke users"
 "${COMPOSE[@]}" exec -T backend env PYTHONPATH=/app python /tmp/seed_demo_user.py
 
 echo "==> PostgreSQL migration head and model drift"
-"${COMPOSE[@]}" exec -T -e VELA_ENTRYPOINT_MODE=check backend python scripts/container_entrypoint.py
+"${COMPOSE[@]}" exec -T -e VELA_ENTRYPOINT_MODE=check backend python -m scripts.container_entrypoint
 
 echo "==> full business/legal API golden path on PostgreSQL"
 VELA_API="http://127.0.0.1:${SMOKE_PORT}/api/v1" bash scripts/verify_e2e.sh

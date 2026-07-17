@@ -12,6 +12,7 @@ SPEC = importlib.util.spec_from_file_location("container_entrypoint", MODULE_PAT
 assert SPEC and SPEC.loader
 container_entrypoint = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(container_entrypoint)
+BACKEND_ROOT = MODULE_PATH.parents[1]
 
 
 def _production_env(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -22,6 +23,31 @@ def _production_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SEED_DEMO_USERS", "true")
     monkeypatch.delenv("DATABASE_URL", raising=False)
     monkeypatch.delenv("VELA_ENTRYPOINT_MODE", raising=False)
+
+
+def test_production_entrypoint_is_importable_as_the_packaged_module() -> None:
+    env = os.environ.copy()
+    env.update(
+        {
+            "APP_ENV": "production",
+            "SECRET_KEY": "module-import-secret-2026-with-diversity",
+            "POSTGRES_PASSWORD": "module-import-db-password-2026!",
+            "VELA_ENTRYPOINT_MODE": "invalid-mode-probe",
+        }
+    )
+
+    result = subprocess.run(
+        [os.sys.executable, "-m", "scripts.container_entrypoint"],
+        cwd=BACKEND_ROOT,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 2
+    assert "VELA_ENTRYPOINT_MODE must be check, migrate, or web" in result.stderr
+    assert "ModuleNotFoundError" not in result.stderr
 
 
 @pytest.mark.parametrize(
