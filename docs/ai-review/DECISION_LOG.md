@@ -79,3 +79,47 @@
 - **影响范围**: Gap Matrix 与 WS-3 验收口径。
 - **谁批准**: 用户。
 - **是否可逆**: 可逆(需新决定)。
+
+## D-0007(Decision A)
+
+- **Decision ID**: D-0007
+- **日期**: 2026-07-18
+- **问题**: 30 项研究分母的产品语义(Phase 0.5 Unresolved Q1)。
+- **最终决定**: 采用 **A+ 方案**。Pack 完整规则分母固定 30 条,全部进入冻结 denominator,不得因关键词、子行业检测、向量召回或 screening 消失。区分 `in_scope` 与 `out_of_scope_by_scope`(法务未选维度的条目;不得标 not_applicable;不进入本次 scope coverage 分子)。所有 `in_scope` 条目最终必须处于 supported / not_applicable / rejected / unanswerable / uncovered 之一,且满足 `scope_total = supported + not_applicable + rejected + unanswerable + uncovered`。关键词/子行业/embedding/检索只能产生 screening annotation、prioritization、likely-applicable candidate、negative/negated/requires-review 标记,不得改变 denominator。`not_applicable` 仅在存在业务确认的否定事实并经 legal 明确确认后成立。CoverageProof 必须同时披露 pack_total、scope_total、out_of_scope_by_scope_count、五类 disposition count、denominator hash。
+- **依据**: EV-0015(P0 分母不稳定);用户批示(本轮任务书第一节)。
+- **影响范围**: WS-1A 设计;A-02 口径;payload schema;CoverageProof schema;前端呈现。
+- **谁批准**: 用户。
+- **是否可逆**: 产品语义决定,变更需新决定。
+
+## D-0008(Decision B)
+
+- **Decision ID**: D-0008
+- **日期**: 2026-07-18
+- **问题**: 规则/Pack 多版本兼容策略(Phase 0.5 Unresolved Q2)。
+- **最终决定**: **多版本不可变共存**。禁止覆盖、重写或一次性重冻结历史 Pack/rules/corpus/compiler/proof/evaluator。要求:brazil_new_energy 现行规则 artifact byte-identical 保留;现有 Pack manifest 精确归档;新规则用新版本(如 3.0),新 Pack 用新版本;旧场景钉旧 version+hash,新场景用新版本;registry 按 id/version/hash 精确加载;evaluator/compiler/proof reader 只增不减;write default 可回退但历史 reader 不得删除;未知历史版本 fail-closed;空库、首次部署与普通测试库必须正常启动。
+- **依据**: 用户批示;EV-0005/0010(现行加载与钉哈希机制)。
+- **影响范围**: WS-1C 全部;WS-1A/1B/1D 的 hash 变更均以此为前提。
+- **谁批准**: 用户。
+- **是否可逆**: 不可逆方向性决定(不可变历史);扩展可追加。
+
+## D-0009(Decision C)
+
+- **Decision ID**: D-0009
+- **日期**: 2026-07-18
+- **问题**: ResearchItem 与 ClaimRecord 分离方式(Phase 0.5 Unresolved Q3)。
+- **最终决定**: 不接受仅 payload 区分,也不接受给现有 ClaimRecord 加 claim_type 后继续保存占位 Claim。采用 Alembic 迁移引入独立研究项模型(命名候选 `ClaimCompilationItem` 或 `ResearchItem`),承载 denominator item、checklist code、scope status、screening status、missing facts、reason codes、research disposition、linked claim id、compilation/version/hash。`ClaimRecord` 只表示真正的法律主张。无法务 draft 时创建 ResearchItem,不创建伪 ClaimRecord,不把"待核验事项:…"存为法律 statement。历史 ClaimRecord 不得修改或重写;新 compiler/evaluator 用新模型,旧数据由旧 evaluator 继续读取。
+- **依据**: EV-0016(P2 语义混淆);用户批示。
+- **影响范围**: WS-1A(依赖 WS-1C 版本基础);机制层模型与 Alembic;与 WS-1C 迁移需协调避免冲突。
+- **谁批准**: 用户。
+- **是否可逆**: 迁移可 downgrade(仅一次性库);语义决定变更需新决定。
+
+## D-0010(外部 Evidence Matrix 采用状态修正)
+
+- **Decision ID**: D-0010
+- **日期**: 2026-07-18
+- **问题**: Phase 0.5 外证矩阵三处采用状态/验收口径修正。
+- **最终决定**: (1) Tesseract 改为"受控实验 → 生产候选":仅在 OCR gold set、CER、页码/bbox、低置信人工队列、版本/语言包 hash 全部验收后方可生产采用;(2) LangGraph 改为"当前不采用;未来仅可用于非安全核心实验":理由是现有确定性状态机已满足需求、新增框架复杂度当前无收益;不得声称 LangGraph 本身必然破坏 frozen bytes;(3) WS-1D 验收不以"grep 零 Brazil 字面量"为唯一标准:真正验收是平台核心不存在 Brazil-specific branch/default/fallback/validation/source mapping/corpus path/release rule;巴西专属内容必须位于 Capability Pack 或 jurisdiction assurance profile。
+- **依据**: 用户批示(本轮任务书第二节)。
+- **影响范围**: 外证矩阵;WS-1D 验收标准;WS-6/OCR 排期。
+- **谁批准**: 用户。
+- **是否可逆**: 可逆(需新决定)。

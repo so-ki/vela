@@ -174,3 +174,18 @@
 - **提交 SHA**: 65f0b398(仓库状态);外部来源以访问日期为准
 - **是否已复现**: 单轮访问,未二次复现;完整逐项字段(已核验事实/可借鉴/不能解决/采用状态/gold set/进入退出条件/URL)见本轮 Phase 0.5 会话报告。
 - **限制和不确定性**: 未核验残留:Qwen3.7-Max 1M 上下文与 strict schema 官方文档、BGE-M3 葡语逐项列名、in-toto↔SLSA 官方关系表述、CoCounsel 巴西覆盖、Vincent 州/市级深度、LegalBench 与 lexml-linker 最后提交日期、projeto.lexml.gov.br 根页(503)、各厂商营销数字(登记为主张)。这些不得当作事实使用。
+
+## EV-0018
+
+- **claim**: 基线动态验证(首次实测)在本基线全部通过:靶向 6 文件 35 passed;全量后端 295 passed;compileall 通过;前端 29 passed、Vite 构建成功;发布边界检查 OK;git diff --check 干净。
+- **文件与精确行号**: N/A(测试运行)
+- **命令与结果**(环境:远程受管容器 Linux;Python 3.12.3(uv venv,scratchpad 内,未用系统 3.11);Node v22.22.2;npm 10.9.7;Docker 29.3.1;运行时工作树 = 基线 65f0b398 + 5 个交接文件):
+  1. `pytest -q tests/test_capability_pack_api.py tests/test_country_independent_fixture_flow.py tests/test_mechanism_layer.py tests/test_legal_source_versions.py tests/test_delivery_assurance.py tests/test_release_safety.py` → **35 passed, 3 warnings in 32.11s**(real 0m33.75s)
+  2. `python -m compileall -q app tests` → 退出 0(real 0m0.14s;pytest 先行已生成 __pycache__)
+  3. `python -m pytest tests -q`(全量)→ **295 passed, 3 warnings in 73.70s**(real 1m15.16s)
+  4. `npm ci` → 成功(real 0m4.81s);`npm run test:components` → **7 文件 29 passed**(Duration 5.88s);`npm run build` → **✓ built in 3.62s**(158 modules 级输出正常)
+  5. `bash scripts/check_release_boundaries.sh` → 全部 OK,exit=0;`git diff --check` → 干净
+- **原始结果摘要**: 无失败、无跳过报告;警告为 starlette testclient 弃用、passlib crypt(Py3.13 移除预告)、reportlab ast.NameConstant 弃用,均非本仓库代码。
+- **提交 SHA**: 产品代码 65f0b398(工作树含 5 个交接文件,不影响 backend/frontend 测试对象)
+- **是否已复现**: 本轮单次运行;未做二次复现。
+- **限制和不确定性**: 测试库为 SQLite/测试配置,PostgreSQL 并发/事务结论仍属 experiment_required(WS-4);Alembic 升降级往返未在本轮运行(需一次性 PostgreSQL,后续专项);passlib 的 Py3.13 弃用警告提示未来升级 3.13 需换 bcrypt 直连或升级 passlib。
