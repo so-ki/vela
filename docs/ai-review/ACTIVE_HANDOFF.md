@@ -18,8 +18,8 @@
 - 注意:Git 的实时 HEAD 只能在恢复时通过 `git rev-parse HEAD` 获取;本文件不记录、也不得用文件记录替代 Git 实时查询(D-0004)。
 
 ## Current Phase
-- Phase: WS-1C/C1 — Capability Pack 历史版本索引与精确寻址基础——已实施并全量验证,等待用户复核
-- Workstream: WS-1C(C1 完成;C2~C5 未开始,未获批准)
+- Phase: WS-1C/C1 + C1.1(C1-F1 inactive 精确身份修补)——已实施并全量验证,等待用户复核
+- Workstream: WS-1C(C1、C1.1 完成;C2~C5 未开始,未获批准)
 - Status: complete_pending_review
 - Allowed file scope(C1 已批准范围): registry.py、新增 version_index.py、新增 test_capability_pack_version_archive.py、5 个交接文件
 - Prohibited actions: 修改 active manifest/生产 rules/生产 corpus/真实归档制品/loader scheme 语义/机制层模型/Claim-Coverage/compiler-proof-release evaluator/Alembic/前端/产品文档/startup-readiness/release 行为;开始 C2~C5 与 WS-1A/B/D/E;创建 PR;合并;推送 Draft 分支
@@ -66,7 +66,7 @@
 2. ResearchItem 模型命名偏好:`ResearchItem` vs `ClaimCompilationItem`(D-0009 两候选,WS-1A 冻结方案时定,可由实施者建议)。
 
 ## Next Exact Action
-- 等待用户复核 WS-1C/C1(证据:EV-0020;全量 309 passed)。经复核通过后,请求批准 C2(真实 1.3.1/2.9/1.13 归档 + byte-identity 测试);C2 前不得创建真实 archive 制品。
+- 等待用户复核 WS-1C/C1 + C1.1(证据:EV-0020、EV-0021;全量 314 passed)。经复核通过后,请求批准 C2(真实 1.3.1/2.9/1.13 归档 + byte-identity 测试);C2 前不得创建真实 archive 制品。
 
 ## Stop Conditions
 - 远端基线移动、产品代码出现非授权改动、或操作将超出 5 个允许文件 → 立即停止并报告。

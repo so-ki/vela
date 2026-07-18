@@ -215,3 +215,18 @@
 - **提交 SHA**: 见本轮提交(feat(capability-packs): add exact archived version lookup)
 - **是否已复现**: 单轮;每项命令一次通过。
 - **限制和不确定性**: 动态验证仍限 SQLite 测试库;startup 扫描(C4)、消费方版本注册表(C3)未实施;`list_versions`/`build_version_index` 暂无生产调用方(为 C2~C4 与未来 startup 扫描准备)。
+
+## EV-0021
+
+- **claim**: C1-F1(inactive live-root 精确身份 Bug)已修复(C1.1)。修复前失败模式:`get_exact` 经 `self.get(pack_id)`(require_active=True)读取 live root,导致 (1) inactive live-root Pack 无法按精确 version/hash 被冻结历史场景读取(抛 CapabilityPackInactiveError);(2) inactive live-root 与 archive 同 pack_id/version 但身份不同时绕过 collision 检查(live 侧被当作不存在);(3) 与 `build_version_index()` 纳入全部 live-root Pack 的行为不一致。修复:`get_exact` 改用 `self.get(pack_id, require_active=False)` 且仅将 `CapabilityPackNotFoundError` 视为 live-root 不存在;routing 行为不变(get 默认仍 require_active、list_active/list_public_active/match/match_material 仍仅 active、archive 仍不参与 routing);新增保守输入验证:version 须匹配 `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`(非严格 SemVer,禁路径分隔符),semantic_hash 规范化小写后须为 64 位十六进制,非法输入抛 CapabilityPackRegistryError;version 不用于拼接 archive 路径(仍经服务器扫描索引查找)。
+- **文件与精确行号**: backend/app/capability_packs/registry.py(_EXACT_VERSION/_SEMANTIC_HASH 常量与 get_exact 重写);backend/tests/test_capability_pack_version_archive.py(新增 5 测试:inactive 精确读取、inactive 对 get/routing 仍不可用、inactive/archive 身份冲突、inactive/archive 同一身份允许、非法 version/hash 格式拒绝+大写 hash 规范化)
+- **命令与结果**(Python 3.12.3 uv venv):
+  1. `pytest -q tests/test_capability_pack_version_archive.py` → **19 passed**(1.07s;原 14 全部保留未降级)
+  2. `python -m compileall -q app tests` → 通过
+  3. `ruff check`(3 文件)→ All checks passed
+  4. 全量 `pytest tests -q` → **314 passed**(86.68s;309 + 新增 5,零失败零跳过)
+  5. `bash scripts/check_release_boundaries.sh` → OK;`git diff --check` → 干净
+- **原始结果摘要**: 生产 registry 行为(test_production_registry_behavior_unchanged)与 fixture 行为(test_fixture_behavior_unchanged)测试保持通过;version_index.py 未改动。
+- **提交 SHA**: 见本轮提交(fix(capability-packs): preserve inactive exact version identity)
+- **是否已复现**: 单轮;每项命令一次通过。
+- **限制和不确定性**: 行为变化披露:此前 get_exact 对"仅存在 inactive live-root 且身份失配"抛 CapabilityPackInactiveError,现统一抛 "version/hash 与冻结身份不一致";全库无依赖旧行为的调用方(全量测试绿)。

@@ -18,6 +18,9 @@ from app.capability_packs.version_index import (
 
 CAPABILITY_PACKS_ROOT = Path(__file__).resolve().parent
 _PACK_ID = re.compile(r"^[a-z0-9][a-z0-9._-]{1,127}$")
+# 保守安全格式（非严格 SemVer）：现有 artifact version 不全遵守 SemVer。
+_EXACT_VERSION = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+_SEMANTIC_HASH = re.compile(r"^[0-9a-f]{64}$")
 
 
 class CapabilityPackRegistryError(ValueError):
@@ -119,37 +122,44 @@ class CapabilityPackRegistry:
 
         Archived versions are only reachable here; they never join active,
         public or routing results. No fallback to active/current/nearest
-        version or any other hash is performed.
+        version or any other hash is performed. Exact historical reads are
+        deliberately decoupled from routing "active" status: an inactive
+        live-root pack stays readable by its exact identity (C1-F1), while
+        get()/match() keep requiring active.
         """
         if not _PACK_ID.fullmatch(pack_id):
             raise CapabilityPackNotFoundError("Capability Pack ID 非法")
-        active_pack: LoadedCapabilityPack | None = None
-        active_error: CapabilityPackRegistryError | None = None
+        if not _EXACT_VERSION.fullmatch(version or ""):
+            raise CapabilityPackRegistryError("Capability Pack version 格式非法")
+        semantic_hash = (semantic_hash or "").lower()
+        if not _SEMANTIC_HASH.fullmatch(semantic_hash):
+            raise CapabilityPackRegistryError("Capability Pack semantic hash 格式非法")
+        live_pack: LoadedCapabilityPack | None = None
         try:
-            active_pack = self.get(pack_id)
-        except (CapabilityPackNotFoundError, CapabilityPackInactiveError) as exc:
-            active_error = exc
+            live_pack = self.get(pack_id, require_active=False)
+        except CapabilityPackNotFoundError:
+            live_pack = None
         archived_pack = self._load_archived_exact(pack_id, version)
         if (
-            active_pack is not None
+            live_pack is not None
             and archived_pack is not None
-            and active_pack.manifest.version == version
-            and identity_of(active_pack) != identity_of(archived_pack)
+            and live_pack.manifest.version == version
+            and identity_of(live_pack) != identity_of(archived_pack)
         ):
             raise CapabilityPackVersionCollisionError(
                 f"Capability Pack 版本身份冲突：{pack_id}@{version}"
-                "（active 与 archive 的 semantic/rules/corpus hash 不一致）"
+                "（live-root 与 archive 的 semantic/rules/corpus hash 不一致）"
             )
         if (
-            active_pack is not None
-            and active_pack.manifest.version == version
-            and active_pack.manifest.semantic_hash == semantic_hash
+            live_pack is not None
+            and live_pack.manifest.version == version
+            and live_pack.manifest.semantic_hash == semantic_hash
         ):
-            return active_pack
+            return live_pack
         if archived_pack is not None and archived_pack.manifest.semantic_hash == semantic_hash:
             return archived_pack
-        if active_pack is None and archived_pack is None and active_error is not None:
-            raise active_error
+        if live_pack is None and archived_pack is None:
+            raise CapabilityPackNotFoundError(f"Capability Pack 不存在：{pack_id}")
         raise CapabilityPackRegistryError("Capability Pack version/hash 与冻结身份不一致")
 
     def build_version_index(self) -> CapabilityPackVersionIndex:

@@ -15,6 +15,7 @@ import pytest
 from app.capability_packs.loader import CapabilityPackLoadError
 from app.capability_packs.registry import (
     CAPABILITY_PACKS_ROOT,
+    CapabilityPackInactiveError,
     CapabilityPackNotFoundError,
     CapabilityPackRegistry,
     CapabilityPackRegistryError,
@@ -448,6 +449,106 @@ def test_load_frozen_capability_pack_loads_archived_identity(synthetic_root: Pat
     stale["rules_artifact_hash"] = "f" * 64
     with pytest.raises(CapabilityPackRegistryError, match="不一致"):
         load_frozen_capability_pack(stale, registry=registry)
+
+
+def test_get_exact_reads_inactive_live_root_by_exact_identity(synthetic_root: Path) -> None:
+    manifest, rules_bytes, corpus_bytes = _build_pack(
+        pack_version="1.0.0", rules_version="2.0", corpus_version="1.0", status="inactive"
+    )
+    _install_active(synthetic_root, manifest, rules_bytes, corpus_bytes)
+    registry = _registry(synthetic_root)
+
+    pack = registry.get_exact(PACK_ID, "1.0.0", manifest["semantic_hash"])
+    assert pack.manifest.version == "1.0.0"
+    assert pack.manifest.status == "inactive"
+    # 精确读取不回退：错误 hash / 错误 version 仍失败。
+    with pytest.raises(CapabilityPackRegistryError, match="不一致"):
+        registry.get_exact(PACK_ID, "1.0.0", "f" * 64)
+    with pytest.raises(CapabilityPackRegistryError, match="不一致"):
+        registry.get_exact(PACK_ID, "9.9.9", manifest["semantic_hash"])
+
+
+def test_inactive_live_root_remains_unavailable_to_get_and_routing(
+    synthetic_root: Path,
+) -> None:
+    manifest, rules_bytes, corpus_bytes = _build_pack(
+        pack_version="1.0.0", rules_version="2.0", corpus_version="1.0", status="inactive"
+    )
+    _install_active(synthetic_root, manifest, rules_bytes, corpus_bytes)
+    registry = _registry(synthetic_root)
+
+    with pytest.raises(CapabilityPackInactiveError):
+        registry.get(PACK_ID)
+    assert registry.list_active() == []
+    assert registry.list_public_active() == []
+    with pytest.raises(CapabilityPackUnsupportedError):
+        registry.match(
+            country="ZZ-ARCH",
+            state="zz-state",
+            industry="arch_industry",
+            action_type="arch_action",
+        )
+
+
+def test_inactive_live_root_archive_identity_collision_fails(synthetic_root: Path) -> None:
+    live_manifest, live_rules, live_corpus = _build_pack(
+        pack_version="1.0.0",
+        rules_version="2.0",
+        corpus_version="1.0",
+        rules_marker="live-inactive",
+        status="inactive",
+    )
+    archive_manifest, archive_rules, archive_corpus = _build_pack(
+        pack_version="1.0.0",
+        rules_version="2.0",
+        corpus_version="1.0",
+        rules_marker="archived-divergent",
+    )
+    assert archive_manifest["semantic_hash"] != live_manifest["semantic_hash"]
+    _install_active(synthetic_root, live_manifest, live_rules, live_corpus)
+    _install_archive(synthetic_root, archive_manifest, archive_rules, archive_corpus)
+    registry = _registry(synthetic_root)
+
+    with pytest.raises(CapabilityPackVersionCollisionError):
+        registry.get_exact(PACK_ID, "1.0.0", live_manifest["semantic_hash"])
+    with pytest.raises(CapabilityPackVersionCollisionError):
+        registry.get_exact(PACK_ID, "1.0.0", archive_manifest["semantic_hash"])
+    with pytest.raises(CapabilityPackVersionCollisionError):
+        registry.build_version_index()
+
+
+def test_identical_inactive_live_root_and_archive_identity_is_allowed(
+    synthetic_root: Path,
+) -> None:
+    manifest, rules_bytes, corpus_bytes = _build_pack(
+        pack_version="1.0.0", rules_version="2.0", corpus_version="1.0", status="inactive"
+    )
+    _install_active(synthetic_root, manifest, rules_bytes, corpus_bytes)
+    _install_archive(synthetic_root, manifest, rules_bytes, corpus_bytes)
+    registry = _registry(synthetic_root)
+
+    pack = registry.get_exact(PACK_ID, "1.0.0", manifest["semantic_hash"])
+    assert pack.manifest.version == "1.0.0"
+    assert registry.build_version_index().lookup(PACK_ID, "1.0.0") is not None
+
+
+def test_get_exact_rejects_invalid_version_and_hash_format(synthetic_root: Path) -> None:
+    manifest, rules_bytes, corpus_bytes = _build_pack(
+        pack_version="1.0.0", rules_version="2.0", corpus_version="1.0"
+    )
+    _install_active(synthetic_root, manifest, rules_bytes, corpus_bytes)
+    registry = _registry(synthetic_root)
+    good_hash = manifest["semantic_hash"]
+
+    for bad_version in ["", "../1.0.0", "1.0.0/..", "1.0.0/x", ".hidden", "v" * 100]:
+        with pytest.raises(CapabilityPackRegistryError, match="version 格式非法"):
+            registry.get_exact(PACK_ID, bad_version, good_hash)
+    for bad_hash in ["", "xyz", "f" * 63, "g" * 64, good_hash + "0"]:
+        with pytest.raises(CapabilityPackRegistryError, match="semantic hash 格式非法"):
+            registry.get_exact(PACK_ID, "1.0.0", bad_hash)
+    # 大写 hash 规范化为小写后接受。
+    pack = registry.get_exact(PACK_ID, "1.0.0", good_hash.upper())
+    assert pack.manifest.semantic_hash == good_hash
 
 
 def test_archive_readable_without_any_active_pack_but_not_routable(
