@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import io
 import json
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -686,20 +688,121 @@ def test_fresh_sqlite_real_mainline_generates_reviews_and_exports(demo_environme
     assert finalized["status"] == "approved"
     assert finalized["can_export"] is True
 
-    # 8. Both delivery formats are generated from the finalized real result.
-    docx_response = client.get(f"/api/v1/scenarios/{scenario_id}/export/docx", headers=legal_headers)
-    assert docx_response.status_code == 200, docx_response.text
-    assert docx_response.headers["content-type"].startswith(
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    # 8. Final review alone is not a delivery authorization.  Draft brief
+    # preview remained available above, while every final artifact now fails
+    # closed until Claim + CoverageProof bind the current snapshot.
+    blocked_delivery = client.get(
+        f"/api/v1/scenarios/{scenario_id}/export/docx", headers=legal_headers
     )
-    assert docx_response.content.startswith(b"PK\x03\x04")
+    assert blocked_delivery.status_code == 409, blocked_delivery.text
+    assert blocked_delivery.json()["detail"]["reason_codes"] == [
+        "claim_compilation_missing"
+    ]
 
-    pdf_response = client.get(f"/api/v1/scenarios/{scenario_id}/export/pdf", headers=legal_headers)
-    assert pdf_response.status_code == 200, pdf_response.text
-    assert pdf_response.headers["content-type"].startswith("application/pdf")
-    assert pdf_response.content.startswith(b"%PDF-")
+    fact_response = client.post(
+        f"/api/v1/scenarios/{scenario_id}/mechanism/facts",
+        headers=business_headers,
+        json={
+            "subject": "project",
+            "attribute": "confirmed_project_material",
+            "value": "坎皮纳斯储能系统组装厂项目材料",
+            "fact_time": "2026-07-17",
+            "block_id": "submitted-material:project",
+            "fact_pack_version": "facts-v0.1",
+            "source_document": "project-material.txt",
+        },
+    )
+    assert fact_response.status_code == 201, fact_response.text
+    fact_id = fact_response.json()["id"]
+    fact_confirm = client.post(
+        f"/api/v1/scenarios/{scenario_id}/mechanism/facts/{fact_id}/confirm",
+        headers=business_headers,
+        json={"confirmation_note": "业务提交人确认该事实与本次冻结项目材料一致。"},
+    )
+    assert fact_confirm.status_code == 200, fact_confirm.text
+
+    drafts = []
+    for section in brief["sections"]:
+        for item in section["items"]:
+            if item["gate_status"] != "passed":
+                continue
+            citation = next(value for value in item["citations"] if value["grounded"])
+            drafts.append(
+                {
+                    "checklist_code": item["code"],
+                    "statement": item["risk_zh"],
+                    "fact_refs": [fact_id],
+                    "evidence_refs": [f"{item['code']}:{citation['id']}"],
+                }
+            )
+    compilation_response = client.post(
+        f"/api/v1/scenarios/{scenario_id}/mechanism/claims/compile",
+        headers=legal_headers,
+        json={"drafts": drafts},
+    )
+    assert compilation_response.status_code == 201, compilation_response.text
+    compilation = compilation_response.json()
+    for claim in compilation["claims"]:
+        if claim["status"] != "awaiting_human_confirmation":
+            continue
+        claim_response = client.post(
+            f"/api/v1/scenarios/{scenario_id}/mechanism/claims/{claim['id']}/confirm",
+            headers=legal_headers,
+            json={
+                "decision": "confirmed",
+                "confirmation_note": "终审法务逐项核对事实、限定表述与冻结法源定位后确认。",
+            },
+        )
+        assert claim_response.status_code == 200, claim_response.text
+    proof_response = client.post(
+        f"/api/v1/scenarios/{scenario_id}/mechanism/coverage-proofs",
+        headers=legal_headers,
+        json={
+            "compilation_id": compilation["id"],
+            "denominator_ref": "frozen checklist and evidence snapshot",
+        },
+    )
+    assert proof_response.status_code == 201, proof_response.text
+
+    # Stored-proof corruption is distinguished from ordinary workflow staleness
+    # and is also audit logged as a blocked 422 delivery attempt.
+    with factory() as db:
+        from app.models.mechanism import CoverageProof
+
+        stored_proof = db.get(CoverageProof, proof_response.json()["id"])
+        original_proof_hash = stored_proof.proof_hash
+        stored_proof.proof_hash = "f" * 64
+        db.commit()
+    corrupt_delivery = client.get(
+        f"/api/v1/scenarios/{scenario_id}/export/audit-bundle", headers=legal_headers
+    )
+    assert corrupt_delivery.status_code == 422, corrupt_delivery.text
+    assert "coverage_proof_stored_hash_invalid" in corrupt_delivery.json()["detail"][
+        "reason_codes"
+    ]
+    with factory() as db:
+        from app.models.mechanism import CoverageProof
+
+        stored_proof = db.get(CoverageProof, proof_response.json()["id"])
+        stored_proof.proof_hash = original_proof_hash
+        db.commit()
+
+    # Passing Answerability does not create an external legal authorization.
+    # Demo identities have no OAB credential, ITI-validated artifact signature,
+    # customer UAT, gold run or production provenance, so every final download
+    # remains blocked.  This is an intentional real-client boundary.
+    for artifact_path in ("audit-bundle", "docx", "pdf"):
+        response = client.get(
+            f"/api/v1/scenarios/{scenario_id}/export/{artifact_path}",
+            headers=legal_headers,
+        )
+        assert response.status_code == 409, response.text
+        detail = response.json()["detail"]
+        assert detail["delivery_allowed"] is False
+        assert detail["blocking_reasons"] == ["active_delivery_release_missing"]
 
     with factory() as db:
+        from app.models.audit_log import AuditLog
         from app.models.scenario import InvestigationScenario, ScenarioGenerationAttempt
 
         scenario = db.get(InvestigationScenario, scenario_id)
@@ -708,4 +811,20 @@ def test_fresh_sqlite_real_mainline_generates_reviews_and_exports(demo_environme
         attempts = db.query(ScenarioGenerationAttempt).filter_by(scenario_id=scenario_id).all()
         assert len(attempts) == 1
         assert attempts[0].status == "succeeded"
+        blocked_gate_logs = (
+            db.query(AuditLog)
+            .filter(AuditLog.action == "delivery.answerability_gate_blocked")
+            .all()
+        )
+        assert len(blocked_gate_logs) == 2
+        blocked_details = "\n".join(entry.detail or "" for entry in blocked_gate_logs)
+        assert "claim_compilation_missing" in blocked_details
+        assert "coverage_proof_stored_hash_invalid" in blocked_details
+        customer_release_logs = (
+            db.query(AuditLog)
+            .filter(AuditLog.action == "delivery.customer_release_blocked")
+            .all()
+        )
+        assert len(customer_release_logs) == 3
+        assert all("active_delivery_release_missing" in (entry.detail or "") for entry in customer_release_logs)
     client.close()

@@ -38,6 +38,15 @@ from app.schemas.legal import LegalRetrievalResponse
 from app.schemas.review import ReviewItemUpdateRequest, ReviewResponse, ReviewReturnRequest
 from app.services.audit import write_audit_log
 from app.services.audit_bundle_service import build_audit_bundle
+from app.services.answerability_gate_service import (
+    AnswerabilityGateError,
+    require_delivery_answerability,
+)
+from app.services.delivery_assurance_service import (
+    DeliveryAssuranceError,
+    DeliveryGateBlocked,
+    require_released_delivery_artifact,
+)
 from app.services.brief_generator import generate_brief
 from app.services.document_extractor import extract_documents_batch, extract_facts_from_document
 from app.services.export_service import build_sample_docx, build_sample_pdf
@@ -109,6 +118,68 @@ from app.services.checklist_payload_service import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["协查场景"])
+
+
+def _require_delivery_gate(
+    db: Session,
+    *,
+    scenario: InvestigationScenario,
+    current_user: User,
+    artifact_type: str,
+    generation_config,
+) -> tuple[dict, object]:
+    """Run the final-artifact gate and persist every blocked attempt."""
+
+    try:
+        answerability = require_delivery_answerability(db, scenario=scenario)
+    except AnswerabilityGateError as exc:
+        detail = exc.detail()
+        write_audit_log(
+            db,
+            user=current_user,
+            action="delivery.answerability_gate_blocked",
+            resource_type="scenario",
+            resource_id=str(scenario.id),
+            detail=json.dumps(
+                {"artifact_type": artifact_type, **detail},
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+        )
+        raise HTTPException(status_code=exc.http_status, detail=detail) from exc
+    try:
+        release, artifact = require_released_delivery_artifact(
+            db,
+            scenario=scenario,
+            generation_config=generation_config,
+            artifact_type=artifact_type,
+        )
+        return {**answerability, "customer_delivery_release": release}, artifact
+    except DeliveryGateBlocked as exc:
+        write_audit_log(
+            db,
+            user=current_user,
+            action="delivery.customer_release_blocked",
+            resource_type="scenario",
+            resource_id=str(scenario.id),
+            detail=json.dumps(
+                {"artifact_type": artifact_type, **exc.report},
+                ensure_ascii=False,
+                sort_keys=True,
+            ),
+        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=exc.report) from exc
+    except DeliveryAssuranceError as exc:
+        detail = {"message": str(exc), "artifact_type": artifact_type}
+        write_audit_log(
+            db,
+            user=current_user,
+            action="delivery.customer_release_blocked",
+            resource_type="scenario",
+            resource_id=str(scenario.id),
+            detail=json.dumps(detail, ensure_ascii=False, sort_keys=True),
+        )
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail) from exc
 
 
 def _save_payload(db: Session, scenario: InvestigationScenario, payload: dict) -> None:
@@ -1521,8 +1592,12 @@ def export_audit_bundle(
             detail="请先完成法务复核定稿后再导出审计包",
         )
 
-    bundle = scenario.checklist.payload.get("audit_bundle") or build_audit_bundle(
-        scenario, generation_config=generation_config
+    gate, artifact = _require_delivery_gate(
+        db,
+        scenario=scenario,
+        current_user=current_user,
+        artifact_type="audit_bundle",
+        generation_config=generation_config,
     )
     write_audit_log(
         db,
@@ -1530,9 +1605,21 @@ def export_audit_bundle(
         action="export.audit_bundle",
         resource_type="scenario",
         resource_id=str(scenario.id),
-        detail=f"导出审计包 v{bundle.get('bundle_version')}",
+        detail=(f"下载冻结审计包 artifact={artifact.id} sha256={artifact.content_sha256} "
+                f"release={gate['customer_delivery_release']['release_hash']}"),
     )
-    return bundle
+    encoded_name = quote(artifact.filename)
+    return Response(
+        content=artifact.content,
+        media_type=artifact.media_type,
+        headers={
+            "Content-Disposition": (
+                f'attachment; filename="vela_audit_bundle.json"; filename*=UTF-8\'\'{encoded_name}'
+            ),
+            "X-Content-SHA256": artifact.content_sha256,
+            "X-Delivery-Release": gate["customer_delivery_release"]["release_hash"],
+        },
+    )
 
 
 @router.get("/scenarios/{scenario_id}/export/docx")
@@ -1553,25 +1640,34 @@ def export_docx(
             detail="请先完成法务复核定稿后再导出",
         )
 
-    content, filename = build_sample_docx(scenario, generation_config=generation_config)
+    gate, artifact = _require_delivery_gate(
+        db,
+        scenario=scenario,
+        current_user=current_user,
+        artifact_type="docx",
+        generation_config=generation_config,
+    )
     write_audit_log(
         db,
         user=current_user,
         action="export.docx",
         resource_type="scenario",
         resource_id=str(scenario.id),
-        detail=f"导出协查底稿 {filename}",
+        detail=(f"下载冻结 DOCX artifact={artifact.id} sha256={artifact.content_sha256} "
+                f"release={gate['customer_delivery_release']['release_hash']}"),
     )
 
     ascii_name = "vela_compliance_brief.docx"
-    encoded_name = quote(filename)
+    encoded_name = quote(artifact.filename)
     return Response(
-        content=content,
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        content=artifact.content,
+        media_type=artifact.media_type,
         headers={
             "Content-Disposition": (
                 f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{encoded_name}'
-            )
+            ),
+            "X-Content-SHA256": artifact.content_sha256,
+            "X-Delivery-Release": gate["customer_delivery_release"]["release_hash"],
         },
     )
 
@@ -1594,24 +1690,33 @@ def export_pdf(
             detail="请先完成法务复核定稿后再导出",
         )
 
-    content, filename = build_sample_pdf(scenario, generation_config=generation_config)
+    gate, artifact = _require_delivery_gate(
+        db,
+        scenario=scenario,
+        current_user=current_user,
+        artifact_type="pdf",
+        generation_config=generation_config,
+    )
     write_audit_log(
         db,
         user=current_user,
         action="export.pdf",
         resource_type="scenario",
         resource_id=str(scenario.id),
-        detail=f"导出 PDF 协查底稿 {filename}",
+        detail=(f"下载冻结 PDF artifact={artifact.id} sha256={artifact.content_sha256} "
+                f"release={gate['customer_delivery_release']['release_hash']}"),
     )
 
     ascii_name = "vela_compliance_brief.pdf"
-    encoded_name = quote(filename)
+    encoded_name = quote(artifact.filename)
     return Response(
-        content=content,
-        media_type="application/pdf",
+        content=artifact.content,
+        media_type=artifact.media_type,
         headers={
             "Content-Disposition": (
                 f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{encoded_name}'
-            )
+            ),
+            "X-Content-SHA256": artifact.content_sha256,
+            "X-Delivery-Release": gate["customer_delivery_release"]["release_hash"],
         },
     )

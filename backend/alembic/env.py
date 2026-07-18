@@ -7,7 +7,17 @@ from alembic import context
 from sqlalchemy import create_engine, pool
 
 from app.core.database import Base
-from app.models import audit_log, scenario, user  # noqa: F401
+# Import every mapped module before exposing Base.metadata to Alembic.  Without
+# this, `alembic check` incorrectly proposes dropping mechanism/source tables
+# that exist in migrations but were never registered in metadata.
+from app.models import (  # noqa: F401
+    audit_log,
+    delivery_assurance,
+    legal_source_version,
+    mechanism,
+    scenario,
+    user,
+)
 
 
 config = context.config

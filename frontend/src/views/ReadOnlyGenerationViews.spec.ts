@@ -83,6 +83,24 @@ describe('read-only generated views', () => {
     expect(Object.keys(client).includes('createFullSample')).toBe(false)
   })
 
+  it('corpus agent scan never requests automatic active-index rebuild', async () => {
+    client.runCorpusMaintenanceAgent.mockResolvedValue({})
+    const wrapper = mount(DashboardView, {
+      global: { stubs: { RouterLink: true, LlmSettingsPanel: true } },
+    })
+    await flushPromises()
+
+    const runButton = wrapper.findAll('button').find((button) =>
+      button.text().includes('运行语料维护 Agent'),
+    )
+    expect(runButton).toBeDefined()
+    await runButton!.trigger('click')
+    await flushPromises()
+
+    expect(client.runCorpusMaintenanceAgent).toHaveBeenCalledOnce()
+    expect(client.runCorpusMaintenanceAgent).toHaveBeenCalledWith(true, false)
+  })
+
   it('business dashboard does not query or enter Legal Playbook onboarding', async () => {
     auth.isLegal = false
     auth.isBusiness = true

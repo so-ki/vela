@@ -176,6 +176,13 @@ async function goToBrief() {
         </div>
         <div class="header-actions">
           <RouterLink
+            v-if="scenario"
+            :to="{ name: 'mechanism', params: { id: scenario.id } }"
+            class="btn-secondary link-btn"
+          >
+            保证机制
+          </RouterLink>
+          <RouterLink
             v-if="auth.isLegal && route.query.from === 'review' && scenario"
             :to="{ name: 'review', params: { id: scenario.id } }"
             class="btn-primary link-btn"
@@ -227,7 +234,7 @@ async function goToBrief() {
         清单与法条检索结果仅供业务侧<strong>查阅</strong>，不构成正式法律意见；法律判断与定稿由法务完成。
       </div>
       <div class="disclaimer-banner" v-else-if="legalSections">
-        以下法条片段来自 LexML / STF / STJ 开放法源索引，仅供协查参考，不构成正式法律意见。匹配度低于 70 分须标注「需法务复核」。
+        以下片段来自本次冻结检索实际返回的法源；具体来源以各命中项为准，仅供协查参考，不构成正式法律意见。匹配度低于 70 分须标注「需法务复核」。
       </div>
       <div class="disclaimer-banner" v-else>
         {{ checklist.disclaimer }}

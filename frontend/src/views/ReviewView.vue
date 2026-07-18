@@ -585,6 +585,10 @@ function openFullBrief(code: string) {
         <div class="header-actions" v-if="auth.isLegal">
           <div class="header-actions-primary">
             <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
+            <RouterLink
+              :to="{ name: 'mechanism', params: { id: scenario.id } }"
+              class="btn-secondary link-btn"
+            >保证机制</RouterLink>
             <template v-if="showChecklistReview && review">
               <button type="button" class="btn-secondary" @click="goBrief">查看简报</button>
               <button

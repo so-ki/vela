@@ -539,10 +539,13 @@ def test_fixture_pack_only_builds_service_proposal_and_snapshot_without_formal_p
             "f" * 64,
             "fixture-generation-input",
             expected_proposal_hash=proposal["proposal_hash"],
-            compliance_dimensions=["fixture_issue"],
+            # Keep this assertion tied to the synthetic pack's actual
+            # allowlisted dimension.  The fixture deliberately has a second
+            # no-evidence dimension for the separate refusal-gate test.
+            compliance_dimensions=["fixture_supported"],
             selected_issue_codes=[],
             match_threshold=70,
-            retrieval_top_k=1,
+            retrieval_top_k=2,
             fit_decision="fit",
             polish=False,
             include_playbook_suggestions=False,

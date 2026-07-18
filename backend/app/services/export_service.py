@@ -16,6 +16,11 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
 from app.models.scenario import InvestigationScenario
 from app.services.disclaimer import DISCLAIMER_FULL_TEXT
+from app.services.export_citation_service import (
+    add_external_hyperlink,
+    source_trace,
+    source_trace_lines,
+)
 from app.services.export_context import export_context, format_export_datetime, safe_export_filename
 from app.services.export_template_law_school import build_law_school_docx
 
@@ -124,6 +129,17 @@ def build_legacy_docx(
                     f"  · {hit.get('title_zh') or hit.get('title_pt')} "
                     f"(匹配度 {hit.get('match_score', 0)}，{hit.get('source_label', '')})"
                 )
+                for trace_line in source_trace_lines(hit):
+                    doc.add_paragraph(f"    {trace_line}")
+                link = doc.add_paragraph("    官方链接：")
+                trace = source_trace(hit)
+                add_external_hyperlink(
+                    link,
+                    url=trace["official_url"],
+                    label=trace["official_url"] or "—",
+                    font_name="PingFang SC",
+                    size_pt=11,
+                )
 
     if brief:
         doc.add_heading("四、中葡双语法律风险简报", level=1)
@@ -226,6 +242,10 @@ def build_sample_pdf(
                 f"(匹配度 {hit.get('match_score', 0)})"
             )
             story.append(Paragraph(_pdf_escape(line), body))
+            for trace_line in source_trace_lines(hit):
+                story.append(Paragraph(_pdf_escape(trace_line), body))
+            trace = source_trace(hit)
+            story.append(Paragraph(_pdf_escape(f"官方链接：{trace['official_url'] or '—'}"), body))
 
     if brief:
         story.append(Paragraph(_pdf_escape("四、双语简报摘要"), h2))

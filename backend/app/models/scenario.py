@@ -26,7 +26,9 @@ class InvestigationScenario(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
     project_name: Mapped[str] = mapped_column(String(255), nullable=False)
-    country: Mapped[str] = mapped_column(String(64), default="brazil", nullable=False)
+    # The route is selected by a frozen Capability Pack; the persistence model
+    # must never invent a country when a caller omitted it.
+    country: Mapped[str] = mapped_column(String(64), nullable=False)
     rules_pack_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     scenario_scope: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     scope_snapshot_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True)

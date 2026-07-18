@@ -28,6 +28,35 @@ SOURCE_LABELS = {
     "jusbrasil": "Jusbrasil 案例索引",
 }
 
+
+def _retrieval_disclaimer(
+    sections: list[dict[str, Any]], *, match_threshold: int
+) -> str:
+    """Describe only sources actually returned by this frozen retrieval result."""
+    source_labels: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    for section in sections:
+        for item in section.get("items") or []:
+            for hit in item.get("legal_hits") or []:
+                source_id = str(hit.get("source") or "").strip()
+                source_label = str(hit.get("source_label") or source_id).strip()
+                if not source_label:
+                    continue
+                identity = (source_id, source_label)
+                if identity in seen:
+                    continue
+                seen.add(identity)
+                source_labels.append(source_label)
+
+    if source_labels:
+        source_text = f"本次冻结检索实际返回的法源（{'、'.join(source_labels)}）"
+    else:
+        source_text = "本次冻结检索未命中可列示法源；未命中不代表不存在相关法律要求"
+    return (
+        f"以下结果基于{source_text}，仅供协查参考，不构成正式法律意见。"
+        f"匹配度低于 {match_threshold} 分的条目须标注「需法务复核」。"
+    )
+
 # Generic function words and citation boilerplate are not legal subject matter.
 # Without this filter, a shared token such as ``lei`` can turn the dimension's
 # 20-point prior into a false candidate (20 + 8 >= the 25-point floor).
@@ -411,9 +440,8 @@ def retrieve_for_checklist_incremental(
         "total_hits": total_hits,
         "zero_hit_items": zero_hit_items,
         "incremental_stats": {"refreshed": refreshed, "carried": carried},
-        "disclaimer": (
-            "以下法条片段来自 LexML / STF / STJ 开放法源索引，仅供协查参考，不构成正式法律意见。"
-            f"匹配度低于 {match_threshold} 分的条目须标注「需法务复核」。"
+        "disclaimer": _retrieval_disclaimer(
+            enriched_sections, match_threshold=match_threshold
         ),
     }
 
@@ -480,8 +508,7 @@ def retrieve_for_checklist(
             "expanded_item_count": expanded_count,
             "expansion_enabled": config.expansion_enabled,
         },
-        "disclaimer": (
-            "以下法条片段来自 LexML / STF / STJ 开放法源索引，仅供协查参考，不构成正式法律意见。"
-            f"匹配度低于 {match_threshold} 分的条目须标注「需法务复核」。"
+        "disclaimer": _retrieval_disclaimer(
+            enriched_sections, match_threshold=match_threshold
         ),
     }

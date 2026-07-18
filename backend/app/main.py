@@ -7,7 +7,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm.exc import StaleDataError
 
-from app.api import auth, legal, llm_settings, onboarding, projects, scenarios, system
+from app.api import (
+    auth,
+    delivery_assurance,
+    legal,
+    legal_source_versions,
+    llm_settings,
+    mechanism,
+    onboarding,
+    projects,
+    scenarios,
+    system,
+)
 from app.core.config import get_settings, validate_runtime_configuration
 from app.core.database import init_db, validate_instance_database_boundary
 from app.core.rate_limit import RateLimitMiddleware
@@ -75,7 +86,7 @@ def create_app() -> FastAPI:
             + ("OpenAPI 文档：/docs · ReDoc：/redoc · " if not settings.is_production else "")
             + "集成说明见仓库 API.md"
         ),
-        version="0.2.0-mvp",
+        version="0.3.0-development-candidate",
         lifespan=lifespan,
         docs_url=None if settings.is_production else "/docs",
         redoc_url=None if settings.is_production else "/redoc",
@@ -117,12 +128,15 @@ def create_app() -> FastAPI:
         app.add_middleware(RateLimitMiddleware)
 
     app.include_router(auth.router, prefix="/api/v1")
+    app.include_router(delivery_assurance.router, prefix="/api/v1")
     app.include_router(onboarding.router, prefix="/api/v1")
     app.include_router(projects.router, prefix="/api/v1")
     app.include_router(legal.router, prefix="/api/v1")
     app.include_router(scenarios.router, prefix="/api/v1")
     app.include_router(system.router, prefix="/api/v1")
     app.include_router(llm_settings.router, prefix="/api/v1")
+    app.include_router(mechanism.router, prefix="/api/v1")
+    app.include_router(legal_source_versions.router, prefix="/api/v1")
 
     return app
 

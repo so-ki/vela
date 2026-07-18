@@ -8,7 +8,7 @@ const auth = useAuthStore()
 const route = useRoute()
 
 const wideLayout = computed(() =>
-  ['review', 'checklist', 'brief', 'project-hub', 'material-review', 'legal-corpus'].includes(String(route.name)),
+  ['review', 'checklist', 'mechanism', 'delivery-assurance', 'brief', 'project-hub', 'material-review', 'legal-corpus'].includes(String(route.name)),
 )
 </script>
 

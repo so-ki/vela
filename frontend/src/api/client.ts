@@ -9,6 +9,28 @@ import type {
   User,
 } from '@/types'
 import type { CapabilityPackIdentity, RulesCatalog, Scenario } from '@/types/scenario'
+import type {
+  ClaimCompilation,
+  ClaimDraft,
+  ClaimRecord,
+  CoverageProof,
+  CoverageTask,
+  DeliveryGateStatus,
+  FactRecord,
+  FactRecordCreatePayload,
+  MaterialLedgerEntry,
+  MaterialLedgerUpsertPayload,
+} from '@/types/mechanism'
+import type {
+  ArtifactManifest,
+  DeliveryArtifact,
+  DeliveryRelease,
+  DeploymentEvidence,
+  ExpertAttestation,
+  LegalContentCertification,
+  LegalCredential,
+  UATAcceptance,
+} from '@/types/delivery'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
@@ -351,6 +373,360 @@ export async function fetchScenario(id: number): Promise<Scenario> {
   return data
 }
 
+export async function fetchMaterialLedger(scenarioId: number): Promise<MaterialLedgerEntry[]> {
+  const { data } = await api.get<MaterialLedgerEntry[]>(
+    `/scenarios/${scenarioId}/mechanism/material-ledger`,
+  )
+  return data
+}
+
+export async function upsertMaterialLedgerEntry(
+  scenarioId: number,
+  blockId: string,
+  payload: MaterialLedgerUpsertPayload,
+): Promise<MaterialLedgerEntry> {
+  const { data } = await api.put<MaterialLedgerEntry>(
+    `/scenarios/${scenarioId}/mechanism/material-ledger/${encodeURIComponent(blockId)}`,
+    payload,
+  )
+  return data
+}
+
+export async function fetchMechanismCoverageTasks(scenarioId: number): Promise<CoverageTask[]> {
+  const { data } = await api.get<CoverageTask[]>(
+    `/scenarios/${scenarioId}/mechanism/coverage-tasks`,
+  )
+  return data
+}
+
+export async function fetchFactRecords(scenarioId: number): Promise<FactRecord[]> {
+  const { data } = await api.get<FactRecord[]>(`/scenarios/${scenarioId}/mechanism/facts`)
+  return data
+}
+
+export async function createFactRecord(
+  scenarioId: number,
+  payload: FactRecordCreatePayload,
+): Promise<FactRecord> {
+  const { data } = await api.post<FactRecord>(
+    `/scenarios/${scenarioId}/mechanism/facts`,
+    payload,
+  )
+  return data
+}
+
+export async function confirmFactRecord(
+  scenarioId: number,
+  factId: string,
+  confirmationNote: string,
+): Promise<FactRecord> {
+  const { data } = await api.post<FactRecord>(
+    `/scenarios/${scenarioId}/mechanism/facts/${factId}/confirm`,
+    { confirmation_note: confirmationNote },
+  )
+  return data
+}
+
+export async function fetchLatestClaimCompilation(
+  scenarioId: number,
+): Promise<ClaimCompilation | null> {
+  try {
+    const { data } = await api.get<ClaimCompilation>(
+      `/scenarios/${scenarioId}/mechanism/claims/latest`,
+    )
+    return data
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) return null
+    throw error
+  }
+}
+
+export async function compileMechanismClaims(
+  scenarioId: number,
+  drafts: ClaimDraft[],
+): Promise<ClaimCompilation> {
+  const { data } = await api.post<ClaimCompilation>(
+    `/scenarios/${scenarioId}/mechanism/claims/compile`,
+    { drafts },
+  )
+  return data
+}
+
+export async function confirmMechanismClaim(
+  scenarioId: number,
+  claimId: string,
+  decision: 'confirmed' | 'rejected',
+  confirmationNote: string,
+): Promise<ClaimRecord> {
+  const { data } = await api.post<ClaimRecord>(
+    `/scenarios/${scenarioId}/mechanism/claims/${claimId}/confirm`,
+    { decision, confirmation_note: confirmationNote },
+  )
+  return data
+}
+
+export async function fetchLatestCoverageProof(scenarioId: number): Promise<CoverageProof | null> {
+  try {
+    const { data } = await api.get<CoverageProof>(
+      `/scenarios/${scenarioId}/mechanism/coverage-proofs/latest`,
+    )
+    return data
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) return null
+    throw error
+  }
+}
+
+export async function createCoverageProof(
+  scenarioId: number,
+  compilationId?: string,
+  denominatorRef = 'scenario-checklist',
+): Promise<CoverageProof> {
+  const { data } = await api.post<CoverageProof>(
+    `/scenarios/${scenarioId}/mechanism/coverage-proofs`,
+    {
+      compilation_id: compilationId || null,
+      denominator_ref: denominatorRef,
+    },
+  )
+  return data
+}
+
+export async function fetchDeliveryGateStatus(
+  scenarioId: number,
+): Promise<DeliveryGateStatus> {
+  const { data } = await api.get<DeliveryGateStatus>(
+    `/scenarios/${scenarioId}/delivery-assurance/status`,
+  )
+  return data
+}
+
+export async function fetchDeliveryArtifacts(scenarioId: number): Promise<DeliveryArtifact[]> {
+  const { data } = await api.get<DeliveryArtifact[]>(
+    `/scenarios/${scenarioId}/delivery-assurance/artifacts`,
+  )
+  return data
+}
+
+export async function freezeDeliveryArtifacts(scenarioId: number): Promise<DeliveryArtifact[]> {
+  const { data } = await api.post<DeliveryArtifact[]>(
+    `/scenarios/${scenarioId}/delivery-assurance/artifacts`,
+    { artifact_types: ['docx', 'pdf', 'audit_bundle'] },
+  )
+  return data
+}
+
+export async function fetchDeliveryArtifactManifest(
+  scenarioId: number,
+): Promise<ArtifactManifest> {
+  const { data } = await api.get<ArtifactManifest>(
+    `/scenarios/${scenarioId}/delivery-assurance/artifact-manifest`,
+  )
+  return data
+}
+
+export async function downloadCandidateArtifact(scenarioId: number, artifactId: string) {
+  const response = await api.get(
+    `/scenarios/${scenarioId}/delivery-assurance/artifacts/${artifactId}/candidate`,
+    { responseType: 'blob' },
+  )
+  return {
+    blob: response.data as Blob,
+    filename:
+      parseContentDisposition(response.headers['content-disposition']) ||
+      'UNSIGNED_CANDIDATE.bin',
+  }
+}
+
+export async function fetchLegalCredentials(): Promise<LegalCredential[]> {
+  const { data } = await api.get<LegalCredential[]>('/delivery-assurance/credentials')
+  return data
+}
+
+export async function submitLegalCredential(
+  payload: Record<string, unknown>,
+): Promise<LegalCredential> {
+  const { data } = await api.post<LegalCredential>('/delivery-assurance/credentials', payload)
+  return data
+}
+
+export async function decideLegalCredential(
+  credentialId: string,
+  payload: Record<string, unknown>,
+): Promise<LegalCredential> {
+  const { data } = await api.post<LegalCredential>(
+    `/delivery-assurance/credentials/${credentialId}/decisions`,
+    payload,
+  )
+  return data
+}
+
+export async function fetchExpertAttestations(
+  scenarioId: number,
+): Promise<ExpertAttestation[]> {
+  const { data } = await api.get<ExpertAttestation[]>(
+    `/scenarios/${scenarioId}/delivery-assurance/expert-attestations`,
+  )
+  return data
+}
+
+export async function submitExpertAttestation(
+  scenarioId: number,
+  payload: Record<string, unknown>,
+): Promise<ExpertAttestation> {
+  const { data } = await api.post<ExpertAttestation>(
+    `/scenarios/${scenarioId}/delivery-assurance/expert-attestations`,
+    payload,
+  )
+  return data
+}
+
+export async function decideExpertSignature(
+  scenarioId: number,
+  attestationId: string,
+  payload: { decision: 'approved' | 'rejected'; note: string },
+): Promise<ExpertAttestation> {
+  const { data } = await api.post<ExpertAttestation>(
+    `/scenarios/${scenarioId}/delivery-assurance/expert-attestations/${attestationId}/signature-decision`,
+    payload,
+  )
+  return data
+}
+
+export async function revokeExpertAttestation(
+  scenarioId: number,
+  attestationId: string,
+  reason: string,
+): Promise<ExpertAttestation> {
+  const { data } = await api.post<ExpertAttestation>(
+    `/scenarios/${scenarioId}/delivery-assurance/expert-attestations/${attestationId}/revoke`,
+    { reason },
+  )
+  return data
+}
+
+export async function fetchUATAcceptances(scenarioId: number): Promise<UATAcceptance[]> {
+  const { data } = await api.get<UATAcceptance[]>(
+    `/scenarios/${scenarioId}/delivery-assurance/uat-acceptances`,
+  )
+  return data
+}
+
+export async function submitUATAcceptance(
+  scenarioId: number,
+  payload: Record<string, unknown>,
+): Promise<UATAcceptance> {
+  const { data } = await api.post<UATAcceptance>(
+    `/scenarios/${scenarioId}/delivery-assurance/uat-acceptances`,
+    payload,
+  )
+  return data
+}
+
+export async function withdrawUATAcceptance(
+  scenarioId: number,
+  acceptanceId: string,
+  reason: string,
+): Promise<UATAcceptance> {
+  const { data } = await api.post<UATAcceptance>(
+    `/scenarios/${scenarioId}/delivery-assurance/uat-acceptances/${acceptanceId}/withdraw`,
+    { reason },
+  )
+  return data
+}
+
+export async function fetchLegalContentCertifications(): Promise<LegalContentCertification[]> {
+  const { data } = await api.get<LegalContentCertification[]>(
+    '/delivery-assurance/legal-content-certifications',
+  )
+  return data
+}
+
+export async function previewLegalContentManifest(payload: Record<string, unknown>) {
+  const { data } = await api.post<{ manifest: Record<string, unknown>; manifest_hash: string }>(
+    '/delivery-assurance/legal-content-certifications/manifest',
+    payload,
+  )
+  return data
+}
+
+export async function submitLegalContentCertification(
+  payload: Record<string, unknown>,
+): Promise<LegalContentCertification> {
+  const { data } = await api.post<LegalContentCertification>(
+    '/delivery-assurance/legal-content-certifications',
+    payload,
+  )
+  return data
+}
+
+export async function revokeLegalContentCertification(
+  certificationId: string,
+  reason: string,
+): Promise<LegalContentCertification> {
+  const { data } = await api.post<LegalContentCertification>(
+    `/delivery-assurance/legal-content-certifications/${certificationId}/revoke`,
+    { reason },
+  )
+  return data
+}
+
+export async function fetchDeploymentEvidence(): Promise<DeploymentEvidence[]> {
+  const { data } = await api.get<DeploymentEvidence[]>('/delivery-assurance/deployments')
+  return data
+}
+
+export async function submitDeploymentEvidence(
+  payload: Record<string, unknown>,
+): Promise<DeploymentEvidence> {
+  const { data } = await api.post<DeploymentEvidence>(
+    '/delivery-assurance/deployments',
+    payload,
+  )
+  return data
+}
+
+export async function revokeDeploymentEvidence(
+  evidenceId: string,
+  reason: string,
+): Promise<DeploymentEvidence> {
+  const { data } = await api.post<DeploymentEvidence>(
+    `/delivery-assurance/deployments/${evidenceId}/revoke`,
+    { reason },
+  )
+  return data
+}
+
+export async function fetchDeliveryReleases(scenarioId: number): Promise<DeliveryRelease[]> {
+  const { data } = await api.get<DeliveryRelease[]>(
+    `/scenarios/${scenarioId}/delivery-assurance/releases`,
+  )
+  return data
+}
+
+export async function submitDeliveryRelease(
+  scenarioId: number,
+  payload: Record<string, unknown>,
+): Promise<DeliveryRelease> {
+  const { data } = await api.post<DeliveryRelease>(
+    `/scenarios/${scenarioId}/delivery-assurance/releases`,
+    payload,
+  )
+  return data
+}
+
+export async function revokeDeliveryRelease(
+  scenarioId: number,
+  releaseId: string,
+  reason: string,
+): Promise<DeliveryRelease> {
+  const { data } = await api.post<DeliveryRelease>(
+    `/scenarios/${scenarioId}/delivery-assurance/releases/${releaseId}/revoke`,
+    { reason },
+  )
+  return data
+}
+
 export async function fetchBrief(scenarioId: number) {
   const { data } = await api.get(`/scenarios/${scenarioId}/brief`)
   return data
@@ -503,7 +879,7 @@ export async function fetchCorpusAgentStatus() {
   return data
 }
 
-export async function runCorpusMaintenanceAgent(syncLexml = true, autoReindex = true) {
+export async function runCorpusMaintenanceAgent(syncLexml = true, autoReindex = false) {
   const { data } = await api.post('/legal/corpus-agent/run', null, {
     params: { sync_lexml: syncLexml, auto_reindex: autoReindex },
   })

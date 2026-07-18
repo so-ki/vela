@@ -15,6 +15,11 @@ from docx.shared import Cm, Pt, RGBColor
 from app.core.config import get_settings
 from app.models.scenario import InvestigationScenario
 from app.services.disclaimer import DISCLAIMER_FULL_TEXT
+from app.services.export_citation_service import (
+    add_external_hyperlink,
+    source_trace,
+    source_trace_lines,
+)
 from app.services.export_context import export_context, format_export_datetime, safe_export_filename
 
 
@@ -180,6 +185,18 @@ def build_law_school_docx(
                         f"（{hit.get('source_label', '')}，匹配度 {hit.get('match_score', 0)}）"
                     )
                     _add_paragraph(doc, line, size=11, space_after=2)
+                    for trace_line in source_trace_lines(hit):
+                        _add_paragraph(doc, f"  {trace_line}", size=10.5, space_after=1)
+                    link = doc.add_paragraph()
+                    link.paragraph_format.space_after = Pt(3)
+                    label = link.add_run("  官方链接：")
+                    _set_run_font(label, size_pt=10.5)
+                    trace = source_trace(hit)
+                    add_external_hyperlink(
+                        link,
+                        url=trace["official_url"],
+                        label=trace["official_url"] or "—",
+                    )
             else:
                 _add_paragraph(doc, "· 未检索到可引用法源片段，建议外聘当地律师补充。", size=11)
 

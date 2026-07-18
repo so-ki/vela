@@ -27,7 +27,14 @@ def get_db() -> Generator[Session, None, None]:
 
 def init_db() -> None:
     settings.data_dir  # ensure data directory exists
-    from app.models import audit_log, scenario, user  # noqa: F401
+    from app.models import (  # noqa: F401
+        audit_log,
+        delivery_assurance,
+        legal_source_version,
+        mechanism,
+        scenario,
+        user,
+    )
 
     # Local SQLite remains zero-setup for demos and tests.  PostgreSQL schemas
     # are exclusively managed by Alembic so a web worker can never silently

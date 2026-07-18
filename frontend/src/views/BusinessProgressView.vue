@@ -103,6 +103,10 @@ onMounted(async () => {
           </p>
         </div>
         <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
+        <RouterLink
+          :to="{ name: 'mechanism', params: { id: scenario.id } }"
+          class="btn-secondary link-btn"
+        >查看事实与保证机制</RouterLink>
         <RouterLink :to="`/scenarios/${scenario.id}/extract`" class="btn-primary link-btn">查看AI抽取表</RouterLink>
       </header>
 

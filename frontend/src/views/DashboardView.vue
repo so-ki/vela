@@ -420,7 +420,9 @@ async function runLegalScan() {
 async function runCorpusAgent() {
   runningCorpusAgent.value = true
   try {
-    await runCorpusMaintenanceAgent(true, true)
+    // The agent may scan and enqueue LexML candidates, but publishing/reindexing
+    // remains an explicit, human-reviewed release action.
+    await runCorpusMaintenanceAgent(true, false)
     corpusAgent.value = await fetchCorpusAgentStatus()
     legalMonitor.value = await fetchLegalMonitor()
     legalStatus.value = await fetchLegalStatus()

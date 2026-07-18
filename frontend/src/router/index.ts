@@ -82,6 +82,18 @@ const router = createRouter({
           meta: { requiresDisclaimer: true, businessReadOnly: true },
         },
         {
+          path: 'scenarios/:id/mechanism',
+          name: 'mechanism',
+          component: () => import('@/views/MechanismView.vue'),
+          meta: { requiresDisclaimer: true, mechanismAccess: true },
+        },
+        {
+          path: 'scenarios/:id/delivery-assurance',
+          name: 'delivery-assurance',
+          component: () => import('@/views/DeliveryAssuranceView.vue'),
+          meta: { requiresDisclaimer: true },
+        },
+        {
           path: 'scenarios/:id/brief',
           name: 'brief',
           component: () => import('@/views/BriefView.vue'),

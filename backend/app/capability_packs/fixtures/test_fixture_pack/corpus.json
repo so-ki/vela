@@ -1,4 +1,25 @@
 {
-  "version": "0.0.1",
-  "sources": []
+  "version": "0.1.0",
+  "default_review_status": "expert_verified",
+  "sources": [
+    {
+      "id": "fixture-source-001",
+      "source": "fixture-official",
+      "urn": "urn:fixture:test:instrument:1",
+      "url": "https://example.invalid/fixture-instrument-1",
+      "official_url": "https://example.invalid/fixture-instrument-1",
+      "title_pt": "Instrumento ficticio permit-token numero 1",
+      "title_zh": "第 1 号 permit-token 虚拟规范",
+      "text_pt": "O permit-token existe apenas para testar a recuperacao deterministica.",
+      "text_zh": "permit-token 仅用于确定性检索测试，不表达任何真实法律要求。",
+      "dimension": "fixture_supported",
+      "level": "fixture",
+      "validity": "vigente",
+      "published_at": "2000-01-01",
+      "tags": ["permit-token", "fixture-evidence-token"],
+      "checklist_codes": ["FIX-SUP-001"],
+      "review_status": "expert_verified",
+      "verification_scope": "synthetic test fixture only"
+    }
+  ]
 }

@@ -205,6 +205,7 @@ function severityClass(s: unknown) {
         <RouterLink :to="`/scenarios/${projectId}/brief`" class="btn-secondary link-btn sm">双语简报</RouterLink>
         <RouterLink :to="`/scenarios/${projectId}/review`" class="btn-primary link-btn sm">法务复核</RouterLink>
         <RouterLink :to="`/scenarios/${projectId}/progress`" class="btn-secondary link-btn sm">业务进度</RouterLink>
+        <RouterLink :to="`/scenarios/${projectId}/delivery-assurance`" class="btn-secondary link-btn sm">客户交付证据台</RouterLink>
       </div>
     </section>
 

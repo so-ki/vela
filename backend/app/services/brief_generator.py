@@ -13,6 +13,24 @@ DEFAULT_THRESHOLD = 70
 PRIORITY_RISK = {"high": "高", "medium": "中", "low": "低"}
 PRIORITY_RISK_PT = {"high": "alta", "medium": "média", "low": "baixa"}
 
+SOURCE_NAMES_PT = {
+    "lexml": "LexML Brasil",
+    "planalto-legislacao": "Portal da Legislação do Planalto",
+    "alesp": "Assembleia Legislativa do Estado de São Paulo (ALESP)",
+    "apexbrasil": "portal oficial da ApexBrasil",
+    "gov-br": "portal oficial Gov.br",
+    "investsp": "portal oficial da InvestSP",
+    "sefaz-sp": "Secretaria da Fazenda e Planejamento do Estado de São Paulo",
+    "campinas": "portal oficial da Prefeitura de Campinas",
+    "stf": "Supremo Tribunal Federal (STF)",
+    "stj": "Superior Tribunal de Justiça (STJ)",
+    "trabalho": "Ministério do Trabalho e Emprego",
+    "previdencia": "Ministério da Previdência Social",
+    "receita-federal": "Receita Federal do Brasil",
+    "ibama": "IBAMA",
+    "jusbrasil": "índice de casos Jusbrasil",
+}
+
 
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
@@ -126,7 +144,36 @@ def _section_summary_pt(dimension_name_pt: str, items: list[dict[str, Any]]) -> 
     )
 
 
-def _executive_summary_zh(scenario: InvestigationScenario, checklist: dict[str, Any], passed: int, blocked: int) -> str:
+def _retrieved_source_names(
+    sections: list[dict[str, Any]],
+) -> tuple[list[str], list[str]]:
+    """Return deduplicated display names for sources actually present in frozen hits."""
+    names_zh: list[str] = []
+    names_pt: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    for section in sections:
+        for item in section.get("items") or []:
+            for hit in item.get("legal_hits") or []:
+                source_id = str(hit.get("source") or "").strip()
+                source_label = str(hit.get("source_label") or source_id).strip()
+                if not source_label:
+                    continue
+                identity = (source_id, source_label)
+                if identity in seen:
+                    continue
+                seen.add(identity)
+                names_zh.append(source_label)
+                names_pt.append(SOURCE_NAMES_PT.get(source_id, source_label))
+    return names_zh, names_pt
+
+
+def _executive_summary_zh(
+    scenario: InvestigationScenario,
+    checklist: dict[str, Any],
+    passed: int,
+    blocked: int,
+    source_names: list[str],
+) -> str:
     sub_sectors = checklist.get("detected_sub_sectors") or []
     sub_label = ""
     if sub_sectors:
@@ -134,22 +181,39 @@ def _executive_summary_zh(scenario: InvestigationScenario, checklist: dict[str, 
         if names:
             sub_label = f"识别子赛道：{names}。"
     pack = checklist.get("industry_pack_name") or "巴西 · 投资协查"
+    source_disclosure = (
+        f"本次冻结检索实际返回的法源：{'、'.join(source_names)}。"
+        if source_names
+        else "本次冻结检索未返回可列示法源。"
+    )
     return (
         f"本简报针对项目「{scenario.project_name}」（{pack} · "
         f"{checklist.get('detected_action_type_name', scenario.action_type)}），"
         f"{sub_label}"
-        f"基于专项核查清单与 LexML/STF/STJ 法源检索结果汇编。"
+        f"基于专项核查清单与冻结检索结果汇编。{source_disclosure}"
         f"共 {passed + blocked} 条核查项，{passed} 条已自动纳入风险摘要，{blocked} 条因匹配度不足或未命中法条而标注「需法务复核」。"
         f"本文件为协查底稿，不构成正式法律意见。"
     )
 
 
-def _executive_summary_pt(scenario: InvestigationScenario, checklist: dict[str, Any], passed: int, blocked: int) -> str:
+def _executive_summary_pt(
+    scenario: InvestigationScenario,
+    checklist: dict[str, Any],
+    passed: int,
+    blocked: int,
+    source_names: list[str],
+) -> str:
+    source_disclosure = (
+        f"Fontes efetivamente retornadas pela busca congelada: {', '.join(source_names)}. "
+        if source_names
+        else "A busca congelada não retornou fontes que pudessem ser listadas. "
+    )
     return (
         f"Este briefing refere-se ao projeto «{scenario.project_name}» "
         f"({checklist.get('detected_industry_name', scenario.industry)} · "
         f"{checklist.get('detected_action_type_name', scenario.action_type)}), "
-        f"compilado a partir da checklist de verificação e fontes LexML/STF/STJ. "
+        f"compilado a partir da checklist de verificação e dos resultados congelados da busca. "
+        f"{source_disclosure}"
         f"Total de {passed + blocked} itens: {passed} incluídos no resumo automático; "
         f"{blocked} marcados para revisão jurídica por baixa aderência ou ausência de fontes. "
         f"Documento de apoio; não constitui parecer jurídico formal."
@@ -236,6 +300,7 @@ def generate_brief(
     profile_title = str(config.output_profile.get("brief_title") or "法律风险协查简报")
     title_zh = f"{profile_title} — {scenario.project_name}"
     title_pt = f"Briefing de Riscos Jurídicos — {scenario.project_name}"
+    source_names_zh, source_names_pt = _retrieved_source_names(sections)
 
     brief = {
         "scenario_id": scenario.id,
@@ -243,8 +308,12 @@ def generate_brief(
         "threshold": threshold,
         "title_zh": title_zh,
         "title_pt": title_pt,
-        "summary_zh": _executive_summary_zh(scenario, checklist_payload, passed_count, blocked_count),
-        "summary_pt": _executive_summary_pt(scenario, checklist_payload, passed_count, blocked_count),
+        "summary_zh": _executive_summary_zh(
+            scenario, checklist_payload, passed_count, blocked_count, source_names_zh
+        ),
+        "summary_pt": _executive_summary_pt(
+            scenario, checklist_payload, passed_count, blocked_count, source_names_pt
+        ),
         "sections": brief_sections,
         "blocked_items": blocked_items,
         "passed_count": passed_count,
