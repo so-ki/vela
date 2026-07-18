@@ -1,0 +1,50 @@
+{
+ "rule_id": "BR-SP-FDI-001",
+ "pack_id": "brazil_new_energy",
+ "version": "0.1.0",
+ "title_zh": "外资登记（RDE-IED）与资本汇入合规",
+ "title_pt": "Registro de capital estrangeiro (RDE-IED)",
+ "legal_sources": [
+  {
+   "citation_id": "urn:lex:br:federal:lei:1962-09-03;4131",
+   "urn": "urn:lex:br:federal:lei:1962-09-03;4131",
+   "article": "arts. 3º, 5º",
+   "label": "Lei 4.131/1962"
+  }
+ ],
+ "elements": [
+  {
+   "element_id": "foreign_capital",
+   "description_zh": "存在境外主体对巴西实体的出资/股东贷款",
+   "description_pt": "capital estrangeiro investido",
+   "fact_fields": [
+    "investment_structure",
+    "funding_source"
+   ]
+  }
+ ],
+ "exceptions": [
+  "纯境内融资且无外资股东的结构"
+ ],
+ "consequences": [
+  "未登记：利润汇回与资本返还受阻、央行处罚"
+ ],
+ "red_flags": [
+  {
+   "flag_id": "RF-FDI-001a",
+   "condition_zh": "资金来源含跨境股东借款但材料无央行登记安排",
+   "severity": "high"
+  }
+ ],
+ "certification_status": "provisional",
+ "production_tracks": {
+  "forward_done": true,
+  "reverse_done": false,
+  "divergence_types": []
+ },
+ "checklist_codes": [
+  "FOR-001",
+  "FOR-003"
+ ],
+ "notes": "provisional：Lei 14.286/2021 新外汇框架对 4.131 的部分修订待第二轮核验补入。"
+}

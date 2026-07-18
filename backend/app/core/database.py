@@ -26,7 +26,7 @@ def get_db() -> Generator[Session, None, None]:
 
 def init_db() -> None:
     settings.data_dir  # ensure data directory exists
-    from app.models import audit_log, scenario, user  # noqa: F401
+    from app.models import audit_log, claim, coverage, fact, material_ledger, scenario, user  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
     try:
@@ -35,4 +35,6 @@ def init_db() -> None:
         migrate_sqlite_user_columns()
         migrate_sqlite_scenario_columns()
     except Exception:
-        pass
+        import logging
+
+        logging.getLogger(__name__).exception("sqlite column migration failed")

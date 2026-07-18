@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.scenario import ComplianceChecklist, InvestigationScenario, utcnow
@@ -31,6 +33,62 @@ from app.services.rule_engine import (
 from app.services.rules_registry import resolve_pack_id, resolve_scenario_pack_id
 from app.services.playbook_agent_service import generate_playbook_draft
 from app.services.investigation_adequacy_service import gate_a_allows_checklist_review
+
+logger = logging.getLogger(__name__)
+
+
+def attach_intake_ledger(
+    db: Session,
+    scenario: InvestigationScenario,
+    checklist_payload: dict,
+    *,
+    pack_id: str | None,
+    uploads: list[tuple[str, bytes, str | None]] | None = None,
+) -> dict:
+    """材料提交建账：文件与抽取快照进六态账本，抽取事实落五元组。
+
+    账本失败不阻断业务提交，但必须在 payload 留下可见标记（不许静默）。
+    """
+    from app.services.fact_service import record_facts_from_extract
+    from app.services.material_ledger_service import ledger_projection, record_intake
+
+    try:
+        import json as _json
+
+        extract_snapshot = checklist_payload.get("document_extract") or None
+        form_fingerprint = _json.dumps(
+            {
+                "project_name": scenario.project_name,
+                "description": scenario.description,
+                "investment_structure": scenario.investment_structure,
+                "funding_source": scenario.funding_source,
+                "project_content_scale": scenario.project_content_scale,
+                "employee_count": scenario.employee_count,
+            },
+            ensure_ascii=False,
+            sort_keys=True,
+        ).encode("utf-8")
+        block_by_name = record_intake(
+            db,
+            scenario_id=scenario.id,
+            pack_id=pack_id,
+            uploads=uploads,
+            archived_files=(extract_snapshot or {}).get("archived_files"),
+            extract_snapshot=extract_snapshot,
+            form_fingerprint=form_fingerprint,
+        )
+        if extract_snapshot:
+            record_facts_from_extract(
+                db,
+                scenario_id=scenario.id,
+                subject=scenario.project_name or f"scenario:{scenario.id}",
+                extract_snapshot=extract_snapshot,
+                block_by_name=block_by_name,
+            )
+        return {**checklist_payload, "material_ledger": ledger_projection(db, scenario.id)}
+    except Exception:
+        logger.exception("material ledger intake failed for scenario %s", scenario.id)
+        return {**checklist_payload, "material_ledger_error": True}
 
 
 def _pack_labels(action_type: str, pack_id: str | None = None) -> tuple[str, str]:
@@ -142,6 +200,9 @@ def create_scenario_materials_only(
 
     scenario.checklist = checklist
     checklist_payload = enrich_pending_scope_payload(scenario, checklist_payload, user_id=user.id)
+    checklist_payload = attach_intake_ledger(
+        db, scenario, checklist_payload, pack_id=pack_id, uploads=uploads
+    )
     checklist.payload = checklist_payload
     db.commit()
 
@@ -490,6 +551,10 @@ def scenario_to_response(scenario: InvestigationScenario) -> ScenarioResponse:
         red_team=payload.get("red_team"),
         unverified_facts=list(payload.get("unverified_facts") or []),
         agent_steps=list(payload.get("agent_steps") or []),
+        answerability=payload.get("answerability"),
+        claims=payload.get("claims"),
+        coverage=payload.get("coverage"),
+        material_ledger=payload.get("material_ledger"),
     )
 
 

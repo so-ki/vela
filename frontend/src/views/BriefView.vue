@@ -1,19 +1,17 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, nextTick, watch } from 'vue'
-import { useRoute, useRouter, RouterLink } from 'vue-router'
-import { fetchBrief, fetchLlmStatus, fetchScenario, generateBrief, submitScenarioForReview } from '@/api/client'
+import { ref, onMounted, nextTick, watch } from 'vue'
+import { useRoute, RouterLink } from 'vue-router'
+import { fetchBrief, fetchLlmStatus, fetchScenario, generateBrief } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import type { RiskBrief, Scenario } from '@/types/scenario'
 
 const route = useRoute()
-const router = useRouter()
 const auth = useAuthStore()
 const scenario = ref<Scenario | null>(null)
 const brief = ref<RiskBrief | null>(null)
 const llmStatus = ref<{ available: boolean; message: string; provider?: string | null } | null>(null)
 const loading = ref(true)
 const generating = ref(false)
-const submitting = ref(false)
 const submitted = ref(false)
 const error = ref<string | null>(null)
 
@@ -39,8 +37,9 @@ onMounted(async () => {
   const id = Number(route.params.id)
   try {
     llmStatus.value = await fetchLlmStatus().catch(() => null)
-    scenario.value = await fetchScenario(id)
-    if (scenario.value.status === 'pending_legal_review') {
+    const loaded = await fetchScenario(id)
+    scenario.value = loaded
+    if (loaded.status === 'pending_legal_review') {
       submitted.value = true
     }
     try {
@@ -82,9 +81,10 @@ async function runGenerate(id: number, polish = true) {
   generating.value = true
   error.value = null
   try {
-    brief.value = await generateBrief(id, polish)
+    const generated = await generateBrief(id, polish)
+    brief.value = generated
     if (scenario.value) {
-      scenario.value.status = brief.value.status === 'blocked' ? 'brief_blocked' : 'brief_generated'
+      scenario.value.status = generated.status === 'blocked' ? 'brief_blocked' : 'brief_generated'
     }
   } catch (e: unknown) {
     error.value = extractError(e)
@@ -102,23 +102,6 @@ function extractError(e: unknown): string {
   return '生成简报失败，请确认已完成法源检索'
 }
 
-async function runSubmit() {
-  if (!scenario.value) return
-  submitting.value = true
-  error.value = null
-  try {
-    scenario.value = await submitScenarioForReview(scenario.value.id)
-    submitted.value = true
-  } catch (e: unknown) {
-    error.value = extractError(e)
-  } finally {
-    submitting.value = false
-  }
-}
-
-const passedItems = computed(() =>
-  (brief.value?.sections || []).flatMap((s) => s.items.filter((i) => i.gate_status === 'passed')),
-)
 </script>
 
 <template>

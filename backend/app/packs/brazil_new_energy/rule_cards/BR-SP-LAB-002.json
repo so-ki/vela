@@ -1,0 +1,48 @@
+{
+ "rule_id": "BR-SP-LAB-002",
+ "pack_id": "brazil_new_energy",
+ "version": "0.1.0",
+ "title_zh": "机械设备作业安全（NR-12 体系）法定基础",
+ "title_pt": "Segurança em máquinas (base legal das NRs)",
+ "legal_sources": [
+  {
+   "citation_id": "urn:lex:br:federal:decreto.lei:1943-05-01;5452",
+   "urn": "urn:lex:br:federal:decreto.lei:1943-05-01;5452",
+   "article": "arts. 155-159, 200",
+   "label": "CLT（授权劳动主管部门颁布 NR）"
+  }
+ ],
+ "elements": [
+  {
+   "element_id": "machinery_ops",
+   "description_zh": "产线含机械设备操作岗位",
+   "description_pt": "operação de máquinas na linha",
+   "fact_fields": [
+    "project_content_scale",
+    "employee_count"
+   ]
+  }
+ ],
+ "exceptions": [],
+ "consequences": [
+  "违反 NR 安全规范：罚款、停线整改、工伤责任加重"
+ ],
+ "red_flags": [
+  {
+   "flag_id": "RF-LAB-002a",
+   "condition_zh": "投产时间表未预留安全培训与设备合规改造周期",
+   "severity": "medium"
+  }
+ ],
+ "certification_status": "provisional",
+ "production_tracks": {
+  "forward_done": true,
+  "reverse_done": false,
+  "divergence_types": []
+ },
+ "checklist_codes": [
+  "LAB-005",
+  "IND-003"
+ ],
+ "notes": "provisional：NR-12 为部颁规范性文件，本卡引用其 CLT 法定授权基础；NR 文本本身属包内待补语料。"
+}

@@ -1,0 +1,64 @@
+{
+ "rule_id": "BR-SP-ENV-001",
+ "pack_id": "brazil_new_energy",
+ "version": "0.1.0",
+ "title_zh": "污染源设施须事前取得州环境许可",
+ "title_pt": "Fonte de poluição exige licença ambiental prévia (CETESB)",
+ "legal_sources": [
+  {
+   "citation_id": "urn:lex:br;sao.paulo:estadual:lei:1976-05-31;997",
+   "urn": "urn:lex:br;sao.paulo:estadual:lei:1976-05-31;997",
+   "article": "art. 5º",
+   "label": "Lei 997/1976 (SP)"
+  },
+  {
+   "citation_id": "urn:lex:br;sao.paulo:estadual:decreto:1976-09-08;8468",
+   "urn": "urn:lex:br;sao.paulo:estadual:decreto:1976-09-08;8468",
+   "article": "arts. 57-58",
+   "label": "Decreto 8.468/1976 (SP)"
+  }
+ ],
+ "elements": [
+  {
+   "element_id": "pollution_source",
+   "description_zh": "项目活动构成州法定义的污染源（工业制造/排放行为）",
+   "description_pt": "atividade constitui fonte de poluição",
+   "fact_fields": [
+    "description",
+    "project_content_scale"
+   ]
+  },
+  {
+   "element_id": "sp_location",
+   "description_zh": "设施位于圣保罗州辖区",
+   "description_pt": "instalação no Estado de São Paulo",
+   "fact_fields": [
+    "investment_destination"
+   ]
+  }
+ ],
+ "exceptions": [
+  "Decreto 8.468/1976 附件列明的豁免/简化许可活动"
+ ],
+ "consequences": [
+  "未取得事前许可：责令停业整改（interdição）、罚款、补办许可并可能追溯处罚"
+ ],
+ "red_flags": [
+  {
+   "flag_id": "RF-ENV-001a",
+   "condition_zh": "计划开工日期早于环境许可取得路径可行时点",
+   "severity": "high"
+  }
+ ],
+ "certification_status": "provisional",
+ "production_tracks": {
+  "forward_done": true,
+  "reverse_done": false,
+  "divergence_types": []
+ },
+ "checklist_codes": [
+  "ENV-001",
+  "ENV-004"
+ ],
+ "notes": "provisional：待巴西法律研究者核验（见 docs/recruitment/）。"
+}

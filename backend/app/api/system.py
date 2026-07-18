@@ -65,3 +65,39 @@ def export_config():
         docx_label=label,
         org_name=settings.export_org_name,
     )
+
+
+class PackSummary(BaseModel):
+    pack_id: str
+    manifest_version: Optional[str] = None
+    display_name: Optional[str] = None
+    certification_status: Optional[str] = None
+    jurisdiction: Optional[dict] = None
+    supported_issues: list[str] = []
+    exclusions: list[str] = []
+    rule_card_count: int = 0
+
+
+@router.get("/packs", response_model=list[PackSummary])
+def list_packs(_: User = Depends(get_current_user)):
+    """已安装能力包清单（manifest v0.1-draft 投影）。"""
+    from app.packs.loader import list_installed_packs, load_rule_cards
+
+    out: list[PackSummary] = []
+    for manifest in list_installed_packs():
+        pack_id = str(manifest.get("pack_id") or "")
+        if not pack_id:
+            continue
+        out.append(
+            PackSummary(
+                pack_id=pack_id,
+                manifest_version=manifest.get("manifest_version"),
+                display_name=manifest.get("display_name"),
+                certification_status=manifest.get("certification_status"),
+                jurisdiction=manifest.get("jurisdiction"),
+                supported_issues=list(manifest.get("supported_issues") or []),
+                exclusions=list(manifest.get("exclusions") or []),
+                rule_card_count=len(load_rule_cards(pack_id)),
+            )
+        )
+    return out

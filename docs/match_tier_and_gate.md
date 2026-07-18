@@ -92,11 +92,12 @@ cd backend && pytest tests/test_rules_pack_loop.py tests/test_contract_structure
 
 演示账号：`biz@demo.vela` / `legal@demo.vela`，密码 `Demo1234!`
 
-## 8. 预设规则包 vs Playbook Profile
+## 8. 能力包 manifest / 预设规则包 / Playbook Profile
 
 | 层级 | 存储 | 决定什么 | 运行时是否自动改 JSON |
 |------|------|----------|------------------------|
-| **规则包** `brazil_new_energy.json` | `backend/app/rules/` | 核查项模板、triggers、维度、Gate A 字段 | **否** — 唯一权威来源 |
+| **能力包 manifest** `manifest.json`（v0.1-draft） | `backend/app/packs/brazil_new_energy/` | 包身份（法域链/行业/动作）、supported_issues、exclusions、certification_status、覆盖分母声明；规则卡在 `rule_cards/` | **否** — 包级唯一引用入口（第二包立项前允许破坏性变更） |
+| **规则包** `brazil_new_energy.json` | `backend/app/rules/` | 核查项模板、triggers、维度、Gate A 字段 | **否** — 清单内容权威来源（由 manifest `components` 引用） |
 | **Playbook Profile** | `data/playbook_profiles/` | 默认协查维度、建议关注编号、阈值偏好、底稿风格 | **否** — 只影响预填与建议 |
 
 - 冷启动完成后写入 `default_compliance_dimensions`、`suggested_checklist_codes`（只读建议）。

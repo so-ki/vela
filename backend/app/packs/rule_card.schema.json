@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "vela:rule-card:v0.1",
+  "title": "Vela 规则卡 v0.1（draft —— 第二个能力包立项前允许破坏性变更）",
+  "type": "object",
+  "required": [
+    "rule_id", "pack_id", "version", "title_zh", "legal_sources",
+    "elements", "consequences", "certification_status", "production_tracks"
+  ],
+  "properties": {
+    "rule_id": { "type": "string", "pattern": "^[A-Z]{2}(-[A-Z0-9]+)+-\\d{3}$" },
+    "pack_id": { "type": "string" },
+    "version": { "type": "string" },
+    "title_zh": { "type": "string" },
+    "title_pt": { "type": "string" },
+    "legal_sources": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["citation_id", "article"],
+        "properties": {
+          "citation_id": {
+            "type": "string",
+            "description": "法源引用标识。具体形制（如 URN LEX）由包决定，平台不假设"
+          },
+          "urn": {
+            "type": "string",
+            "pattern": "^urn:lex:",
+            "description": "可选：URN LEX 标识（国际通用 scheme，法域段由包填写）"
+          },
+          "article": { "type": "string", "description": "条款定位" },
+          "label": { "type": "string" }
+        }
+      }
+    },
+    "elements": {
+      "type": "array", "minItems": 1,
+      "description": "要件清单；每条要件挂它所需的事实字段",
+      "items": {
+        "type": "object",
+        "required": ["element_id", "description_zh", "fact_fields"],
+        "properties": {
+          "element_id": { "type": "string" },
+          "description_zh": { "type": "string" },
+          "description_pt": { "type": "string" },
+          "fact_fields": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "判断该要件所需的事实字段 key（对应事实五元组的 attribute）"
+          }
+        }
+      }
+    },
+    "exceptions": { "type": "array", "items": { "type": "string" } },
+    "consequences": {
+      "type": "array", "minItems": 1,
+      "items": { "type": "string" },
+      "description": "法律后果（罚则/停业/许可失效等）"
+    },
+    "red_flags": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["flag_id", "condition_zh", "severity"],
+        "properties": {
+          "flag_id": { "type": "string" },
+          "condition_zh": { "type": "string" },
+          "severity": { "enum": ["high", "medium", "low"] }
+        }
+      }
+    },
+    "certification_status": {
+      "enum": ["provisional", "reviewed", "certified"],
+      "description": "现阶段全库恒为 provisional；reviewed/certified 需巴西法律人核验记录"
+    },
+    "production_tracks": {
+      "type": "object",
+      "required": ["forward_done", "reverse_done"],
+      "properties": {
+        "forward_done": { "type": "boolean", "description": "法条正向轨已完成" },
+        "reverse_done": { "type": "boolean", "description": "表单逆向轨已完成" },
+        "divergence_types": {
+          "type": "array",
+          "items": { "enum": ["A", "B", "C", "D", "E"] },
+          "description": "双轨差异类型（见实验③记录表）"
+        }
+      }
+    },
+    "checklist_codes": {
+      "type": "array", "items": { "type": "string" },
+      "description": "关联的现有核查清单条目编号（如 ENV-001），用于把规则卡接到现有清单/检索流"
+    },
+    "notes": { "type": "string" }
+  }
+}

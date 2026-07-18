@@ -21,6 +21,20 @@
 
 详见 [`docs/P1_LLM_HARNESS.md`](docs/P1_LLM_HARNESS.md)。
 
+### 平台骨架 v0.1 ＋ 参考能力包 v0.1
+
+| 机制件（法域中立） | 说明 |
+|------|------|
+| **能力包 manifest** | `backend/app/packs/brazil_new_energy/manifest.json`（v0.1-draft，provisional）＋首批 10 张规则卡（双轨制、待巴西法律人核验） |
+| **六态材料账本** | 每份材料块有唯一状态（raw_archived→…→superseded），非法迁移抛错，迁移留痕 |
+| **事实五元组** | 主体＋属性＋值＋时间＋出处材料块；无出处的事实不得支撑结论 |
+| **Claim 编译器** | 简报每条结论编译为带证据链的 Claim；无证据只能 blocked / unanswerable |
+| **覆盖证明** | 分母来自包声明的官方来源；"检索到多少算多少"不构成分母 |
+| **拒答门** | 四类拒答原因显式区分（无包/材料不足/无证据/模型不可用），叠加在 70 分门控之上 |
+| **删除巴西测试** | `backend/tests/test_core_without_brazil.py`：机制层在中立 fixture 上跑通成功与拒答路径，源码禁法域字面量 |
+
+设计说明见 [`docs/design/平台骨架v0.1与参考能力包v0.1.md`](docs/design/平台骨架v0.1与参考能力包v0.1.md)；实验登记簿（判据先行）见 [`docs/experiments/README.md`](docs/experiments/README.md)。
+
 ---
 
 ## 技术栈

@@ -16,3 +16,7 @@ pypdf==5.1.0
 reportlab==4.2.5
 psycopg2-binary==2.9.10
 gunicorn==23.0.0
+
+# 测试与 schema 校验
+pytest>=7.4
+jsonschema>=4.19

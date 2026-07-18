@@ -1,0 +1,57 @@
+{
+ "rule_id": "BR-SP-LAB-001",
+ "pack_id": "brazil_new_energy",
+ "version": "0.1.0",
+ "title_zh": "雇佣关系登记与 CLT 强制适用",
+ "title_pt": "Registro de empregados e aplicação da CLT",
+ "legal_sources": [
+  {
+   "citation_id": "urn:lex:br:federal:decreto.lei:1943-05-01;5452",
+   "urn": "urn:lex:br:federal:decreto.lei:1943-05-01;5452",
+   "article": "arts. 2º-3º, 41",
+   "label": "CLT"
+  }
+ ],
+ "elements": [
+  {
+   "element_id": "employment_relation",
+   "description_zh": "存在从属性、经常性、有偿性的用工关系",
+   "description_pt": "vínculo empregatício",
+   "fact_fields": [
+    "employee_count"
+   ]
+  },
+  {
+   "element_id": "registration",
+   "description_zh": "全部雇员完成法定登记（含 eSocial 申报义务）",
+   "description_pt": "registro de empregados",
+   "fact_fields": [
+    "employee_count"
+   ]
+  }
+ ],
+ "exceptions": [
+  "真实的独立承包/服务外包关系（须实质审查，形式外包被普遍否定）"
+ ],
+ "consequences": [
+  "未登记用工：逐人罚款、劳动债务追溯（含 FGTS/INSS）、劳动检察介入"
+ ],
+ "red_flags": [
+  {
+   "flag_id": "RF-LAB-001a",
+   "condition_zh": "用工规模与申报的雇佣结构明显不符或计划全员'外包'",
+   "severity": "high"
+  }
+ ],
+ "certification_status": "provisional",
+ "production_tracks": {
+  "forward_done": true,
+  "reverse_done": false,
+  "divergence_types": []
+ },
+ "checklist_codes": [
+  "LAB-001",
+  "LAB-002"
+ ],
+ "notes": "provisional：待巴西法律研究者核验（见 docs/recruitment/）。"
+}

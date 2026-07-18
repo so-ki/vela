@@ -1,0 +1,56 @@
+{
+ "rule_id": "BR-SP-ENV-004",
+ "pack_id": "brazil_new_energy",
+ "version": "0.1.0",
+ "title_zh": "选址污染场地尽调（áreas contaminadas）",
+ "title_pt": "Diligência de áreas contaminadas no local",
+ "legal_sources": [
+  {
+   "citation_id": "urn:lex:br;sao.paulo:estadual:lei:2009-07-08;13577",
+   "urn": "urn:lex:br;sao.paulo:estadual:lei:2009-07-08;13577",
+   "article": "arts. 1º-13",
+   "label": "Lei 13.577/2009 (SP)"
+  },
+  {
+   "citation_id": "urn:lex:br;sao.paulo:estadual:decreto:2013-06-05;59263",
+   "urn": "urn:lex:br;sao.paulo:estadual:decreto:2013-06-05;59263",
+   "article": "arts. 3º-10",
+   "label": "Decreto 59.263/2013 (SP)"
+  }
+ ],
+ "elements": [
+  {
+   "element_id": "site_history",
+   "description_zh": "目标地块存在既往工业使用或列入污染场地名录的可能",
+   "description_pt": "histórico industrial do terreno",
+   "fact_fields": [
+    "investment_destination",
+    "facility_notes"
+   ]
+  }
+ ],
+ "exceptions": [
+  "全新未利用地块且不在 CETESB 污染场地名录"
+ ],
+ "consequences": [
+  "取得受污染地块的所有人/占有人可承担修复连带责任（无过错责任）"
+ ],
+ "red_flags": [
+  {
+   "flag_id": "RF-ENV-004a",
+   "condition_zh": "收购既有厂房/棕地且材料无污染尽调安排",
+   "severity": "high"
+  }
+ ],
+ "certification_status": "provisional",
+ "production_tracks": {
+  "forward_done": true,
+  "reverse_done": false,
+  "divergence_types": []
+ },
+ "checklist_codes": [
+  "ENV-001",
+  "IND-001"
+ ],
+ "notes": "provisional：待巴西法律研究者核验（见 docs/recruitment/）。"
+}

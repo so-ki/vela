@@ -1,0 +1,55 @@
+{
+ "rule_id": "BR-SP-ENV-003",
+ "pack_id": "brazil_new_energy",
+ "version": "0.1.0",
+ "title_zh": "固体废弃物管理计划（PGRS）义务",
+ "title_pt": "Plano de Gerenciamento de Resíduos Sólidos",
+ "legal_sources": [
+  {
+   "citation_id": "urn:lex:br:federal:lei:2010-08-02;12305",
+   "urn": "urn:lex:br:federal:lei:2010-08-02;12305",
+   "article": "arts. 20-21",
+   "label": "Lei 12.305/2010 (PNRS)"
+  },
+  {
+   "citation_id": "urn:lex:br;sao.paulo:estadual:lei:2006-03-16;12300",
+   "urn": "urn:lex:br;sao.paulo:estadual:lei:2006-03-16;12300",
+   "article": "art. 4º",
+   "label": "Lei 12.300/2006 (SP)"
+  }
+ ],
+ "elements": [
+  {
+   "element_id": "industrial_waste_generator",
+   "description_zh": "制造过程产生工业固废/危废",
+   "description_pt": "geração de resíduos industriais",
+   "fact_fields": [
+    "description",
+    "project_content_scale"
+   ]
+  }
+ ],
+ "exceptions": [
+  "非危废且纳入市政收运体系的小规模产生者"
+ ],
+ "consequences": [
+  "无 PGRS：环境许可不予核发/续期；行政处罚"
+ ],
+ "red_flags": [
+  {
+   "flag_id": "RF-ENV-003a",
+   "condition_zh": "电池/化学品制造项目材料未提及废物处置安排",
+   "severity": "medium"
+  }
+ ],
+ "certification_status": "provisional",
+ "production_tracks": {
+  "forward_done": true,
+  "reverse_done": false,
+  "divergence_types": []
+ },
+ "checklist_codes": [
+  "ENV-002"
+ ],
+ "notes": "provisional：待巴西法律研究者核验（见 docs/recruitment/）。"
+}

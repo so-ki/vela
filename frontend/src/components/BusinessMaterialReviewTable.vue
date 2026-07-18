@@ -31,6 +31,7 @@ export type ReviewFact = {
   value: string
   source_snippet?: string | null
   source_filename?: string | null
+  verification_status?: string | null
 }
 
 const props = withDefaults(

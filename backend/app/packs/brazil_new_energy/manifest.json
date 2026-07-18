@@ -1,0 +1,58 @@
+{
+  "_notice": "manifest v0.1-draft —— 第二个能力包立项前允许破坏性变更（breaking changes allowed until pack #2 kickoff）",
+  "manifest_version": "0.1-draft",
+  "pack_id": "brazil_new_energy",
+  "external_code": "br-sp-new-energy",
+  "version": "0.1.0",
+  "display_name": "巴西·圣保罗州·新能源绿地建厂 参考能力包",
+  "jurisdiction": {
+    "chain": ["BR", "BR-SP"],
+    "country": "brazil",
+    "default_state": "sao_paulo",
+    "note": "联邦层适用全巴西；州层承诺仅限圣保罗州，其余州为 overlay 提示级"
+  },
+  "industry": "new_energy",
+  "project_action": "greenfield_plant",
+  "supported_issues": [
+    "environment_licensing",
+    "labor",
+    "foreign_investment",
+    "tax_icms",
+    "industry_access",
+    "data_compliance"
+  ],
+  "exclusions": [
+    "刑事责任个案判断",
+    "税务筹划方案设计",
+    "诉讼/仲裁策略",
+    "并购交易结构（属未来第二能力包候选）",
+    "非圣保罗州的州级规则承诺（仅提示级 overlay）"
+  ],
+  "certification_status": "provisional",
+  "certification_note": "全部规则卡未经巴西执业者核验；招募与核验流程见 docs/recruitment/。certified 状态需巴西法律人逐卡签核后方可标记。",
+  "components": {
+    "rules_pack": "app/rules/brazil_new_energy.json",
+    "rule_cards_dir": "app/packs/brazil_new_energy/rule_cards",
+    "legal_corpus": "app/data/brazil_legal_corpus.json",
+    "official_portals": "app/data/brazil_official_portals.json",
+    "material_house_rules": "app/data/material_house_rules.json"
+  },
+  "coverage_denominators": {
+    "_note": "只有列在此处的来源才允许覆盖任务进入'目录穷举后未见'态（官方分母存在）",
+    "sp_state_env_core": {
+      "label": "首包州级环境核心法规清单（实验①目标清单 S01–S12）",
+      "source": "docs/experiments/README.md#实验①-州级元数据完备率",
+      "kind": "curated_official_list"
+    },
+    "conama_target": {
+      "label": "CONAMA 目标决议清单（C01–C06）",
+      "source": "docs/experiments/README.md#实验①-州级元数据完备率",
+      "kind": "curated_official_list"
+    },
+    "federal_target": {
+      "label": "联邦目标法规清单（F01–F12）",
+      "source": "docs/experiments/README.md#实验①-州级元数据完备率",
+      "kind": "curated_official_list"
+    }
+  }
+}

@@ -4,7 +4,7 @@ import { useTextareaAutoGrow } from '@/composables/useTextareaAutoGrow'
 
 const props = withDefaults(
   defineProps<{
-    modelValue: string
+    modelValue?: string
     rows?: number
     placeholder?: string
     inputClass?: string

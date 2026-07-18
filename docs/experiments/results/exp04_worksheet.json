@@ -1,0 +1,1257 @@
+{
+ "generated_at": "2026-07-18T05:07:05.398547+00:00",
+ "instruction": "每块与官方原文比对，verdict 填 ok/error/unsure；error 必须写 note 说明错在哪",
+ "samples": [
+  {
+   "source_id": "alesp-decreto-8468-1976",
+   "urn": "urn:lex:br;sao.paulo:estadual:decreto:1976-09-08;8468",
+   "title": "Decreto 8.468/1976 (SP) — texto consolidado ALESP",
+   "official_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/1976/decreto-8468-08.09.1976.html",
+   "revision_marker_count": 0,
+   "blocks": [
+    {
+     "block_index": 0,
+     "text": "decreto n.8.468, de 08.09.1976 \r\n \r\n \r\n \r\n \n\r\n \r\n DECRETO N.&ordm; 8.468, DE 8 DE SETEMBRO DE\r\n1976 \r\n\r\n \r\n \r\n Aprova o\r\nRegulamento da Lei n.&deg; 997, de 31 de maio de 1976, que\r\ndisp&otilde;e sobre a preven&ccedil;&atilde;o e o controle\r\nda\r\npolui&ccedil;&atilde;o do meio ambiente \r\n\r\n \r\n \r\nPAULO EGYDIO MARTINS, GOVERNADOR DO ESTADO DE S&Atilde;O PAULO, no\r\nuso de suas atribui&ccedil;&otilde;es legais, \r\n \r\nDecreta:",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 1,
+     "text": "Artigo 1.&ordm; &mdash; Fica aprovado o\r\nRegulamento, anexo ao presente\r\ndecreto da Lei n.&deg; 997, de 31 de maio de 1976, que\r\ndisp&otilde;e\r\nsobre a preven&ccedil;&atilde;o e o controle da\r\npolui&ccedil;&atilde;o\r\ndo meio ambiente.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 2,
+     "text": "Artigo 2.&deg; &mdash; Este decreto\r\nentrar&aacute; em vigor na data de sua\r\npublica&ccedil;&atilde;o \r\n \r\nPal&aacute;cio dos Bandeirantes, 8 de setembro de 1976. \r\n \r\nPAULO EGYDIO MARTINS \r\n \r\nPublicado na Casa Civil, aos 6 de setembro de 1976. \r\n \r\nMaria Ang&eacute;lica Galiazzi, Diretora de Divis&atilde;o de\r\nAtos do Governador \r\n \r\n \r\n ANEXO A QUE\r\nSE REFERE O DECRETO N.&deg; 8.468, DE 8 DE SETEMBRO DE 1976 \r\n\r\n \r\n \r\n Regulamento da Lei n.&deg;\r\n997, de 31 de Maio de 1976, que\r\nDisp&otilde;e Sobre a Preven&ccedil;&atilde;o e o Controle\r\nda\r\nPolui&ccedil;&atilde;o do Meio Ambiente \r\n\r\n \r\n \r",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 3,
+     "text": "Artigo 1.&deg; &mdash; O sistema de\r\npreven&ccedil;&atilde;o e controle\r\nda polui&ccedil;&atilde;o do meio ambiente passa a ser regido\r\nna forma\r\nprevista neste regulamento.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 4,
+     "text": "Artigo 2.&ordm; &mdash; Fica proibido o lan&ccedil;amento\r\nou a\r\nlibera&ccedil;&atilde;o de poluentes nas &aacute;guas, no\r\nar ou no solo.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 5,
+     "text": "Artigo 3.&ordm; &mdash; Considera-se poluente toda e qualquer\r\nforma de\r\nmat&eacute;ria ou energia lan&ccedil;ada ou liberada nas\r\n&aacute;guas,\r\nno ar ou no solo: \r\n \r\nI &mdash; com intensidade, em quantidade e de\r\nconcentra&ccedil;&atilde;o, em desacordo com os\r\npadr&otilde;es de\r\nemiss&atilde;o estabelecidos neste regulamento e normas dele\r\ndecorrentes; \r\n \r\nII &mdash; com caracter&iacute;sticas e\r\ncondi&ccedil;&otilde;es de\r\nlan&ccedil;amento ou libera&ccedil;&atilde;o, em desacordo\r\ncom os\r\npadr&otilde;es de condicionamento e projeto estabelecidos nas\r\nmesmas\r\nprescri&ccedil;&otilde;es. \r",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 6,
+     "text": "Artigo 4.&ordm; &mdash; S&atilde;o consideradas fontes de\r\npolui&ccedil;&atilde;o todas e quaisquer atividades, processos,\r\nopera&ccedil;&otilde;es ou dispositivos, m&oacute;veis ou\r\nn&atilde;o\r\nque, independentemente de seu campo de aplica&ccedil;&atilde;o,\r\ninduzam, produzam ou possam produzir a polui&ccedil;&atilde;o\r\ndo meio\r\nambiente, tais como: estabelecimentos industriais,\r\nagropecu&aacute;rios\r\ne comerciais, ve&iacute;culos automotores e correlatos,\r\nequipamentos e\r\nmaquin&aacute;rias, e queima de material ao ar livre. \r\n \r\n \r\n CAP&Iacute;TULO II\n\r\n \r\n \r\nDa Compet&ecirc;ncia",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 7,
+     "text": "Artigo 5.&ordm; &mdash; Compete &agrave; Companhia Estadual\r\nde\r\nTecnologia de Saneamento B&aacute;sico e de Defesa do Meio Ambiente\r\n&mdash; CETESB, na qualidade de &oacute;rg&atilde;o\r\ndelegado do Governo\r\ndo Estado de S&atilde;o Paulo, a aplica&ccedil;&atilde;o da\r\nLei\r\nn.&ordm; 997, de 31 de maio de 1976, deste regulamento e das normas\r\ndele decorrentes.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 8,
+     "text": "Artigo 6.&ordm; &mdash; No exerc&iacute;cio da\r\ncompet&ecirc;ncia\r\nprevista no artigo anterior, incluem-se entre as\r\natribui&ccedil;&otilde;es da CETESB, para controle e\r\npreserva&ccedil;&atilde;o do meio ambiente: \r\n \r\nI &mdash; estabelecer e executar planos e programas de atividades\r\nde\r\npreven&ccedil;&atilde;o e controle da\r\npolui&ccedil;&atilde;o; \r\n \r\nII &mdash; efetuar levantamentos, organizar e manter o\r\ncadastramento de fontes de polui&ccedil;&atilde;o; \r\n \r\nIII &mdash; programar e realizar coleta de amostras, exames de\r\nlaborat&oacute;rios e an&aacute;lises de resultados,\r\nnecess&aacu",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 9,
+     "text": "Artigo 7.&ordm; &mdash; As &aacute;guas interiores situadas\r\nno\r\nterrit&oacute;rio do Estado, para os efeitos deste regulamento,\r\nser&atilde;o classificadas segundo os seguintes usos preponderantes: \r\n \r\nI &mdash; CLASSE 1 &mdash; &aacute;guas destinadas ao\r\nabastecimento\r\ndom&eacute;stico, sem tratamento pr&eacute;vio ou com simples\r\ndesinfec&ccedil;&atilde;o; \r\n \r\nII &mdash; CLASSE 2 &mdash; &aacute;guas destinadas ao\r\nabastecimento\r\ndom&eacute;stico, ap&oacute;s tratamento convencional,\r\n&agrave;\r\nirriga&ccedil;&atilde;o de hortali&ccedil;as ou plantas\r\nfrut&iacute;feras e &agrave; recrea&c",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 10,
+     "text": "Artigo 8.&ordm; &mdash; O enquadramento de um corpo de\r\n&aacute;gua, em\r\nqualquer classe, n&atilde;o levar&aacute; em conta a\r\nexist&ecirc;ncia\r\neventual de par&acirc;metros fora dos limites previstos para a\r\nclasse\r\nreferida, devido a condi&ccedil;&otilde;es naturais.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 11,
+     "text": "Artigo 9.&ordm; &mdash; N&atilde;o ser&atilde;o objeto\r\nde enquadramento\r\nnas classes deste regulamento os corpos de &aacute;gua projetados\r\npara\r\ntratamento e transporte de &aacute;guas residu&aacute;rias. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; Os projetos de que\r\ntrata este\r\nartigo dever&atilde;o ser submetidos &agrave;\r\naprova&ccedil;&atilde;o\r\nda CETESB, que definir&aacute; tamb&eacute;m a qualidade do\r\nefluente. \r\n \r\n \r\n CAP&Iacute;TULO\r\nII \n\r\n \r\n \r\n Dos\r\nPadr&otilde;es \n\r\n\r\n \r\n \r\n SE&Ccedil;&Atilde;O I\n\r\n \r\n \r\n Dos Padr&otilde;es de Qualidade",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 12,
+     "text": "Artigo 10 &mdash; Nas &aacute;guas de Classe 1 n&atilde;o\r\nser&atilde;o\r\ntolerados lan&ccedil;amentos de efluentes, mesmo tratados.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 13,
+     "text": "Artigo 11 &mdash; Nas aguas de Classe 2 n&atilde;o\r\npoder&atilde;o ser\r\nlan&ccedil;ados efluentes, mesmo tratados, que prejudiquem sua\r\nqualidade\r\npela altera&ccedil;&atilde;o dos seguintes\r\npar&acirc;metros ou valores. \r\n \r\nI &mdash; virtualmente ausentes: \r\n \r\na) materiais flutuantes inclusive espumas n&atilde;o naturais; \r\n \r\nb) subst&acirc;ncias sol&uacute;veis em hexana; \r\n \r\nc) subst&acirc;ncias que comuniquem gosto ou odor; \r\n \r\nd) no caso de subst&acirc;ncias potencialmente prejudiciais,\r\nat&eacute; os limites m&aacute;ximos abaixo relacionados: \r\n \r\n1. Am&ocirc;nia &mdash; 0,5 mg/l de",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 14,
+     "text": "Artigo 12 &mdash; Nas &aacute;guas de Classe 3 n&atilde;o\r\npoder&atilde;o ser lan&ccedil;ados efluentes, mesmo tratados,\r\nque\r\nprejudiquem sua qualidade pela altera&ccedil;&atilde;o dos\r\nseguintes\r\npar&acirc;metros ou valores: \r\n \r\nI &mdash; virtualmente ausentes: \r\n \r\na) materiais flutuantes, inclusive espumas n&atilde;o naturais; \r\n \r\nb) subst&acirc;ncias sol&uacute;veis em hexana; \r\n \r\nc) subst&acirc;ncias que comuniquem gosto ou odor; \r\n \r\nd) no caso de subst&acirc;ncias potencialmente prejudiciais,\r\nat&eacute; os limites m&aacute;ximos abaixo relacionados: \r\n \r\n1. Am&ocirc;nia &mdash; 0,5",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 15,
+     "text": "Artigo 13 &mdash; Nas &aacute;guas de Classe 4 n&atilde;o\r\npoder&atilde;o ser lan&ccedil;ados efluentes, mesmo tratados,\r\nque\r\nprejudiquem sua qualidade pela altera&ccedil;&atilde;o dos\r\nseguintes\r\nvalores ou condi&ccedil;&otilde;es: \r\n \r\nI &mdash; materiais flutuantes, inclusive espumas n&atilde;o\r\nnaturais virtualmente ausentes; \r\n \r\nII &mdash; odor e aspecto &mdash; n&atilde;o\r\nobjet&aacute;veis; \r\n \r\nIII &mdash; Fen&oacute;is; at&eacute; 1,0 mg/l (um\r\nmiligrama por litro); \r\n \r\nIV &mdash; Oxig&ecirc;nio Dissolvido (OD), superior a 0,5 mg/l\r\n(cinco\r\nd&eacute;cimos de miligrama por litro) em",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 16,
+     "text": "Artigo 14 &mdash; Os limites de Demanda Bioqu&iacute;mica de\r\nOxig&ecirc;nio (DBO), estabelecidos para as Classes 2 e 3,\r\npoder&atilde;o ser elevados, caso o estudo de\r\nautodepura&ccedil;&atilde;o do corpo receptor demonstre que os\r\nteores\r\nm&iacute;nimos de Oxig&ecirc;nio Dissolvido (OD) previstos\r\nn&atilde;o\r\nser&atilde;o desobedecidos em nenhum ponto do mesmo, nas\r\ncondi&ccedil;&otilde;es cr&iacute;ticas de vaz&atilde;o.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 17,
+     "text": "Artigo 15 &mdash; Para os efeitos deste regulamento, consideram-se\r\n\"Virtualmente Ausentes\" teores desprez&iacute;veis de poluentes,\r\ncabendo &agrave; CETESB, quando necess&aacute;rio,\r\nquantific&aacute;-los caso por caso.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 18,
+     "text": "Artigo 16 &mdash; Os m&eacute;todos de an&aacute;lises\r\ndevem ser os\r\ninternacionalmente aceitos e especificados no \"Standard Methods\",\r\n&uacute;ltima edi&ccedil;&atilde;o, salvo os constantes de\r\nnormas\r\nespec&iacute;ficas j&aacute; aprovadas pela\r\nAssocia&ccedil;&atilde;o\r\nBrasileira de Normas T&eacute;cnicas (ABNT). \r\n \r\n \r\n SE&Ccedil;&Atilde;O II\n\r\n \r\n \r\n Dos Padr&otilde;es de Emiss&atilde;o",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 19,
+     "text": "Artigo 17 &mdash; Os efluentes de qualquer natureza somente\r\npoder&atilde;o ser lan&ccedil;ados nas &aacute;guas\r\ninteriores ou\r\ncosteiras, superficiais ou subterr&acirc;neas, situadas no\r\nterrit&oacute;rio do Estado, desde que n&atilde;o sejam\r\nconsiderados\r\npoluentes, na forma estabelecida no artigo 3.&ordm; deste\r\nregulamento. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; A presente\r\ndisposi&ccedil;&atilde;o aplica-se aos lan&ccedil;amentos\r\nfeitos,\r\ndiretamente, por fonte de polui&ccedil;&atilde;o, ou\r\nindiretamente,\r\natrav&eacute;s de canaliza&ccedil;&otilde;es\r\np&uacute;blicas ou\r\nprivadas,",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 20,
+     "text": "Artigo 18 &mdash; Os efluentes de qualquer fonte poluidora somente\r\npoder&atilde;o ser lan&ccedil;ados, direta ou indiretamente,\r\nnas\r\ncole&ccedil;&otilde;es de &aacute;gua, desde que\r\nobede&ccedil;am\r\n&agrave;s seguintes condi&ccedil;&otilde;es: \r\n \r\nI &mdash; pH entre 5,0 (cinco inteiros) e 9,0 (nove inteiros); \r\n \r\nII &mdash; temperatura inferior a 40&deg;C (quarenta graus\r\nCelsius); \r\n \r\nIII &mdash; materiais sediment&aacute;veis at&eacute; 1,0\r\nml/l (um mililitro por litro) em teste de uma hora em \"cone imhoff\"; \r\n \r\nIV &mdash; subst&acirc;ncias sol&uacute;veis em hexana\r\nat&eacute; 100 m",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 21,
+     "text": "Artigo 19 &mdash; Os efluentes de qualquer fonte poluidora somente\r\npoder&atilde;o ser lan&ccedil;ados em sistema\r\np&uacute;blico de esgoto\r\nprovido de esta&ccedil;&atilde;o de tratamento, se obedecerem\r\n&agrave;s\r\nseguintes condi&ccedil;&otilde;es: \r\n \r\nI &mdash; pH entre 5,0 (cinco inteiros) e 9,0 (nove inteiros); \r\n \r\nII &mdash; temperatura inferior a 40&deg;C (quarenta graus\r\nCelsius); \r\n \r\nIII &mdash; materiais sediment&aacute;veis abaixo de 10 ml/l\r\n(dez mililitros por litro) em\r\nprova de sedimenta&ccedil;&atilde;o de 1 (uma) hora\r\nem &laquo;cone imhoff&raquo;; \r\n \r\nIV &mdash; subst&acir",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 22,
+     "text": "Artigo 20 &mdash; Para efeito de utiliza&ccedil;&atilde;o e\r\npreserva&ccedil;&atilde;o do ar, o territ&oacute;rio do\r\nEstado de\r\nS&atilde;o Pauto fica dividido em 11 (onze) Regi&otilde;es,\r\ndenominadas\r\nRegi&otilde;es de Controle de Qualidade do Ar &mdash; R C Q A. \r\n \r\n&sect; 1.&ordm; &mdash; As regi&otilde;es a que se\r\nrefere este artigo\r\ndever&atilde;o coincidir com as 11 (onze) Regi&otilde;es\r\nAdministrativas do Estado, estabelecidas no Decreto estadual\r\nn.&deg;\r\n52.576, de 12 de dezembro de 1970, a saber: \r\n \r\n1 &mdash; Regi&atilde;o da Grande S&atilde;o Paulo\r\n&mdash; R C Q A 1 \r\n \r\n2 &m",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 23,
+     "text": "Artigo 21 &mdash; Considera-se ultrapassado um padr&atilde;o de\r\nqualidade do ar, numa Regi&atilde;o ou Sub-Regi&atilde;o de\r\nControle de\r\nQualidade do Ar, quando a concentra&ccedil;&atilde;o aferida em\r\nqualquer das Esta&ccedil;&otilde;es Medidoras localizadas na\r\n&aacute;rea correspondente exceder, pelo menos, uma das\r\nconcentra&ccedil;&otilde;es m&aacute;ximas especificadas no\r\nartigo 29.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 24,
+     "text": "Artigo 22 &mdash; Ser&atilde;o estabelecidos por decreto\r\npadr&otilde;es\r\nespeciais de qualidade ao ar aos Munic&iacute;pios considerados\r\nEst&acirc;ncias Balne&aacute;rias, Hidrominerais ou\r\nClim&aacute;ticas,\r\ninclusive exig&ecirc;ncias espec&iacute;ficas para evitar a sua\r\ndeteriora&ccedil;&atilde;o.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 25,
+     "text": "Artigo 23 &mdash; Considera-se saturada, em termos de\r\npolui&ccedil;&atilde;o do ar, uma Regi&atilde;o ou\r\nSub-Regi&atilde;o,\r\nquando qualquer valor m&aacute;ximo dos padr&otilde;es de\r\nqualidade do\r\nar nelas estiver ultrapassado.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 26,
+     "text": "Artigo 24 &mdash; Nas Regi&otilde;es ou Sub-Regi&otilde;es\r\nconsideradas\r\nsaturadas, a CETESB poder&aacute; estabelecer exig&ecirc;ncias\r\nespeciais para atividades que lancem poluente.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 27,
+     "text": "Artigo 25 &mdash; Nas Regi&otilde;es ou Sub-Regi&otilde;es\r\nainda,\r\nn&atilde;o consideradas saturadas, ser&aacute; vedado\r\nultrapassar\r\nqualquer valor m&aacute;ximo dos padr&otilde;es de qualidade do\r\nar.\n\r\n \r\n \r\n SE&Ccedil;&Atilde;O II\n\r\n \r\n \r\n Das Proibi&ccedil;&otilde;es e\r\nExig&ecirc;ncias Gerais",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 28,
+     "text": "Artigo 26 &mdash; Fica proibida a\r\nqueima ao ar livre de\r\nres&iacute;duos\r\ns&oacute;lidos, l&iacute;quidos ou de qualquer outro\r\nmaterial\r\ncombust&iacute;vel, exceto mediante\r\nautoriza&ccedil;&atilde;o\r\npr&eacute;via da CETESB, para: \r\n \r\nI &mdash; treinamento de combate a inc&ecirc;ndio; \r\n \r\nII &mdash; evitar o desenvolvimento de esp&eacute;cies\r\nindesej&aacute;veis, animais ou vegetais, para\r\nprote&ccedil;&acirc;o\r\n&agrave; agricultura e &agrave; pecu&aacute;ria.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 29,
+     "text": "Artigo 27 &mdash; Fica proibida a instala&ccedil;&atilde;o\r\ne o\r\nfuncionamento de incineradores domiciliares ou prediais, de\r\nquaisquer tipos.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 30,
+     "text": "Artigo 28 &mdash; A CETESB, nos casos em que se fizer\r\nnecess&aacute;rio, poder&aacute; exigir: \r\n \r\nI &mdash; a instala&ccedil;&atilde;o e\r\nOpera&ccedil;&atilde;o de equipamentos autom&aacute;ticos\r\nde\r\nmedi&ccedil;&atilde;o com registradores, nas fontes de\r\npolui&ccedil;&atilde;o\r\ndo ar, para monitoramento das quantidades de poluentes emitidos,\r\ncabendo a esse &oacute;rg&atilde;o, &agrave; vista dos\r\nrespectivos\r\nregistros, fiscalizar seu funcionamento; \r\n \r\nII &mdash; que os respons&aacute;veis pelas fontes de\r\npolui&ccedil;&atilde;o comprovem a quantidade e\r\nqualidade dos\r\npoluentes atmosf",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 31,
+     "text": "Artigo 29 &mdash; Ficam estabelecidos\r\npara todo o\r\nterrit&oacute;rio do\r\nEstado de S&atilde;o Paulo os seguintes Padr&otilde;es de\r\nQualidade do\r\nAr: \r\n \r\nI &mdash; para part&iacute;culas em suspens&atilde;o: \r\n \r\na) 80 (oitenta) microgramas por metro c&uacute;bico, ou valor\r\ninferior\r\n&mdash; concentra&ccedil;&atilde;o m&eacute;dia\r\ngeom&eacute;trica\r\nanual; ou \r\n \r\nb) 240 (duzentos e quarenta) microgramas por metro c&uacute;bico,\r\nou\r\nvalor inferior &mdash; concentra&ccedil;&atilde;o\r\nm&eacute;dia de 24\r\n(vinte e quatro), horas consecutivas, n&atilde;o podendo ser\r\nultrapassada mais de uma ",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 32,
+     "text": "Artigo 30 &mdash; Para os fins do &sect; 2.&ordm; do artigo\r\nanterior, ficam estabelecidos os seguintes M&eacute;todos: \r\n \r\nI &mdash; para part&iacute;culas em suspens&atilde;o:\r\nM&eacute;todo de Amostrador de Grandes Volumes, ou equivalente, conforme Anexo I\r\ndeste regulamento; \r\n \r\nII &mdash; para di&oacute;xido de enxofre:\r\nM&eacute;todo de Pararosanilina ou equivalente, conforme Anexo 2\r\ndeste\r\nregulamento; \r\n \r\nIII &mdash; para mon&oacute;xido de carbono: M&eacute;todo\r\nde Absor&ccedil;&atilde;o de Radia&ccedil;&atilde;o Infravermelho n&atilde;o Dispersivo, ou\r\nequivalente, conforme Anex",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 33,
+     "text": "Artigo 31 &mdash; Fica proibida a\r\nemiss&atilde;o de\r\nfuma&ccedil;a, por\r\nparte de fontes estacion&aacute;rias, com densidade\r\ncolorim&eacute;trica superior ao padr&atilde;o 1 da Escala de\r\nRingelmann, salvo por: \r\n \r\nI &mdash; um &uacute;nico per&iacute;odo de 15 (quinze)\r\nminutos por dia, para opera&ccedil;&atilde;o de aquecimento de\r\nfornalha; \r\n \r\nII &mdash; um per&iacute;odo de 3 (tr&ecirc;s)\r\nminutos, consecutivos ou n&atilde;o, em qualquer fase de 1 (uma)\r\nhora. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; A emiss&atilde;o\r\nde fuma&ccedil;a\r\ncom densidade superior ao padr&atilde;o estabel",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 34,
+     "text": "Artigo 32 &mdash; Nenhum ve&iacute;culo automotor a\r\n&oacute;leo diesel\r\npoder&aacute; circular ou operar no territ&oacute;rio do Estado\r\nde\r\nS&atilde;o Paulo, emitindo, pelo cano de descarga, fuma&ccedil;a\r\ncom\r\ndensidade colorim&eacute;trica superior ao padr&atilde;o\r\nn.&deg; 2 da\r\nescala de Ringelmann, ou equivalente, por mais de 5 (cinco) segundos\r\nconsecutivos, exceto para partida a frio. \r\n \r\n&sect; 1.&ordm; &mdash; A\r\nespecifica&ccedil;&atilde;o do m&eacute;todo\r\nde medida a que se refere este artigo, ser&aacute; fixada\r\natrav&eacute;s de norma a ser baixada pela CETESB. \r\n \r\n&sect; 2.&",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 35,
+     "text": "Artigo 33 &mdash; Fica proibida a emiss&atilde;o de\r\nsubst&acirc;ncias\r\nodor&iacute;feras na atmosfera, em quantidades que possam ser\r\npercept&iacute;veis fora dos limites da &aacute;rea de\r\npropriedade da\r\nfonte emissora. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; A crit&eacute;rio\r\nda CETESB, a\r\nconstata&ccedil;&atilde;o da emiss&atilde;o de que trata\r\neste artigo,\r\nser&aacute; efetuada: \r\n \r\n1) por t&eacute;cnicos credenciados da CETESB; \r\n \r\n2) com refer&ecirc;ncia &agrave;s subst&acirc;ncias a\r\nseguir enumeradas, atrav&eacute;s de sua\r\nconcentra&ccedil;&atilde;o no\r\nar, por compara&ccedil",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 36,
+     "text": "Artigo 34 &mdash; O lan&ccedil;amento de efluentes provenientes\r\nda\r\nqueima de combust&iacute;veis s&oacute;lidos,\r\nl&iacute;quidos ou\r\ngasosos dever&aacute; ser realizado atrav&eacute;s de\r\nchamin&eacute;.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 37,
+     "text": "Artigo 35 &mdash; Toda fonte de polui&ccedil;&atilde;o do\r\nar\r\ndever&aacute; ser provida de sistema de\r\nventila&ccedil;&atilde;o local\r\nexaustora e o len&ccedil;amento de efluentes na atmosfera somente\r\npoder&aacute; ser realizado atrav&eacute;s de\r\nchamin&eacute;, salvo\r\nquando especificado diversamente neste regulamento ou em normas dele\r\ndecorrentes. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; As\r\nopera&ccedil;&otilde;es,\r\nprocessos ou funcionamento dos equipamentos de britagem, moagem,\r\ntransporte, manipula&ccedil;&atilde;o, carga e descarga de\r\nmaterial\r\nfragmentado ou particulado, poder&a",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 38,
+     "text": "Artigo 36 &mdash; O armazenamento de material fragmentado ou\r\nparticulado dever&aacute; ser feito em silos adequadamente vedados,\r\nou\r\nem outro sistema de controle de polui&ccedil;&atilde;o de ar de\r\nefici&ecirc;ncia igual ou superior, de molde a impedir o arraste,\r\npela\r\na&ccedil;&atilde;o dos ventos, do respectivo material.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 39,
+     "text": "Artigo 37 &mdash; Em &aacute;reas cujo uso preponderante for\r\nresidencial ou comercial, ficar&aacute; a crit&eacute;rio da\r\nCETESB\r\nespecificar o tipo de combust&iacute;vel a ser utilizado por novos\r\nequipamentos ou dispositivos de combust&atilde;o. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; Incluem-se nas\r\ndisposi&ccedil;&otilde;es deste artigo os fornos de\r\npanifica&ccedil;&atilde;o e de restaurantes e caldeiras para\r\nqualquer\r\nfinalidade.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 40,
+     "text": "Artigo 38 &mdash; As substancias odor&iacute;feras resultantes\r\ndas\r\nfontes a seguir enumeradas dever&atilde;o ser incineradas em\r\np&oacute;s-queimadores, operando a uma temperatura\r\nm&iacute;nima de\r\n750&deg;C (setecentos e cinquenta graus Celsius), em tempo de\r\nresid&ecirc;ncia m&iacute;nima de 0,5 (cinco\r\nd&eacute;cimos) segundos,\r\nou por outro sistema de controle de poluentes, de efici&ecirc;ncia\r\nigual ou superior: \r\n \r\nI &mdash; torrefa&ccedil;&atilde;o e resfriamento de\r\ncaf&eacute;, amendoim, castanha de caj&uacute; e cevada; \r\n \r\nII &mdash; autoclaves e digestores utilizados em aprove",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 41,
+     "text": "Artigo 39 &mdash; As emiss&otilde;es provenientes de\r\nincineradores de\r\nres&iacute;duos s&eacute;pticos e cir&uacute;rgicos\r\nhospitalares\r\ndever&atilde;o ser oxidadas em p&oacute;s-queimador que utilize\r\ncombust&iacute;vel gasoso, operando a uma temperatura\r\nm&iacute;nima de\r\n850&deg; C (oitocentos e cinquenta graus Celsius) e em tempo de\r\nresid&ecirc;ncia m&iacute;nima de 0,8 (oito d&eacute;cimos)\r\nsegundos,\r\nou por outro sistema de controle de poluentes de efici&ecirc;ncia\r\nigual\r\nou superior. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; Para fins de\r\nfiscaliza&ccedil;&atilde;o, o p&oacute;s-q",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 42,
+     "text": "Artigo 40 &mdash; As opera&ccedil;&otilde;es de cobertura\r\nde\r\nsuperf&iacute;cies realizadas por aspers&atilde;o, tais como\r\npintura ou\r\naplica&ccedil;&atilde;o de verniz a rev&oacute;lver,\r\ndever&atilde;o\r\nrealizar-se em compartimento pr&oacute;prio, provido de sistema de\r\nventila&ccedil;&atilde;o local exaustora e de equipamento\r\neficiente\r\npara a reten&ccedil;&atilde;o de material particulado.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 43,
+     "text": "Artigo 41 &mdash; As fontes de polui&ccedil;&atilde;o, para\r\nas quais\r\nn&atilde;o foram estabelecidos padr&otilde;es de\r\nemiss&atilde;o,\r\nadotar&atilde;o sistemas de controle de\r\npolui&ccedil;&atilde;o do ar\r\nbaseados na melhor tecnologia pr&aacute;tica dispon&iacute;vel\r\npara\r\ncada caso. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; A\r\nado&ccedil;&atilde;o da\r\ntecnologia preconizada neste artigo, ser&aacute; feita pela\r\nan&aacute;lise e aprova&ccedil;&atilde;o da CETESB de plano\r\nde controle\r\napresentado por meio do respons&aacute;vel pela fonte de\r\npolui&ccedil;&atilde;o, que especificar&aacute",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 44,
+     "text": "Artigo 42 &mdash; Fontes novas de polui&ccedil;&atilde;o do\r\nar, que\r\npretendam instalar-se ou funcionar, quanto &agrave;\r\nlocaliza&ccedil;&atilde;o, ser&atilde;o: \r\n \r\nI &mdash; obrigadas a comprovar que as emiss&otilde;es\r\nprovenientes da\r\ninstala&ccedil;&atilde;o ou funcionamento n&atilde;o\r\nacarretar&atilde;o, para a Regi&atilde;o ou Sub-Regi&atilde;o tida\r\ncomo\r\nsaturada, aumento nos n&iacute;veis dos poluentes que as\r\ncaracterizem\r\ncomo tal; \r\n \r\nII &mdash; proibidas de instalar-se ou de funcionar quando, a\r\ncrit&eacute;rio da CETESB, houver o risco potencial a que alude o\r\ninciso V do a",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 45,
+     "text": "Artigo 43 &mdash; Fica institu&iacute;do o Plano de\r\nEmerg&ecirc;ncia\r\npara Epis&oacute;dios Cr&iacute;ticos de\r\nPolui&ccedil;&atilde;o do Ar,\r\nvisando provid&ecirc;ncias dos Governos do Estado de S&atilde;o\r\nPaulo e\r\ndos Munic&iacute;pios, assim como de entidades privadas e da\r\ncomunidade\r\nem geral, com o objetivo de prevenir grave e iminente risco\r\n&agrave;\r\nsa&uacute;de da popula&ccedil;&atilde;o. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; O Plano de\r\nEmerg&ecirc;ncia\r\nreferido neste artigo ser&aacute; executado pela CETESB e\r\nCoordenadoria\r\nEstadual de Defesa Civil &mdash; CEDEC.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 46,
+     "text": "Artigo 44 &mdash; Considera-se Epis&oacute;dio\r\nCr&iacute;tico de\r\nPolui&ccedil;&atilde;o do Ar a presen&ccedil;a de altas\r\nconcentra&ccedil;&otilde;es de poluentes na atmosfera em curto\r\nper&iacute;odo de tempo resultante da ocorr&ecirc;ncia de\r\ncondi&ccedil;&otilde;es meteorol&oacute;gicas\r\ndesfavor&aacute;veis\r\n&agrave; dispers&atilde;o dos mesmos.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 47,
+     "text": "Artigo 45 &mdash; Para execu&ccedil;&atilde;o do Plano\r\ntratado neste\r\nCap&iacute;tulo, ficam estabelecidos os N&iacute;veis de\r\nAten&ccedil;&atilde;o, de Alerta e de Emerg&ecirc;ncia. \r\n \r\n&sect; 1.&deg; &mdash; Para a\r\ndeclara&ccedil;&atilde;o de qualquer dos\r\nN&iacute;veis enumerados neste artigo ser&atilde;o consideradas\r\nas\r\nconcentra&ccedil;&otilde;es de di&oacute;xido de enxofre,\r\nmaterial\r\nparticulado, combina&ccedil;&atilde;o de di&oacute;xido de\r\nenxofre e\r\nmaterial particulado, concentra&ccedil;&atilde;o de\r\nmon&oacute;xido de\r\ncarbono e oxidantes fotoqu&iacute;micos, bem como as\r\np",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 48,
+     "text": "Artigo 46 &mdash; Ser&aacute; declarado o N&iacute;vel de\r\nAten&ccedil;&atilde;o quando, prevendo-se a\r\nmanuten&ccedil;&atilde;o\r\ndas emiss&otilde;es, bem como condi&ccedil;&otilde;es\r\nmeteorol&oacute;gicas desfavor&aacute;veis &agrave;\r\ndispers&atilde;o\r\ndos poluentes nas 24 (vinte e quatro) horas subsequentes, for atingida\r\numa ou mais das condi&ccedil;&otilde;es a seguir enumeradas: \r\n \r\nI &mdash; concentra&ccedil;&atilde;o de di&oacute;xido\r\nde enxofre (SO 2 )\r\nm&eacute;dia de 24 (vinte e quatro) horas, de 800 (oitocentos)\r\nmicrogramas por metro c&uacute;bico; \r\n \r\nII &mdash; concentra&cce",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 49,
+     "text": "Artigo 47 &mdash; Ser&aacute; declarado o N&iacute;vel de\r\nAlerta\r\nquando, prevendo-se manuten&ccedil;&atilde;o das\r\nemiss&otilde;es, bem\r\ncomo condi&ccedil;&otilde;es meteorol&oacute;gicas\r\ndesfavor&aacute;veis\r\n&agrave; dispers&atilde;o de poluentes nas 24 (vinte e quatro)\r\nhoras\r\nsubseq&uuml;entes, for atingida uma ou mais das\r\ncondi&ccedil;&otilde;es a\r\nseguir enumeradas: \r\n \r\nI &mdash; concentra&ccedil;&atilde;o de di&oacute;xido\r\nde enxofre\r\n(SO 2 ), m&eacute;dia de 24 (vinte e quatro) horas, de 1.600\r\n(hum mil\r\ne\r\nseiscentos) microgramas por metro c&uacute;bico; \r\n \r\nII &mdash; concentr",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 50,
+     "text": "Artigo 48 &mdash; Ser&aacute; declarado o N&iacute;vel de\r\nEmerg&ecirc;ncia quando, prevendo-se a\r\nmanuten&ccedil;&atilde;o das\r\nemiss&otilde;es, bem como condi&ccedil;&otilde;es\r\nmeteorol&oacute;gicas\r\ndesfavor&aacute;veis &agrave; dispers&atilde;o dos\r\npoluentes nas 24\r\n(vinte e quatro) horas subseq&uuml;entes, for atingida uma ou mais das\r\ncondi&ccedil;&otilde;es a seguir enumeradas: \r\n \r\nI &mdash; concentra&ccedil;&atilde;o de di&oacute;xido\r\nde enxofre\r\n(SO 2 ), m&eacute;dia de 24 (vinte e quatro) horas, de 2.100\r\n(dois\r\nmil e\r\ncem) microgramas por metro c&uacute;bico; \r\n \r\nII &mdash; con",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 51,
+     "text": "Artigo 49 &mdash; Caber&aacute; ao Secret&aacute;rio de\r\nEstado de Obras\r\ne do Meio Ambiente declarar os N&iacute;veis de\r\nAten&ccedil;&atilde;o e\r\nde Alerta, e ao Governador o de Emerg&ecirc;ncia, devendo as\r\ndeclara&ccedil;&otilde;es efetuar-se por qualquer dos meios\r\nusuais de\r\ncomunica&ccedil;&atilde;o de massa.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 52,
+     "text": "Artigo 50 &mdash; Durante a perman&ecirc;ncia dos estados de\r\nN&iacute;veis a que se refere este Cap&iacute;tulo, observada a\r\nlegisla&ccedil;&atilde;o federal pertinente, as fontes de\r\npolui&ccedil;&atilde;o do ar ficar&atilde;o, na\r\n&aacute;rea atingida,\r\nsujeitas &agrave;s seguintes restri&ccedil;&otilde;es: \r\n \r\nI &mdash; quando da declara&ccedil;&atilde;o do\r\nN&iacute;vel de\r\nAten&ccedil;&atilde;o, devido a mon&oacute;xido de carbono\r\ne/ou\r\noxidantes fotoqu&iacute;micos, dever&aacute; ser evitado o uso\r\ndesnecess&aacute;rio de autom&oacute;veis particulares; \r\n \r\nII &mdash; quando da decl",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 53,
+     "text": "Artigo 51 &mdash; N&atilde;o &eacute;\r\npermitido depositar,\r\ndispor,\r\ndescarregar, enterrar, infiltrar ou acumular no solo\r\nres&iacute;duos,\r\nem qualquer estado da mat&eacute;ria, desde que poluentes, na forma\r\nestabelecida no artigo 3.&deg; deste regulamento.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 54,
+     "text": "Artigo 52 &mdash; O solo somente poder&aacute; ser utilizado\r\npara\r\ndestino final de res&iacute;duos de qualquer natureza, desde que\r\nsua\r\ndisposi&ccedil;&atilde;o seja feita de forma adequada,\r\nestabelecida em\r\nprojetos espec&iacute;ficos de transporte e destino final, ficando\r\nvedada a simples descarga ou dep&oacute;sito, seja em propriedade\r\np&uacute;blica ou particular. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; Quando a\r\ndisposi&ccedil;&atilde;o\r\nfinal, mencionada neste artigo, exigir a execu&ccedil;&atilde;o\r\nde\r\naterros sanit&aacute;rios, dever&atilde;o ser tomadas medidas\r\nadequadas\r\np",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 55,
+     "text": "Artigo 53 &mdash; Os res&iacute;duos de qualquer natureza,\r\nportadores\r\nde patog&ecirc;nicos, ou de alta toxicidade, bem como\r\ninflam&aacute;veis, explosivos, radioativos e outros prejudiciais,\r\na\r\ncrit&eacute;rio da CETESB, dever&atilde;o sofrer, antes de sua\r\ndisposi&ccedil;&atilde;o final no solo, tratamento\r\ne|ou\r\ncondicionamento adequados, fixados em projetos espec&iacute;ficos,\r\nque\r\natendam aos requisitos de prote&ccedil;&atilde;o de meio\r\nambiente.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 56,
+     "text": "Artigo 54 &mdash; Ficam sujeitos &agrave;\r\naprova&ccedil;&atilde;o da\r\nCETESB os projetos mencionados nos artigos 52 e 53, bem como a\r\nfiscaliza&ccedil;&atilde;o de sua\r\nimplanta&ccedil;&atilde;o,\r\nopera&ccedil;&atilde;o e manuten&ccedil;&atilde;o.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 57,
+     "text": "Artigo 55 &mdash; Somente ser&aacute; tolerada a\r\nacumula&ccedil;&atilde;o tempor&aacute;ria de\r\nres&iacute;duos de\r\nqualquer natureza na fonte de polui&ccedil;&atilde;o ou em\r\noutros\r\nlocais, desde que n&atilde;o ofere&ccedil;a risco de\r\npolui&ccedil;&atilde;o\r\nambiental.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 58,
+     "text": "Artigo 56 &mdash; O tratamento, quando for o caso, o transporte e a\r\ndisposi&ccedil;&atilde;o de res&iacute;duos de qualquer\r\nnatureza, de\r\nestabelecimentos industriais, comerciais e de\r\npresta&ccedil;&atilde;o\r\nde servi&ccedil;os, quando n&atilde;o forem de responsabilidade\r\ndo\r\nMunic&iacute;pio, dever&atilde;o ser feitos pela\r\npr&oacute;pria fonte\r\nde polui&ccedil;&atilde;o. \r\n \r\n&sect; 1&deg; &mdash; A execu&ccedil;&atilde;o,\r\npelo Munic&iacute;pio,\r\ndas servi&ccedil;os mencionados neste artigo, n&atilde;o\r\neximir&aacute;\r\na responsabilidade da fonte de polui&ccedil;&atilde;o, quanto a\r\neve",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 59,
+     "text": "Artigo 57 &mdash; Para efeito de\r\nobten&ccedil;&atilde;o das\r\nlicen&ccedil;as de instala&ccedil;&atilde;o e de\r\nfuncionamento,\r\nconsideram-se fontes de polui&ccedil;&atilde;o: \r\n \r\nI &mdash; atividades de extra&ccedil;&atilde;o e tratamento\r\nde minerais; \r\n \r\nII &mdash; atividades industriais; \r\n \r\nIII &mdash; servi&ccedil;os de repara&ccedil;&atilde;o,\r\nmanuten&ccedil;&atilde;o e conserva&ccedil;&atilde;o,\r\nou qualquer tipo de\r\natividade comercial ou de servi&ccedil;os, que utilizem processos\r\nou\r\nopera&ccedil;&otilde;es de cobertura de superf&iacute;cies\r\nmet&aacute;licas e n&atilde;o met&aa",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 60,
+     "text": "Artigo 58 &mdash; Depender&atilde;o\r\nde pr&eacute;via\r\nlicen&ccedil;a de instala&ccedil;&atilde;o: \r\n \r\nI &mdash; os loteamentos: \r\n \r\nII &mdash; a constru&ccedil;&atilde;o\r\nreconstru&ccedil;&atilde;o ou\r\nreforma de pr&eacute;dio destinado &agrave;\r\ninstala&ccedil;&atilde;o de\r\numa fonte de polui&ccedil;&atilde;o; \r\n \r\nIII &mdash; a instala&ccedil;&atilde;o de uma fonte de\r\npolui&ccedil;&atilde;o em pr&eacute;dio j&aacute;\r\nconstru&iacute;do; \r\n \r\nIV &mdash; a instala&ccedil;&atilde;o, a\r\namplia&ccedil;&atilde;o ou\r\naltera&ccedil;&atilde;o de uma fonte de\r\npolui&ccedil;&atilde;o.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 61,
+     "text": "Artigo 59 &mdash; A licen&ccedil;a de\r\ninstala&ccedil;&atilde;o\r\ndever&aacute; ser requerida pelo interessado diretamente\r\n&agrave;\r\nCETESB, mediante: \r\n \r\nI &mdash; pagamento do pre&ccedil;o estabelecido no\r\nCap&iacute;tulo V, do T&iacute;tulo V, deste regulamento; \r\n \r\nII &mdash; apresenta&ccedil;&atilde;o de\r\ncertid&atilde;o da Prefeitura\r\nMunicipal, declarando que o local e o tipo de\r\ninstala&ccedil;&atilde;o\r\nest&atilde;o conformes com sitas leis e regulamentos\r\nadministrativos; \r\n \r\nIII &mdash; apresenta&ccedil;&atilde;o de memoriais e\r\ninforma&ccedil;&otilde;es que forem exigidos.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 62,
+     "text": "Artigo 60 &mdash; N&atilde;o ser&aacute; expedida\r\nlicen&ccedil;a de\r\ninstala&ccedil;&atilde;o quando houver ind&iacute;cios ou\r\nevid&ecirc;ncia de que ocorrer&aacute; lan&ccedil;amento ou\r\nlibera&ccedil;&atilde;o de poluentes nas &aacute;guas, no\r\nar ou no solo.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 63,
+     "text": "Artigo 61 &mdash; Os &oacute;rg&atilde;os da\r\nAdministra&ccedil;&atilde;o centralizada ou descentralizada do\r\nEstado e\r\ndos Munic&iacute;pios dever&atilde;o exigir a\r\napresenta&ccedil;&atilde;o das licen&ccedil;as de\r\ninstala&ccedil;&atilde;o de que trata este Cap&iacute;tulo,\r\nantes de\r\naprovarem projetos ou de fornecerem licen&ccedil;as ou\r\nalvar&aacute;s,\r\nde qualquer tipo, para as fontes de polui&ccedil;&atilde;o\r\nrelacionadas\r\nno artigo 57, com exce&ccedil;&atilde;o do inciso IV, sob pena\r\nde\r\nnulidade do ato.\n\r\n \r\n \r\n \r\n CAP&Iacute;TULO III\n\r\n \r\n \r\n Das\r\nLicen&ccedil;as de Funcionamento",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 64,
+     "text": "Artigo 62 &mdash; Depender&atilde;o\r\nde licen&ccedil;a de\r\nfuncionamento: \r\n \r\nI &mdash; a utiliza&ccedil;&atilde;o de pr&eacute;dio\r\nde\r\nconstru&ccedil;&atilde;o nova ou modificada, destinado a\r\ninstala&ccedil;&atilde;o de uma fonte de\r\npolui&ccedil;&atilde;o; \r\n \r\nII &mdash; o funcionamento ou a opera&ccedil;&atilde;o de\r\nfonte de\r\npolui&ccedil;&atilde;o em pr&eacute;dio j&aacute;\r\nconstru&iacute;do; \r\n \r\nIII &mdash; o funcionamento ou a opera&ccedil;&atilde;o de\r\numa fonte de polui&ccedil;&atilde;o instalada, ampliada ou\r\nalterada; \r\n \r\nIV &mdash; o funcionamento ou a opera&ccedil;&atilde;o",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 65,
+     "text": "Artigo 63 &mdash; A licen&ccedil;a de funcionamento\r\ndever&aacute; ser\r\nrequerida pelo interessado diretamente &agrave; CETESB, mediante: \r\n \r\nI &mdash; pagamento do pre&ccedil;o estabelecido no\r\nCap&iacute;tulo V, do T&iacute;tulo V, deste regulamento; \r\n \r\nII &mdash; apresenta&ccedil;&atilde;o da licen&ccedil;a\r\nde instala&ccedil;&atilde;o. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash;\r\nDispensar-se-&aacute;\r\nlicen&ccedil;a de instala&ccedil;&atilde;o da fonte de\r\npolui&ccedil;&atilde;o, para efeito deste artigo, se a mesma\r\nj&aacute;\r\ntiver sido aprovada antes da vig&ecirc;ncia deste regulamen",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 66,
+     "text": "Artigo 64 &mdash; Poder&aacute; ser fornecida\r\nlicen&ccedil;a de\r\nfuncionamento a t&iacute;tulo prec&aacute;rio, com validade\r\nnunca\r\nsuperior a 6 (seis) meses, nos casos em que for necess&aacute;rio o\r\nfuncionamento ou opera&ccedil;&atilde;o da fonte, para teste de\r\nefici&ecirc;ncia do sistema de controle de\r\npolui&ccedil;&atilde;o do\r\nmeio ambiente.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 67,
+     "text": "Artigo 65 &mdash; N&atilde;o ser&aacute; fornecida\r\nlicen&ccedil;a de\r\nfuncionamento quando n&atilde;o tiverem sido cumpridas todas as\r\nexig&ecirc;ncias feitas por ocasi&atilde;o da\r\nexpedi&ccedil;&atilde;o\r\nda licen&ccedil;a de instala&ccedil;&atilde;o, ou quando\r\nhouver\r\nind&iacute;cio ou evid&ecirc;ncia de\r\nlibera&ccedil;&atilde;o ou\r\nlan&ccedil;amento de poluentes nas &aacute;guas, no ar ou no\r\nsolo.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 68,
+     "text": "Artigo 66 &mdash; Os &oacute;rg&atilde;os da\r\nadministra&ccedil;&atilde;o centralizada ou descentralizada do\r\nEstado e\r\ndos Munic&iacute;pios dever&atilde;o exigir a\r\napresenta&ccedil;&atilde;o das licen&ccedil;as de\r\nfuncionamento de que\r\ntrata este Cap&iacute;tulo, antes de concederem licen&ccedil;a\r\nou\r\nalvar&aacute; de funcionamento para as fontes de\r\npolui&ccedil;&atilde;o\r\nrelacionadas no artigo 57, com exce&ccedil;&atilde;o de seus\r\nincisos\r\nIV, VIII e X, sob pena de nulidade do ato.\n\r\n \r\n \r\n \r\n CAP&Iacute;TULO IV\n\r\n \r\n Do Registro",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 69,
+     "text": "Artigo 67 &mdash; As fontes de\r\npolui&ccedil;&atilde;o\r\nenumeradas nos\r\nincisos I, lI III, VI, VII, VIII e IX do artigo 57, existentes na data\r\nde vig&ecirc;ncia deste regulamento, ficam obrigadas a\r\nregistrar-se na CETESB e a obter licen&ccedil;a de funcionamento.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 70,
+     "text": "Artigo 68 &mdash; Para fins do disposto no artigo anterior, a\r\nconvoca&ccedil;&atilde;o ser&aacute; feita por\r\npublica&ccedil;&atilde;o\r\nna imprensa oficial. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; A\r\nconvoca&ccedil;&atilde;o\r\nfixar&aacute; prazo e estabelecer&aacute;\r\ncondi&ccedil;&otilde;es para\r\nobten&ccedil;&atilde;o do registro e licen&ccedil;a de que\r\ntrata o\r\nartigo anterior.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 71,
+     "text": "Artigo 69 &mdash; N&atilde;o ser&atilde;o expedidas\r\nlicen&ccedil;as de\r\nfuncionamento a fontes de polui&ccedil;&atilde;o que\r\nlan&ccedil;arem ou\r\nliberarem poluentes nas &aacute;guas, no ar ou no solo.\n\r\n \r\n \r\n CAP&Iacute;TULO V\n\r\n \r\n \r\n Dos\r\nPre&ccedil;os para Expedi&ccedil;&atilde;o de\r\nLicen&ccedil;as",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 72,
+     "text": "Artigo 70 &mdash; O pre&ccedil;o para\r\nexpedi&ccedil;&atilde;o de\r\nlicen&ccedil;as de instala&ccedil;&atilde;o e de\r\nfuncionamento\r\nser&aacute; cobrado separadamente.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 73,
+     "text": "Artigo 71 &mdash; O pre&ccedil;o para\r\nexpedi&ccedil;&atilde;o das\r\nlicen&ccedil;as de instala&ccedil;&atilde;o, para todo e\r\nqualquer\r\nloteamento de im&oacute;veis, ser&aacute; cobrado em\r\nfun&ccedil;&atilde;o da seguinte f&oacute;rmula: \r\n \r\nP = F&radic;A, \r\n \r\nonde \r\n \r\nP = Pre&ccedil;o a ser cobrado, em UPC \r\n \r\nF = Valor fixo igual a 0,1 \r\n \r\n&radic;A = Raiz quadrada da soma das &aacute;reas dos lotes, em m&sup2;\r\n(metros quadrados).",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 74,
+     "text": "Artigo 72 &mdash; O pre&ccedil;o para\r\nexpedi&ccedil;&atilde;o das\r\nlicen&ccedil;as de instala&ccedil;&atilde;o, para todo e\r\nqualquer\r\nsistema p&uacute;blico de tratamento ou\r\ndisposi&ccedil;&atilde;o final\r\nde res&iacute;duos, ou de materiais, s&oacute;lidos,\r\nl&iacute;quidos ou\r\ngasosos, ser&aacute; cobrado em fun&ccedil;&atilde;o da seguinte\r\nf&oacute;rmula: \r\n \r\nP = F &times; C,\n\r\nonde \r\n \r\nP = Pre&ccedil;o a ser\r\ncobrado, em cruzeiros \r\n \r\nF = Valor fixo igual a 0,5/100 \r\n \r\nC = Custo do empreendimento \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; Nos casos em que a\r\nCETESB atuar\r\ncomo &oac",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 75,
+     "text": "Artigo 73 &mdash; O pre&ccedil;o para\r\nexpedi&ccedil;&atilde;o das\r\nlicen&ccedil;as de instala&ccedil;&atilde;o, para todo e\r\nqualquer\r\nservi&ccedil;o de coleta, transporte e\r\ndisposi&ccedil;&atilde;o final\r\nde lodos ou materiais retidos em esta&ccedil;&otilde;es, bem\r\ncomo\r\ndispositivos de tratamento de &aacute;gua, esgotos ou\r\nres&iacute;duos\r\nl&iacute;quidos industriais, ser&aacute; cobrado em\r\nfun&ccedil;&atilde;o da seguinte f&oacute;rmula:\n\r\nP = F,\n\r\nonde \r\n \r\nP = Pre&ccedil;o a ser\r\ncobrado, em UPC \r\n \r\nF = Valor fixo igual a 30.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 76,
+     "text": "Artigo 74 &mdash; O pre&ccedil;o para\r\nexpedi&ccedil;&atilde;o das\r\nlicen&ccedil;as de instala&ccedil;&atilde;o, para as\r\nfontes de\r\npolui&ccedil;&atilde;o constantes dos incisos I, II, III, V,\r\nVI, VII, IX\r\ndo artigo 57, ser&aacute; cobrado em fun&ccedil;&atilde;o da\r\nseguinte\r\nf&oacute;rmula: \r\n \r\nP = F1 + F2 &times; W &times; &radic;A,\n\r\nonde \r\n \r\nP &mdash; Pre&ccedil;o a ser cobrado, em UPC \r\n \r\nF1 = Valor fixo igual a 13 \r\n \r\nF2 = Valor fixo igual a 0,3 \r\n \r\nW = Fator de complexidade da fonte de polui&ccedil;&atilde;o,\r\nconstante do Anexo 5 deste regulamento \r\n \r\n&radic;A = Raiz quadrada ",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 77,
+     "text": "Artigo 75 &mdash; O pre&ccedil;o para\r\nexpedi&ccedil;&atilde;o das\r\nlicen&ccedil;as de funcionamento ser&aacute; cobrado segundo as\r\nmesmas\r\nf&oacute;rmulas utilizadas para c&aacute;lculo dos\r\npre&ccedil;os para\r\nexpedi&ccedil;&atilde;o das licen&ccedil;as de\r\ninstala&ccedil;&atilde;o.\n\r\n \r\n \r\n T&Iacute;TULO VI\n\r\n \r\n \r\n Da Fiscaliza&ccedil;&atilde;o e\r\ndas San&ccedil;&otilde;es \r\n\r\n \r\n \n\r\n\r\n \r\n CAP&Iacute;TULO\r\nI\n\r\n \r\n Da Fiscaliza&ccedil;&atilde;o",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 78,
+     "text": "Artigo 76 &mdash; A\r\nfiscaliza&ccedil;&atilde;o do\r\ncumprimento do\r\ndisposto neste regulamento e das normas dele decorrentes,\r\nser&aacute;\r\nexercida por agentes credenciados da CETESB",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 79,
+     "text": "Artigo 77 &mdash; No exerc&iacute;cio da\r\na&ccedil;&atilde;o fiscalizadora, ficam asseguradas aos agentes\r\ncredenciados na\r\nCETESB a entrada, a qualquer dia ou hora, e a perman&ecirc;ncia\r\npelo\r\ntempo que se tornar necess&aacute;rio, em estabelecimentos\r\np&uacute;blicos ou privados \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; Os agentes, quando\r\nobstados,\r\npoder&atilde;o requisitar for&ccedil;a policial para o\r\nexerc&iacute;cio\r\nde suas atribui&ccedil;&otilde;es em qualquer parte do\r\nterrit&oacute;rio do Estado.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 80,
+     "text": "Artigo 78 &mdash; Aos agentes credenciados compete: \r\n \r\nI &mdash; efetuar vistorias em geral, levantamentos e\r\navalia&ccedil;&otilde;es; \r\n \r\nII &mdash; verificar a ocorr&ecirc;ncia de\r\ninfra&ccedil;&otilde;es e propor as respectivas penalidades; \r\n \r\nIII &mdash; lavrar de imediato o auto de\r\ninspe&ccedil;&atilde;o, fornecendo c&oacute;pia ao\r\ninteressado; \r\n \r\nIV &mdash; intimar por escrito as entidades poluidoras, ou\r\npotencialmente poluidoras, a\r\nprestarem esclarecimentos em local e data previamente\r\nfixados.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 81,
+     "text": "Artigo 79 &mdash; As fontes de polui&ccedil;&atilde;o ficam\r\nobrigadas a\r\nsubmeter &agrave; CETESB quando solicitado, o plano completo do\r\nlan&ccedil;amento de res&iacute;duos l&iacute;quidos,\r\ns&oacute;lidos ou\r\ngasosos. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; Para efeito do\r\ndisposto neste\r\nartigo, poder-se-&aacute; exigir a\r\napresenta&ccedil;&atilde;o de\r\ndetalhes, fluxogramas, memoriais, informa&ccedil;&otilde;es,\r\nplantas e\r\nprojetos bem como linhas completas de produ&ccedil;&atilde;o,\r\ncom\r\nesquema de marcha das mat&eacute;rias-primas beneficiadas e\r\nrespectivos\r\nprodutos, sub-produto",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 82,
+     "text": "Artigo 80 &mdash; Aos infratores das\r\ndisposi&ccedil;&otilde;es da Lei\r\nn.&ordm; 997, de 31 de maio de 1976, deste regulamento e das demais\r\nnormas dele decorrentes, ser&atilde;o aplicadas as seguintes\r\npenalidades: \r\n \r\nI &mdash; advert&ecirc;ncia; \r\n \r\nII &mdash; multa n&atilde;o inferior ao valor de 5 UPCs (cinco\r\nUnidades-Padr&atilde;o de Capital) e n&atilde;o superior ao de\r\n45\r\nUPCs (quarenta e cinco Unidades-Padr&atilde;o de\r\nCapital),\r\npor dia em que persistir a infra&ccedil;&atilde;o; \r\n \r\nIII &mdash; interdi&ccedil;&atilde;o tempor&aacute;ria\r\nou definitiva.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 83,
+     "text": "Artigo 81 &mdash; Para efeito de aplica&ccedil;&atilde;o\r\ndas\r\npenalidades a que se refere o artigo anterior, as\r\ninfra&ccedil;&otilde;es classificam-se em: \r\n \r\nI &mdash; leves &mdash; as espor&aacute;dicas e que\r\nn&atilde;o causem\r\nrisco ou dano &agrave; sa&uacute;de, &agrave; flora,\r\n&agrave; fauna ou\r\naos materiais, nem provoquem altera&ccedil;&otilde;es\r\nsens&iacute;veis\r\nno meio ambiente; \r\n \r\nII &mdash; graves &mdash; as que se n&atilde;o enquadrem\r\nnas duas outras classifica&ccedil;&otilde;es; \r\n \r\nIII &mdash; grav&iacute;ssimas &mdash; as que causem perigo\r\nou dano\r\n&agrave; sa&uacute",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 84,
+     "text": "Artigo 82 &mdash; Responde pela infra&ccedil;&atilde;o quem\r\nde qualquer\r\nmodo a cometer, concorrer para a sua pr&aacute;tica, ou dela se\r\nbeneficiar.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 85,
+     "text": "Artigo 83 &mdash; A penalidade de advert&ecirc;ncia\r\nser&aacute;\r\naplicada quando se tratar de primeira infra&ccedil;&atilde;o de\r\nnatureza leve ou grave, devendo, na mesma oportunidade, quando for o\r\ncaso, fixar-se prazo para que sejam sanadas as irregularidades\r\napontadas. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; Quando se tratar de\r\ninfra&ccedil;&atilde;o de natureza leve e consideradas as\r\ncircunst&acirc;ncias atenuantes do caso, poder&aacute;, a\r\ncrit&eacute;rio da CETESB, ser aplicada a penalidade de\r\nadvert&ecirc;ncia, mesmo que outras j&aacute; tenham sido\r\nimpostas ao\r\ninfrator.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 86,
+     "text": "Artigo 84 &mdash; Na aplica&ccedil;&atilde;o das multas de\r\nque trata o\r\ninciso II do artigo 80, ser&atilde;o observados os seguintes\r\nlimites: \r\n \r\nI &mdash; de 5 UPCs (cinco Unidades &mdash; Padr&atilde;o\r\nde Capital) a\r\n13 UPCs (treze Unidades &mdash; Padr&atilde;o de Capital) no\r\ncaso de\r\ninfra&ccedil;&atilde;o considerada leve; \r\n \r\nII &mdash; de 14 UPCs (catorze Unidades &mdash;\r\nPadr&atilde;o de\r\nCapital) a 45 UPCs (quarenta e cinco Unidades &mdash;\r\nPadr&atilde;o de\r\nCapital), nos casos de infra&ccedil;&atilde;o considerada grave.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 87,
+     "text": "Artigo 85 &mdash; Ser&aacute; aplicada multa di&aacute;ria,\r\nquando a\r\nirregularidade n&atilde;o for sanada ap&oacute;s o decurso do\r\nprazo\r\nconcedido para sua corre&ccedil;&atilde;o. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; Nos casos em que a\r\ninfra&ccedil;&atilde;o n&atilde;o for continuada, a multa\r\naplicada\r\nser&aacute; de valor equivalente a de um dia.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 88,
+     "text": "Artigo 86 &mdash; No caso de aplica&ccedil;&atilde;o de\r\nmulta\r\ndi&aacute;ria, poder&aacute;, a crit&eacute;rio da CETESB,\r\nser\r\nconcedido novo prazo para corre&ccedil;&atilde;o das\r\nirregularidades\r\napontadas, desde que requerido fundamentalmente pelo infrator,\r\nsustando-se, durante o decorrer do prazo, se concedido, a\r\nincid&ecirc;ncia da multa.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 89,
+     "text": "Artigo 87 &mdash; A aplica&ccedil;&atilde;o da multa\r\ndi&aacute;ria\r\ncessar&aacute; mediante comunica&ccedil;&atilde;o escrita\r\ndo infrator\r\nde que foram tomadas as provid&ecirc;ncias exigidas. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; Ap&oacute;s a\r\ncomunica&ccedil;&atilde;o mencionada neste artigo, ser&aacute; feita,\r\nquando\r\nfor o\r\ncaso, uma inspe&ccedil;&atilde;o por agente credenciado,\r\nretroagindo o\r\ntermo final de aplica&ccedil;&atilde;o da penalidade\r\n&agrave; data da\r\ncomunica&ccedil;&atilde;o, se constatada a veracidade da mesma.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 90,
+     "text": "Artigo 88 &mdash; Nos casos de reincid&ecirc;ncia, a multa\r\nser&aacute;\r\naplicada pelo valor correspondente ao dobro da anteriormente imposta. \r\n \r\n&sect; 1.&ordm; &mdash; Caracteriza-se a\r\nreincid&ecirc;ncia quando for cometida nova\r\ninfra&ccedil;&atilde;o da mesma natureza. \r\n \r\n&sect; 2.&deg; &mdash; A primeira irregularidade, desde que\r\ncorrigida\r\nno prazo fixado, n&atilde;o constituir&aacute; elemento para\r\nconfigurar\r\nreincid&ecirc;ncia.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 91,
+     "text": "Artigo 89 &mdash; A penalidade de interdi&ccedil;&atilde;o,\r\ntempor&aacute;ria ou definitiva, observada a\r\nlegisla&ccedil;&atilde;o\r\nfederal pertinente, ser&aacute; aplicada nos casos de\r\ninfra&ccedil;&atilde;o grav&iacute;ssima ou a\r\ncrit&eacute;rio da\r\nCETESB, a partir da terceira reincid&ecirc;ncia. \r\n \r\n&sect; 1.&ordm; &mdash; A aplica&ccedil;&atilde;o\r\nda penalidade de\r\ninterdi&ccedil;&atilde;o tempor&aacute;ria\r\nimplicar&aacute; na\r\nsuspens&atilde;o da licen&ccedil;a de funcionamento. \r\n \r\n&sect; 2.&deg; &mdash; A aplica&ccedil;&atilde;o da\r\npenalidade de\r\ninterdi&ccedil;&atilde;o defini",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 92,
+     "text": "Artigo 90 &mdash; No caso de resist&ecirc;ncia, a\r\ninterdi&ccedil;&atilde;o ser&aacute; efetuada com\r\nrequisi&ccedil;&atilde;o de for&ccedil;a policial. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; Na\r\nhip&oacute;tese deste artigo,\r\na fonte poluidora ficar&aacute; sob cust&oacute;dia policial,\r\nat&eacute; sua\r\nlibera&ccedil;&atilde;o pela CETESB.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 93,
+     "text": "Artigo 91 &mdash; Quando da aplica&ccedil;&atilde;o da\r\npenalidade de\r\ninterdi&ccedil;&atilde;o, o agente poluidor ser&aacute; o\r\n&uacute;nico\r\nrespons&aacute;vel pelas consequ&ecirc;ncias da medida,\r\nn&atilde;o\r\ncabendo quaisquer pagamentos ou indeniza&ccedil;&otilde;es, por\r\nparte\r\nda CETESB. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; Todos os custos ou\r\ndespesas\r\ndecorrentes da aplica&ccedil;&atilde;o da penalidade de\r\ninterdi&ccedil;&atilde;o correr&atilde;o por conta do\r\ninfrator.\n\r\n \r\n \r\n \r\n CAP&Iacute;TULO III\n\r\n \r\n \r\n Do\r\nProcedimento Administrativo \n\r\n \n\r\n \r\n \r\n \n\r\n \r\n SE&Ccedil;&Atil",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 94,
+     "text": "Artigo 92 &mdash; Constatada a\r\nirregularidade, ser&aacute;\r\nlavrado o\r\nauto de infra&ccedil;&atilde;o, em 3 (tr&ecirc;s) vias, no\r\nm&iacute;nimo, destinando-se a primeira ao autuado e as demais\r\n&agrave;\r\nforma&ccedil;&atilde;o do processo administrativo, devendo\r\naquele\r\ninstrumento conter: \r\n \r\nI &mdash; o nome da pessoa f&iacute;sica ou jur&iacute;dica\r\nautuada, com o respectivo endere&ccedil;o; \r\n \r\nII &mdash; o fato constitutivo da infra&ccedil;&atilde;o e\r\no local, hora e data respectivos; \r\n \r\nIII &mdash; a disposi&ccedil;&atilde;o legal ou\r\nregulamentar em que se fundamenta a autua&cc",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 95,
+     "text": "Artigo 93 &mdash; A penalidade de advert&ecirc;ncia\r\nser&aacute; aplicada por agente credenciado da CETESB.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 96,
+     "text": "Artigo 94 &mdash; A penalidade de multa ser&aacute; aplicada\r\npelo gerente da &aacute;rea competente da mesma entidade.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 97,
+     "text": "Artigo 95 &mdash; A penalidade de interdi&ccedil;&atilde;o,\r\ntempor&aacute;ria ou definitiva, ser&aacute; aplicada pelo\r\nSecret&aacute;rio de Obras e do Meio Ambiente, por proposta da\r\nDiretoria da CETESB.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 98,
+     "text": "Artigo 96 &mdash; A crit&eacute;rio da autoridade competente,\r\npoder&aacute; ser concedido prazo para\r\ncorre&ccedil;&atilde;o da\r\nirregularidade apontada no auto de infra&ccedil;&atilde;o. \r\n \r\n&sect; 1.&ordm; &mdash; o prazo concedido poder&aacute;\r\nser dilatado,\r\ndesde que requerido fundamentadamente pelo infrator, antes\r\nde\r\nvencido o prazo anterior. \r\n \r\n&sect; 2.&ordm; &mdash; Das decis&otilde;es que\r\nconcederem ou denegarem\r\nprorroga&ccedil;&atilde;o, ser&aacute; dada\r\nci&ecirc;ncia ao infrator.\n\r\n \r\n \r\n \r\n SE&Ccedil;&Atilde;O II\n\r\n \r\n \r\n Do Recolhimento das Multas",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 99,
+     "text": "Artigo 97 &mdash; As multas previstas\r\nneste regulamento\r\ndever&atilde;o\r\nser recolhidas pelo infrator dentro de 20 (vinte) dias, contados da\r\nci&ecirc;ncia da Notifica&ccedil;&atilde;o para\r\nRecolhimento da Multa,\r\nsob pena de inscri&ccedil;&atilde;o como d&iacute;vida\r\nativa.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 100,
+     "text": "Artigo 98 &mdash; O recolhimento referido no artigo anterior\r\ndever&aacute; ser feito em qualquer ag&ecirc;ncia do Banco do\r\nEstado de\r\nS&atilde;o Paulo S/A., a favor da CETESB, mediante guia a ser\r\nfornecida\r\npela se&ccedil;&atilde;o competente. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; Na falta de\r\nag&ecirc;ncia do\r\nBanco do Estado de S&atilde;o Paulo S/A., as multas\r\npoder&atilde;o ser\r\nrecolhidas na Caixa Econ&ocirc;mica do Estado de S&atilde;o\r\nPaulo S/A\r\nou em estabelecimento banc&aacute;rio autorizado.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 101,
+     "text": "Artigo 99 &mdash; O n&atilde;o recolhimento da multa no prazo\r\nfixado no\r\nartigo 97, al&eacute;m de sujeitar o infrator &agrave;\r\ndecad&ecirc;ncia\r\ndo direito de recurso, acarretar&aacute; sobre o d&eacute;bito: \r\n \r\nI &mdash; corre&ccedil;&atilde;o monet&aacute;ria de\r\nseu valor, a\r\npartir do segundo m&ecirc;s subsequente ao da\r\nimposi&ccedil;&atilde;o\r\nda multa; \r\n \r\nII &mdash; acr&eacute;scimo de 1,1/2% (um e meio por cento), a\r\npartir\r\ndo m&ecirc;s subsequente ao do vencimento do prazo fixado para o\r\nrecolhimento; \r\n \r\nIII &mdash; acr&eacute;scimo de 20% (vinte por cento), quando\r\ninscrito",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 102,
+     "text": "Artigo 100 &mdash; Nos casos de cobran&ccedil;a judicial, a\r\nCETESB\r\nencaminhar&aacute; os processos administrativos ao\r\nDepartamento de\r\n&Aacute;guas e Energia El&eacute;trica, para que este proceda\r\n&agrave; inscri&ccedil;&atilde;o da d&iacute;vida e\r\nexecu&ccedil;&atilde;o.\n\r\n \r\n \r\n \r\n \r\n CAP&Iacute;TULO IV\n\r\n \r\n \r\n Dos\r\nRecursos",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 103,
+     "text": "Artigo 101 &mdash; Os recursos, que\r\nn&atilde;o ter&atilde;o\r\nefeito\r\nsuspensivo, ser&atilde;o interpostos dentro de 20 (vinte) dias,\r\ncontados da ci&ecirc;ncia do auto de infra&ccedil;&atilde;o.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 104,
+     "text": "Artigo 102 &mdash; Os recursos, instru&iacute;dos com todos os\r\nelementos necess&aacute;rios ao seu exame, dever&atilde;o ser\r\ndirigidos ao Superintendente da &aacute;rea competente da CETESB,\r\nquando se tratar de aplica&ccedil;&atilde;o das penalidades de\r\nadvert&ecirc;ncia e multa, e ao Governador do Estado, quando se\r\ntratar\r\nde interdi&ccedil;&atilde;o.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 105,
+     "text": "Artigo 103 &mdash; N&atilde;o ser&atilde;o conhecidos os\r\nrecursos que\r\ndeixarem de vir acompanhados de c&oacute;pia autenticada da guia de\r\nrecolhimento da multa. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; No caso de\r\naplica&ccedil;&atilde;o de muita di&aacute;ria, o\r\nrecolhimento a que se\r\nrefere este artigo dever&aacute; ser efetuado pela\r\nimport&acirc;ncia\r\npecuni&aacute;ria correspondente ao per&iacute;odo compreendido\r\nentre a\r\ndata do auto de infra&ccedil;&atilde;o e a da\r\ninterposi&ccedil;&atilde;o do recurso.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 106,
+     "text": "Artigo 104 &mdash; Os recursos encaminhados por via postal\r\ndever&atilde;o ser registrados com &laquo;Aviso de\r\nRecebimento&raquo; e\r\ndar entrada na CETESB dentro do prazo fixado no artigo 101, valendo,\r\npara esse efeito, o comprovante do recebimento do correio.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 107,
+     "text": "Artigo 105 &mdash; Os recursos ser&atilde;o decididos depois de\r\nouvida\r\na autoridade recorrida, que poder&aacute; reconsiderar sua\r\ndecis&atilde;o.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 108,
+     "text": "Artigo 106 &mdash; As restitui&ccedil;&otilde;es de multa\r\nresultantes\r\nda aplica&ccedil;&atilde;o do presente regulamento\r\nser&atilde;o\r\nefetuadas, sempre, pelo valor recolhido, sem quaisquer\r\nacr&eacute;scimos. \r\n \r\nPar&aacute;grafo &uacute;nico &mdash; As\r\nrestitui&ccedil;&otilde;es\r\nmencionadas neste artigo dever&atilde;o ser requeridas ao\r\nSuperintendente de Administra&ccedil;&atilde;o da CETESB,\r\natrav&eacute;s de peti&ccedil;&atilde;o, que\r\ndever&aacute; ser\r\ninstru&iacute;da com: \r\n \r\n1) nome do infrator e seu endere&ccedil;o; \r\n \r\n2) n&uacute;mero do processo administrativo a que se r",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 109,
+     "text": "Artigo 107 &mdash; Caber&aacute; pedido de\r\nreconsidera&ccedil;&atilde;o\r\ndo n&atilde;o acolhimento da comunica&ccedil;&atilde;o\r\nprevista no\r\nartigo 87, desde que formulado dentro de 10 (dez) dias, contados da\r\nci&ecirc;ncia da decis&atilde;o da CETESB, comprovada, de\r\nmaneira\r\ninequ&iacute;voca, a cessa&ccedil;&atilde;o da\r\nirregularidade.\n\r\n \r\n \r\n \r\n T&Iacute;TULO VII\n\r\n \r\n \r\n Das Disposi&ccedil;&otilde;es Finais",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 110,
+     "text": "Artigo 108 &mdash; Na contagem dos\r\nprazos estabelecidos neste\r\nregulamento, excluir-se-&aacute; o dia do in&iacute;cio e\r\nincluir-se-&aacute; o do vencimento, prorrogando-se este,\r\nautomaticamente, para o primeiro dia &uacute;til, se recair em dia\r\nsem\r\nexpediente na CETESB.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 111,
+     "text": "Artigo 109 &mdash; Na elabora&ccedil;&atilde;o de Planos\r\nDiretores\r\nUrbanos ou Regionais, bem como no estabelecimento de distritos ou zonas\r\nindustriais, dever&aacute; ser previamente ouvida a CETESB, quanto\r\naos\r\nassuntos de sua compet&ecirc;ncia, tendo em vista a\r\npreserva&ccedil;&atilde;o do meio ambiente.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 112,
+     "text": "Artigo 110 &mdash; Os ve&iacute;culos novos com motor a\r\nexplos&atilde;o\r\npor fa&iacute;sca s&oacute; poder&atilde;o ser\r\ncomercializados por seus\r\nfabricantes, no territ&oacute;rio do Estado de S&atilde;o\r\nPaulo, desde\r\nque n&atilde;o emitam mon&oacute;xido de carbono,\r\nhidrocarbonetos ou\r\n&oacute;xido de nitrog&ecirc;nio, este expresso em\r\ndi&oacute;xido de\r\nnitrog&ecirc;nio, pelo cano de descarga, respiro do\r\nc&aacute;rter ou\r\npor evapora&ccedil;&atilde;o de combust&iacute;vel, em\r\nquantidades\r\nsuperiores aos padr&otilde;es de emiss&atilde;o fixados.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 113,
+     "text": "Artigo 111 &mdash; Os ve&iacute;culos com motor a\r\nexplos&atilde;o por\r\nfa&iacute;sca, atualmente em uso, s&oacute; poder&atilde;o\r\ncircular no\r\nEstado de S&atilde;o Paulo, desde que n&atilde;o emitam\r\nmon&oacute;xido\r\nde carbono ou hidrocarbonetos, pelo cano de descarga, em quantidades\r\nsuperiores aos padr&otilde;es de emiss&atilde;o fixados.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 114,
+     "text": "Artigo 112 &mdash; Os padr&otilde;es de emiss&atilde;o de\r\nque tratam os\r\nartigos anteriores, bem como os m&eacute;todos de medida e demais\r\nprocedimentos de testes ser&atilde;o fixados em decreto.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 115,
+     "text": "Artigo 113 &mdash; Os arruamentos e loteamentos dever&atilde;o\r\nser\r\npreviamente aprovados pela CETESB, que poder&aacute; exigir projeto\r\ncompleto de sistema de abastecimento de &aacute;gua, de escoamento\r\nde\r\n&aacute;guas pluviais, de coleta de\r\ndisposi&ccedil;&atilde;o de esgotos\r\nsanit&aacute;rios, compreendendo instala&ccedil;&otilde;es\r\npara\r\ntratamento ou depura&ccedil;&atilde;o.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 116,
+     "text": "Artigo 114 &mdash; A CETESB conceder&aacute; prazo adequado\r\npara que as\r\natuais fontes de polui&ccedil;&atilde;o atendam &agrave;s\r\nnormas deste\r\nregulamento, desde que possuam e venham operando regularmente\r\ninstala&ccedil;&otilde;es adequadas e aprovadas de controle de\r\npolui&ccedil;&atilde;o.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 117,
+     "text": "Artigo 115 &mdash; Ser&atilde;o fixados por decretos\r\nespec&iacute;ficos\r\nos padr&otilde;es de condicionamento e projeto, assim como outras\r\nnormas para preserva&ccedil;&atilde;o de recursos\r\nh&iacute;dricos e as\r\nreferentes &agrave; polui&ccedil;&atilde;o causada por\r\nru&iacute;dos e\r\nradia&ccedil;&otilde;es ionizantes.\n\r\n \r\n \r\n \r\n ANEXO I \r\n \r\n A\r\nQUE SE REFERE O ARTIGO 30, I \n\r\n \n\r\n \r\n \r\n &mdash;\r\nM&Eacute;TODO REFER&Ecirc;NCIA PARA A\r\nDETERMINA&Ccedil;&Atilde;O DE PART&Iacute;CULAS EM\r\nSUSPENS&Atilde;O NA\r\nATMOSFERA (M&Eacute;TODO DO AMOSTRADOR DE GRANDES VOLUMES). \n\r\n \r\n \r\n 1. PRINC&Iacut",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 118,
+     "text": "Artigo 74. \r\n\r\n \r\n\r\n \r\n VALORES DO FATOR \r\nDE COMPLEXIDADE DA \r\nFONTE DE POLUI&Ccedil;&Atilde;O (W) \n\r\n\r\n \r\n \r\n \r\n \r\n \r\n \r\n VALOR \r\n \r\n \r\n FONTE DE\r\nPOLUI&Ccedil;&Atilde;O \r\n DE W \r\n \r\n \r\n 00 &mdash; Ind&uacute;stria de\r\nExtra&ccedil;&atilde;o e Tratamento de Minerais \r\n \r\n \r\n \r\n \r\n Atividades de\r\nextra&ccedil;&atilde;o, com ou sem beneficiamento, de \r\nminerais \n\r\n \r\n \r\n \r\n \r\n \r\n s&oacute;lidos,\r\nl&iacute;quidos ou gasosos, que se encontrem em estado natural \n\r\n \r\n 2,0 \r\n \r\n \r\n 10 &mdash; Ind&uacute;stria de Produtos\r\nMinerais N&atilde;o Met&aacute;licos \r\n \r\n \r\n \r\n \r\n Aparelhamento de pedras\r",
+     "verdict": "",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "source_id": "alesp-lei-997-1976",
+   "urn": "urn:lex:br;sao.paulo:estadual:lei:1976-05-31;997",
+   "title": "Lei 997/1976 (SP) — texto consolidado ALESP",
+   "official_url": "https://www.al.sp.gov.br/repositorio/legislacao/lei/1976/lei-997-31.05.1976.html",
+   "revision_marker_count": 0,
+   "blocks": [
+    {
+     "block_index": 0,
+     "text": "Lei n&ordm; 997, de 31 de maio de 1976 - Assembleia Legislativa do Estado de S&atilde;o Paulo \r\n \r\n \r\n Assembleia Legislativa do Estado de S&atilde;o Paulo \r\n \r\n Ficha informativa \r\n \n Texto compilado \r\n LEI N&ordm; 997, DE 31 DE MAIO DE 1976 \r\n (Atualizada at&eacute; a Lei n&ordm; 9.477, de 30 de dezembro de 1996) \r\n \r\n Disp&otilde;e sobre o controle da polui&ccedil;&atilde;o do meio ambiente \r\n \r\n \r\nO GOVERNADOR DO ESTADO DE S&Atilde;O PAULO:\n\r\nFa&ccedil;o saber que, nos termos dos &sect;&sect; 1&ordm; e 3&ordm; do",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 1,
+     "text": "Artigo 24 da Constitui&ccedil;&atilde;o do Estado (Emenda n. 2), promulgo a seguinte lei:",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 2,
+     "text": "Artigo 1&ordm; - Fica institu&iacute;do o sistema de preven&ccedil;&atilde;o e controle da polui&ccedil;&atilde;o do meio ambiente, na forma prevista nesta lei.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 3,
+     "text": "Artigo 2&ordm; - Considera-se polui&ccedil;&atilde;o do meio ambiente a presen&ccedil;a, o lan&ccedil;amento ou a libera&ccedil;&atilde;o, nas &aacute;guas, no ar ou no solo, de toda e qualquer forma de mat&eacute;ria ou energia, com intensidade em quantidade, de concentra&ccedil;&atilde;o ou com caracter&iacute;sticas em desacordo com as que forem estabelecidas em decorr&ecirc;ncia desta lei, ou que tornem ou possam tornar as &aacute;guas, o ar ou o solo:\n\r\n I - impr&oacute;prios, nocivos ou ofensivos &agrave; sa&uacute;de;\n\r\n II - inconvenientes ao bem-estar p&uacute;blico;\n\r\n III - danosos ",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 4,
+     "text": "Artigo 3&ordm; - Fica proibido o lan&ccedil;amento ou libera&ccedil;&atilde;o de poluentes nas &aacute;guas, no ar ou no solo.\n\r \nPar&aacute;grafo &uacute;nico - Considera-se poluente toda e qualquer forma de mat&eacute;ria ou energia que, direta ou indiretamente, causa polui&ccedil;&atilde;o do meio ambiente de que trata o artigo anterior.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 5,
+     "text": "Artigo 4&ordm; - A atividade fiscalizadora e repressiva, de que trata esta lei, ser&aacute; exercida no que diz respeito a despejos, pelo &oacute;rg&atilde;o estadual de controle da polui&ccedil;&atilde;o do meio ambiente, em todo e qualquer corpo ou curso de &aacute;gua situado nos limites do territ&oacute;rio do Estado, ainda que n&atilde;o pertencendo ao seu dom&iacute;nio, n&atilde;o estejam sob sua jurisdi&ccedil;&atilde;o.\n\r \nPar&aacute;grafo &uacute;nico - Para cumprimento do disposto neste artigo, o &oacute;rg&atilde;o estadual representar&aacute; ao federal competente, sempre que a po",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 6,
+     "text": "Artigo 5&ordm; - A instala&ccedil;&atilde;o, a constru&ccedil;&atilde;o ou a amplia&ccedil;&atilde;o, bem como a opera&ccedil;&atilde;o ou funcionamento das fontes de polui&ccedil;&atilde;o que forem enumeradas no regulamento desta lei ficam sujeitas &agrave; pr&eacute;via autoriza&ccedil;&atilde;o do &oacute;rgdo estadual de controle da polui&ccedil;&atilde;o do meio ambiente mediante licen&ccedil;as de instala&ccedil;&atilde;o e de funcionamento.\n\r\n Par&aacute;grafo &uacute;nico - &Eacute; considerada fonte de polui&ccedil;&atilde;o qualquer atividade, sistema, processo, opera&ccedil;&atilde",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 7,
+     "text": "Artigo 5&deg; - A instala&ccedil;&atilde;o, a constru&ccedil;&atilde;o ou a amplia&ccedil;&atilde;o, bem como a opera&ccedil;&atilde;o ou o funcionamento das fontes de polui&ccedil;&atilde;o que forem enumeradas no Regulamento desta lei, ficam sujeitos &agrave; pr&eacute;via autoriza&ccedil;&atilde;o do &oacute;rg&atilde;o estadual de controle da polui&ccedil;&atilde;o do meio-ambiente, mediante expedi&ccedil;&atilde;o, quando for o caso, de Licen&ccedil;a Ambiental Pr&eacute;via (LAP), de Licen&ccedil;a Ambiental de Instala&ccedil;&atilde;o (LAI) e/ou de Licen&ccedil;a Ambiental de Opera&cced",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 8,
+     "text": "Artigo 5&ordm; com reda&ccedil;&atilde;o dada pela Lei n&ordm; 9.477, de 30/12/1996 .",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 9,
+     "text": "Artigo 6&ordm; - Os &oacute;rg&atilde;os da Administra&ccedil;&atilde;o direta ou indireta, do Estado e dos Munic&iacute;pios, dever&atilde;o exigir a apresenta&ccedil;&atilde;o das licen&ccedil;as de que trata o artigo anterior, antes de aprovarem projetos de amplia&ccedil;&atilde;o, instala&ccedil;&atilde;o ou constru&ccedil;&atilde;o das fontes de polui&ccedil;&atilde;o que forem enumeradas no regulamento desta lei, ou de autorizarem a opera&ccedil;&atilde;o ou o funcionamento dessas fontes, sob pena de nulidade de seus atos.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 10,
+     "text": "Artigo 7&ordm; - Os infratores das disposi&ccedil;&otilde;es desta lei, de seu regulamento e das demais normas dela decorrentes, ficam sujeitos &agrave;s seguintes penalidades:\n\r\n I - advert&ecirc;ncia;\n\r\n II - multa n&atilde;o inferior ao valor de 5 (cinco) UPCs (Unidades Padr&atilde;o de Capital) e n&atilde;o superior ao de 45 (quarenta e cinco) UPCs, por dia em que persistir a infra&ccedil;&atilde;o;\n\r\n III - interdi&ccedil;&atilde;o tempor&aacute;ria ou definitiva.\n\r\n &sect; 1&ordm; - Na aplica&ccedil;&atilde;o das multas di&aacute;rias a que se refere este artigo, ser&atilde;o observados ",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 11,
+     "text": "Artigo 7.&deg; - As infra&ccedil;&otilde;es desta lei, de seu regulamento e das demais normas dela decorrentes ser&atilde;o, a crit&eacute;rio da autoridade competente, classificadas em leves, graves e grav&iacute;ssimas, levando-se em conta: (NR)\n\r\n I - sua maior ou menor gravidade; (NR)\n\r\n II - suas circunst&acirc;ncias atenuantes e agravantes; (NR)\n\r\n III - os antecedentes do infrator. (NR)\n\r \nPar&aacute;grafo &uacute;nico - Responder&aacute; pela infra&ccedil;&atilde;o quem, por qualquer modo, a cometer, concorrer para sua pr&aacute;tica ou dela se beneficiar. (NR) \n\r\n \r\n -",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 12,
+     "text": "Artigo 7&ordm; com reda&ccedil;&atilde;o dada pela Lei n&ordm; 1.874, de 08/12/1978 .",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 13,
+     "text": "Artigo 7.&ordm; - As infra&ccedil;&otilde;es &agrave;s disposi&ccedil;&otilde;es desta lei, de seu regulamento, bem como das normas, padr&otilde;es e exig&ecirc;ncias t&eacute;cnicas dela decorrentes ser&atilde;o, a crit&eacute;rio da autoridade competente, classificadas em leves, graves e grav&iacute;ssimas, levando-se em conta: (NR)\n\r\n I - a intensidade do dano, efetivo ou potencial; (NR)\n\r\n II - as circunst&acirc;ncias atenuantes ou agravantes; e (NR)\n\r\n III - os antecedentes do infrator. (NR)\n\r \nPar&aacute;grafo &uacute;nico - Responder&aacute; pela infra&ccedil;&atilde;o quem por qualquer",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 14,
+     "text": "Artigo 7&ordm; com reda&ccedil;&atilde;o dada pela Lei n&ordm; 8.943, de 29/09/1994 .",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 15,
+     "text": "Artigo 8&ordm; - Responder&aacute; pela infra&ccedil;&atilde;o quem, por qualquer modo, a cometer, concorrer para sua pr&aacute;tica ou dela se beneficiar.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 16,
+     "text": "Artigo 8.&deg; - As infra&ccedil;&otilde;es de que trata o artigo anterior ser&atilde;o punidas com as seguintes penalidades: (NR)\n\r\n I - advert&ecirc;ncia; (NR)\n\r\n II - multa de 10 (dez) a 1.000 (mil) vezes o valor nominal da ORTN, &agrave; data da infra&ccedil;&atilde;o; (NR)\n\r\n III - interdi&ccedil;&atilde;o tempor&aacute;ria ou definitiva; (NR)\n\r\n IV - embargo e demoli&ccedil;&atilde;o. (NR)\n\r\n &sect; 1.&deg; - A penalidade de multa ser&aacute; aplicada observados os seguintes limites: (NR)\n\r\n 1. de 10 (dez) a 100 (cem) vezes o valor nominal da ORTN nas infra&ccedil;&otilde;es leves; (NR)\n",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 17,
+     "text": "Artigo 8&ordm; com reda&ccedil;&atilde;o dada pela Lei n&ordm; 1.874, de 08/12/1978 .",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 18,
+     "text": "Artigo 8.&ordm; - As infra&ccedil;&otilde;es de que trata o artigo anterior ser&atilde;o punidas com as seguintes penalidades: (NR)\n\r\n I - advert&ecirc;ncia; (NR)\n\r\n II - multa de 10 a 10.000 vezes o valor da Unidade Fiscal do Estado de S&atilde;o Paulo - Ufesp; (NR)\n\r\n III - interdi&ccedil;&atilde;o tempor&aacute;ria ou definitiva; (NR)\n\r\n IV - embargo; (NR)\n\r\n V - demoli&ccedil;&atilde;o; (NR)\n\r\n VI - suspens&atilde;o de financiamentos e benef&iacute;cios fiscais; e (NR)\n\r\n VII - apreens&atilde;o ou recolhimento, tempor&aacute;rio ou definitivo. (NR)\n\r\n &sect; 1.&ordm; - A penalidade de mult",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 19,
+     "text": "Artigo 8&ordm; com reda&ccedil;&atilde;o dada pela Lei n&ordm; 8.943, de 29/09/1994 .",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 20,
+     "text": "Artigo 9&ordm; - Nos casos de reincid&ecirc;ncia, a multa ser&aacute; aplicada pelo valor correspondente ao dobro da anteriormente imposta, podendo, por&eacute;m a penalidade consistir na interdi&ccedil;&atilde;o, tempor&aacute;ria ou definitiva, a partir da terceira reincid&ecirc;ncia. \n\r\n Par&aacute;grafo &uacute;nico - Caracteriza-se a reincid&ecirc;ncia quando o infrator cometer nova infra&ccedil;&atilde;o da mesma natureza.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 21,
+     "text": "Artigo 9.&ordm; - As multas poder&atilde;o ter sua exigibilidade suspensa quando o infrator, nos termos e condi&ccedil;&otilde;es aceitas e aprovadas pela autoridade competente, se obrigar &agrave; ado&ccedil;&atilde;o de medidas espec&iacute;ficas para fazer cessar e corrigir a degrada&ccedil;&atilde;o ambiental. (NR)\n\r\n &sect; 1.&ordm; - Cumpridas todas as obriga&ccedil;&otilde;es assumidas pelo infrator, a multa poder&aacute; ter redu&ccedil;&atilde;o de at&eacute; 90% (noventa por cento) de seu valor. (NR)\n\r\n &sect; 2.&ordm; - O infrator n&atilde;o poder&aacute; beneficiar-se da redu&ccedi",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 22,
+     "text": "Artigo 9&ordm; com reda&ccedil;&atilde;o dada pela Lei n&ordm; 8.943, de 29/09/1994 .",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 23,
+     "text": "Artigo 10 - Da aplica&ccedil;&atilde;o das penalidades previstas nesta lei caber&aacute; recurso &agrave; autoridade imediatamente superior, no prazo de 20 (vinte) dias contados da data do auto de infra&ccedil;&atilde;o, ouvida a autoridade recorrida, que poder&aacute; reconsiderar sua decis&atilde;o.\n\r \nPar&aacute;grafo &uacute;nico - No caso de imposi&ccedil;&atilde;o de multa, o recurso somente ser&aacute; processado se garantida a inst&acirc;ncia, mediante pr&eacute;vio recolhimento, no &oacute;rg&atilde;o arrecadador competente, do valor da multa aplicada.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 24,
+     "text": "Artigo 11 - O produto da arrecada&ccedil;&atilde;o das multas decorrentes das infra&ccedil;&otilde;es previstas nesta lei constituir&aacute; receita do Departamento de &Aacute;guas e Energia El&eacute;trica.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 25,
+     "text": "Artigo 12 - O d&eacute;bito relativo &agrave; multa aplicada nos termos do",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 26,
+     "text": "Artigo 7&ordm;, n&atilde;o recolhido no prazo que for fixado, ficar&aacute; sujeito:\n\r\n I - &agrave; corre&ccedil;&atilde;o monet&aacute;ria do seu valor, a partir do segundo m&ecirc;s subsequente ao da lavratura do auto de infra&ccedil;&atilde;o e imposi&ccedil;&atilde;o da multa;\n\r\n II - ao acr&eacute;scimo de 1,5% (um e meio por cento) por m&ecirc;s ou fra&ccedil;&atilde;o, a partir do m&ecirc;s subsequente ao do vencimento do prazo fixado para o recolhimento da multa;\n\r\n III - ao acr&eacute;scimo de 20% (vinte por cento), quando inscrito para cobran&ccedil;a executiva.\n\r\n &sect; 1&ordm; - ",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 27,
+     "text": "Artigo 12 revogado pela Lei n&ordm; 8.943, de 29/09/1994 .",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 28,
+     "text": "Artigo 13 - Fica o Poder Executivo autorizado a determinar medidas de emerg&ecirc;ncia a fim de evitar epis&oacute;dios cr&iacute;ticos de polui&ccedil;&atilde;o ambiental ou impedir sua continuidade, em casos de grave e iminente risco para vidas humanas ou recursos econ&ocirc;micos.\n\r \nPar&aacute;grafo &uacute;nico - Para a execu&ccedil;&atilde;o das medidas de emerg&ecirc;ncia de que trata este artigo, poder&atilde;o, durante o per&iacute;odo cr&iacute;tico, ser reduzidas ou impedidas quaisquer atividades em &aacute;reas atingidas pela ocorr&ecirc;ncia.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 29,
+     "text": "Artigo 14 - Para garantir a execu&ccedil;&atilde;o do Sistema de Preven&ccedil;&atilde;o e Controle da Polui&ccedil;&atilde;o do Meio Ambiente previsto nesta lei, em seu regulamento e nas normas dela decorrentes, ficam assegurados aos agentes credenciados do &oacute;rg&atilde;o competente a entrada, a qualquer dia ou hora, e a perman&ecirc;ncia, pelo tempo que se tornar necess&aacute;rio, em estabelecimentos p&uacute;blicos ou privados.\n\r\n \r \nPar&aacute;grafo &uacute;nico - Para os fins do disposto neste artigo, o &oacute;rg&atilde;o ambiental competente poder&aacute; ainda exigir que os respo",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 30,
+     "text": "Artigo 15 - Constituir&atilde;o, tamb&eacute;m, objeto do regulamento desta lei:\n\r\n I - a indica&ccedil;&atilde;o de &oacute;rg&atilde;o da Administra&ccedil;&atilde;o, direta ou indireta, competente para a aplica&ccedil;&atilde;o desta lei, e a fixa&ccedil;&atilde;o de suas atribui&ccedil;&otilde;es;\n\r\n II - a determina&ccedil;&atilde;o de normas de utiliza&ccedil;&atilde;o e preserva&ccedil;&atilde;o das &aacute;guas, do ar e do solo, bem como do ambiente ecol&oacute;gico em geral;\n\r\n III - a enumera&ccedil;&atilde;o das fontes de polui&ccedil;&atilde;o referidas nos Artigos 4&ordm; e 5&ordm",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 31,
+     "text": "Artigo 16 - Somente poder&atilde;o ser concedidos financiamentos, com recursos oriundos do Tesouro do Estado, sob forma de fundos especiais ou de capital, ou de qualquer outra, com taxas e condi&ccedil;&otilde;es favorecidas pelas institui&ccedil;&otilde;es financeiras sob controle acion&aacute;rio do Governo do Estado, a empresas que apresentarem o certificado a que se refere esta lei, emitido pelos &oacute;rg&atilde;os estaduais de controle da polui&ccedil;&atilde;o.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 32,
+     "text": "Artigo 17 - Vetado.\n\r\nDisposi&ccedil;&atilde;o Transit&oacute;ria\n\r\n \r \nArtigo &uacute;nico - As fontes de polui&ccedil;&atilde;o que forem enumeradas em regulamento, existentes &agrave; data da vig&ecirc;ncia desta lei, ficam obrigadas a registrar-se no &oacute;rg&atilde;o estadual de controle da polui&ccedil;&atilde;o do meio ambiente e a obter licen&ccedil;a de funcionamento, no prazo que lhes for fixado.\n\r\nPal&aacute;cio dos Bandeirantes, 31 de maio de 1976.\n\r\nPAULO EGYDIO MARTINS\n\r\nFrancisco Henrique Fernando de Barros\n\r\nSecret&aacute;rio de Obras e do Meio Ambiente\n\r\nRoberto Cerqueira Ce",
+     "verdict": "",
+     "note": ""
+    }
+   ]
+  },
+  {
+   "source_id": "alesp-lei-13577-2009",
+   "urn": "urn:lex:br;sao.paulo:estadual:lei:2009-07-08;13577",
+   "title": "Lei 13.577/2009 (SP) — texto consolidado ALESP",
+   "official_url": "https://www.al.sp.gov.br/repositorio/legislacao/lei/2009/lei-13577-08.07.2009.html",
+   "revision_marker_count": 0,
+   "blocks": [
+    {
+     "block_index": 0,
+     "text": "Lei n&ordm; 13.577, de 08 de julho de 2009 - Assembleia Legislativa do Estado de S&atilde;o Paulo \r\n \r\n \r\n Assembleia Legislativa do Estado de S&atilde;o Paulo \r\n \r\n Ficha informativa \r\n \r\n LEI N&ordm; 13.577, DE 08 DE JULHO DE 2009 \r\n \r\n \r\n Disp&otilde;e sobre diretrizes e procedimentos para a prote&ccedil;&atilde;o da qualidade do solo e gerenciamento de &aacute;reas contaminadas, e d&aacute; outras provid&ecirc;ncias correlatas. \r\n \r\nO VICE-GOVERNADOR, EM EXERC&Iacute;CIO NO CARGO DE GOVERNADOR DO ESTADO DE S&Atilde;O PAULO:\n\r\nFa&ccedil;o saber que a Assembleia Legislativa decreta e eu prom",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 1,
+     "text": "Artigo 1&ordm; - Esta lei trata da prote&ccedil;&atilde;o da qualidade do solo contra altera&ccedil;&otilde;es nocivas por contamina&ccedil;&atilde;o, da defini&ccedil;&atilde;o de responsabilidades, da identifica&ccedil;&atilde;o e do cadastramento de &aacute;reas contaminadas e da remedia&ccedil;&atilde;o dessas &aacute;reas de forma a tornar seguros seus usos atual e futuro.\n\r\n \r\n \n\r\n \r\nSe&ccedil;&atilde;o II \r\n \r\nDos Objetivos",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 2,
+     "text": "Artigo 2&ordm; - Constitui objetivo desta lei garantir o uso sustent&aacute;vel do solo, protegendo-o de contamina&ccedil;&otilde;es e prevenindo altera&ccedil;&otilde;es nas suas caracter&iacute;sticas e fun&ccedil;&otilde;es, por meio de:\n\r\n I - medidas para prote&ccedil;&atilde;o da qualidade do solo e das &aacute;guas subterr&acirc;neas;\n\r\n II - medidas preventivas &agrave; gera&ccedil;&atilde;o de &aacute;reas contaminadas;\n\r\n III - procedimentos para identifica&ccedil;&atilde;o de &aacute;reas contaminadas;\n\r\n IV - garantia &agrave; sa&uacute;de e &agrave; seguran&ccedil;a da popula&cced",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 3,
+     "text": "Artigo 3&ordm; - Para efeitos desta lei, s&atilde;o adotadas as seguintes defini&ccedil;&otilde;es:\n\r\n I - &aacute;gua subterr&acirc;nea: &aacute;gua de ocorr&ecirc;ncia natural na zona saturada do subsolo;\n\r\n II - &Aacute;rea Contaminada: &aacute;rea, terreno, local, instala&ccedil;&atilde;o, edifica&ccedil;&atilde;o ou benfeitoria que contenha quantidades ou concentra&ccedil;&otilde;es de mat&eacute;ria em condi&ccedil;&otilde;es que causem ou possam causar danos &agrave; sa&uacute;de humana, ao meio ambiente ou a outro bem a proteger;\n\r\n III - &Aacute;rea Contaminada sob Investiga&ccedil;&a",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 4,
+     "text": "Artigo 4&ordm; - S&atilde;o instrumentos, dentre outros, para a implanta&ccedil;&atilde;o do sistema de prote&ccedil;&atilde;o da qualidade do solo e para o gerenciamento de &aacute;reas contaminadas:\n\r\n I - Cadastro de &Aacute;reas Contaminadas;\n\r\n II - disponibiliza&ccedil;&atilde;o de informa&ccedil;&otilde;es;\n\r\n III - declara&ccedil;&atilde;o de informa&ccedil;&atilde;o volunt&aacute;ria;\n\r\n IV - licenciamento e fiscaliza&ccedil;&atilde;o;\n\r\n V - Plano de Desativa&ccedil;&atilde;o do Empreendimento;\n\r\n VI - Plano Diretor e legisla&ccedil;&atilde;o de uso e ocupa&ccedil;&atilde;o do solo;\n",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 5,
+     "text": "Artigo 5&ordm; - O Cadastro de &Aacute;reas Contaminadas ser&aacute; constitu&iacute;do por informa&ccedil;&otilde;es detalhadas sobre todos os empreendimentos e atividades que:\n\r\n I - sejam potencialmente poluidores;\n\r\n II - no passado abrigaram atividades pass&iacute;veis de provocar qualquer tipo de contamina&ccedil;&atilde;o do solo;\n\r\n III - estejam sob suspeita de estarem contaminados;\n\r\n IV - demais casos pertinentes &agrave; contamina&ccedil;&atilde;o do solo.\n\r\n &sect; 1&ordm; - Para efeito da elabora&ccedil;&atilde;o do Cadastro a que se refere o &ldquo;caput&rdquo; deste artigo, as ",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 6,
+     "text": "Artigo 6&ordm; - Qualquer pessoa f&iacute;sica ou jur&iacute;dica que, por a&ccedil;&atilde;o ou omiss&atilde;o, possa contaminar o solo deve adotar as provid&ecirc;ncias necess&aacute;rias para que n&atilde;o ocorram altera&ccedil;&otilde;es significativas e prejudiciais &agrave;s fun&ccedil;&otilde;es do solo.\n\r \nPar&aacute;grafo &uacute;nico - Para os efeitos desta lei, s&atilde;o consideradas fun&ccedil;&otilde;es do solo:\n\r\n 1 - sustenta&ccedil;&atilde;o da vida e do &ldquo;habitat&rdquo; para pessoas, animais, plantas e organismos do solo;\n\r\n 2 - manuten&ccedil;&atilde;o do ciclo da &aac",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 7,
+     "text": "Artigo 7&ordm; - Os &oacute;rg&atilde;os do Sistema Estadual de Administra&ccedil;&atilde;o da Qualidade Ambiental, Prote&ccedil;&atilde;o, Controle e Desenvolvimento do Meio Ambiente e Uso Adequado dos Recursos Naturais - SEAQUA, institu&iacute;do pela Lei n&ordm; 9.509, de 20 de mar&ccedil;o de 1997 , bem como os demais &oacute;rg&atilde;os ou entidades da Administra&ccedil;&atilde;o P&uacute;blica direta ou indireta, no exerc&iacute;cio das atividades de licenciamento e controle, dever&atilde;o atuar de forma preventiva e corretiva com o objetivo de evitar altera&ccedil;&otilde;es significa",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 8,
+     "text": "Artigo 8&ordm; - A atua&ccedil;&atilde;o dos &oacute;rg&atilde;os do SEAQUA, no que se refere &agrave; prote&ccedil;&atilde;o da qualidade do solo e ao gerenciamento de &aacute;reas contaminadas, ter&aacute; como par&acirc;metros os Valores de Refer&ecirc;ncia de Qualidade, os Valores de Preven&ccedil;&atilde;o e os Valores de Interven&ccedil;&atilde;o, estabelecidos pelo &oacute;rg&atilde;o ambiental estadual.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 9,
+     "text": "Artigo 9&ordm; - Os Valores de Refer&ecirc;ncia de Qualidade ser&atilde;o utilizados para orientar a pol&iacute;tica de preven&ccedil;&atilde;o e controle das fun&ccedil;&otilde;es do solo.\n\r \nPar&aacute;grafo &uacute;nico - Para os efeitos desta lei, o Poder P&uacute;blico dever&aacute; tornar dispon&iacute;veis informa&ccedil;&otilde;es sobre a qualidade do solo e das &aacute;guas subterr&acirc;neas.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 10,
+     "text": "Artigo 10 - Os Valores de Preven&ccedil;&atilde;o ser&atilde;o utilizados para disciplinar a introdu&ccedil;&atilde;o de subst&acirc;ncias no solo.\n\r \nPar&aacute;grafo &uacute;nico - Na hip&oacute;tese de os Valores de Preven&ccedil;&atilde;o serem ultrapassados, a continuidade da atividade ser&aacute; submetida a nova avalia&ccedil;&atilde;o do &oacute;rg&atilde;o ambiental, devendo os respons&aacute;veis legais pela introdu&ccedil;&atilde;o no solo de cargas poluentes proceder ao monitoramento dos impactos decorrentes.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 11,
+     "text": "Artigo 11 - Os Valores de Interven&ccedil;&atilde;o ser&atilde;o utilizados para impedir a continuidade da introdu&ccedil;&atilde;o de cargas poluentes no solo.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 12,
+     "text": "Artigo 12 - O &oacute;rg&atilde;o ambiental competente poder&aacute; exigir do respons&aacute;vel legal por &aacute;rea com fontes potenciais de contamina&ccedil;&atilde;o do solo e das &aacute;guas subterr&acirc;neas a manuten&ccedil;&atilde;o de programa de monitoramento da &aacute;rea e de seu entorno.\n\r\n \r\n \n\r\n \r\nCAP&Iacute;TULO III \r\n \r\nDas &Aacute;reas Contaminadas \r\n \r\n\r\nSe&ccedil;&atilde;o I \r\n \r\nDas Responsabilidades",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 13,
+     "text": "Artigo 13 - S&atilde;o considerados respons&aacute;veis legais e solid&aacute;rios pela preven&ccedil;&atilde;o, identifica&ccedil;&atilde;o e remedia&ccedil;&atilde;o de uma &aacute;rea contaminada:\n\r\n I - o causador da contamina&ccedil;&atilde;o e seus sucessores;\n\r\n II - o propriet&aacute;rio da &aacute;rea;\n\r\n III - o superfici&aacute;rio;\n\r\n IV - o detentor da posse efetiva;\n\r\n V - quem dela se beneficiar direta ou indiretamente.\n\r \nPar&aacute;grafo &uacute;nico - Poder&aacute; ser desconsiderada a pessoa jur&iacute;dica quando sua personalidade for obst&aacute;culo para a identifica&cced",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 14,
+     "text": "Artigo 14 - Havendo perigo &agrave; vida ou &agrave; sa&uacute;de da popula&ccedil;&atilde;o, em decorr&ecirc;ncia da contamina&ccedil;&atilde;o de uma &aacute;rea, o respons&aacute;vel legal dever&aacute; comunicar imediatamente tal fato aos &oacute;rg&atilde;os ambientais e de sa&uacute;de e adotar prontamente as provid&ecirc;ncias necess&aacute;rias para elidir o perigo.\n\r\n &sect; 1&ordm; - Para fins deste artigo, consideram-se perigo &agrave; vida ou &agrave; sa&uacute;de, dentre outras, as seguintes ocorr&ecirc;ncias:\n\r\n 1 - inc&ecirc;ndios;\n\r\n 2 - explos&otilde;es;\n\r\n 3 - epis&oacute;dio",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 15,
+     "text": "Artigo 15 - O respons&aacute;vel legal, ao detectar ind&iacute;cios ou suspeitas de que uma &aacute;rea esteja contaminada, dever&aacute; imediatamente comunicar tal fato aos &oacute;rg&atilde;os ambiental e de sa&uacute;de competentes.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 16,
+     "text": "Artigo 16 - A &aacute;rea ser&aacute; classificada como &Aacute;rea Contaminada sob Investiga&ccedil;&atilde;o quando houver constata&ccedil;&atilde;o da presen&ccedil;a de:\n\r\n I - contaminantes no solo ou na &aacute;gua subterr&acirc;nea em concentra&ccedil;&otilde;es acima dos Valores de Interven&ccedil;&atilde;o;\n\r\n II - produto em fase livre, proveniente da &aacute;rea;\n\r\n III - subst&acirc;ncias, condi&ccedil;&otilde;es ou situa&ccedil;&otilde;es que, de acordo com par&acirc;metros espec&iacute;ficos, possam representar perigo.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 17,
+     "text": "Artigo 17 - O &oacute;rg&atilde;o ambiental competente dever&aacute; adotar os seguintes procedimentos para identifica&ccedil;&atilde;o de &aacute;reas contaminadas:\n\r\n I - manter informa&ccedil;&otilde;es sobre as &aacute;reas com potencial de contamina&ccedil;&atilde;o;\n\r\n II - realizar avalia&ccedil;&atilde;o preliminar da &aacute;rea onde haja ind&iacute;cios de contamina&ccedil;&atilde;o, ou solicitar, do respons&aacute;vel legal, a ado&ccedil;&atilde;o de provid&ecirc;ncias, conforme as prioridades estabelecidas em regulamento;\n\r\n III - exigir do respons&aacute;vel legal a realiza&ccedil",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 18,
+     "text": "Artigo 18 - Classificada a &aacute;rea como &Aacute;rea Contaminada sob Investiga&ccedil;&atilde;o, caber&aacute; ao &oacute;rg&atilde;o ambiental competente:\n\r\n I - providenciar a inclus&atilde;o da &aacute;rea no cadastro de &Aacute;reas Contaminadas;\n\r\n II - notificar os &oacute;rg&atilde;os p&uacute;blicos estaduais envolvidos, em especial o &oacute;rg&atilde;o respons&aacute;vel pela outorga do direito de uso de &aacute;guas subterr&acirc;neas, as Prefeituras Municipais, os Conselhos Municipais de Meio Ambiente respectivos e os demais interessados;\n\r\n III - determinar ao respons&aacute;ve",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 19,
+     "text": "Artigo 19 - Classificada a &aacute;rea como &Aacute;rea Contaminada sob Investiga&ccedil;&atilde;o, os &oacute;rg&atilde;os ambientais e de sa&uacute;de dever&atilde;o implementar programa que garanta &agrave; popula&ccedil;&atilde;o afetada, por meio de seus representantes, o acesso &agrave;s informa&ccedil;&otilde;es dispon&iacute;veis e a participa&ccedil;&atilde;o no processo de avalia&ccedil;&atilde;o e remedia&ccedil;&atilde;o da &aacute;rea.\n\r\n \r\n \n\r\n \r\nSe&ccedil;&atilde;o III \r\n \r\nDa Remedia&ccedil;&atilde;o",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 20,
+     "text": "Artigo 20 - O respons&aacute;vel legal pela &aacute;rea classificada como &Aacute;rea Contaminada sob Investiga&ccedil;&atilde;o dever&aacute; realizar investiga&ccedil;&atilde;o detalhada para conhecimento da extens&atilde;o total da contamina&ccedil;&atilde;o e identifica&ccedil;&atilde;o de todos os receptores de risco.\n\r \nPar&aacute;grafo &uacute;nico - Nos casos em que houver comprometimento de uma fonte de abastecimento de &aacute;gua, o respons&aacute;vel pela contamina&ccedil;&atilde;o dever&aacute; fornecer fonte alternativa de &aacute;gua pot&aacute;vel para abastecimento da popula&c",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 21,
+     "text": "Artigo 21 - A tomada de decis&atilde;o, pelo &oacute;rg&atilde;o ambiental, sobre a interven&ccedil;&atilde;o em uma &Aacute;rea Contaminada sob Investiga&ccedil;&atilde;o ser&aacute; subsidiada por avalia&ccedil;&atilde;o de risco para fins de remedia&ccedil;&atilde;o, a ser executada pelo respons&aacute;vel legal.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 22,
+     "text": "Artigo 22 - A &Aacute;rea Contaminada sob Investiga&ccedil;&atilde;o n&atilde;o pode ter seu uso alterado at&eacute; a conclus&atilde;o das etapas de investiga&ccedil;&atilde;o detalhada e da avalia&ccedil;&atilde;o de risco.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 23,
+     "text": "Artigo 23 - Quando os valores definidos para risco aceit&aacute;vel &agrave; vida, &agrave; sa&uacute;de humana e ao meio ambiente forem ultrapassados, a &aacute;rea ser&aacute; classificada como &Aacute;rea Contaminada, devendo ser promovida sua remedia&ccedil;&atilde;o.\n\r \nPar&aacute;grafo &uacute;nico - Os valores a que se refere o &ldquo;caput&rdquo; deste artigo ser&atilde;o definidos em conjunto entre a Secretaria do Meio Ambiente e a Secretaria da Sa&uacute;de, por meio de ato espec&iacute;fico, ouvido o Conselho Estadual de Meio Ambiente - CONSEMA.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 24,
+     "text": "Artigo 24 - Classificada a &aacute;rea como &Aacute;rea Contaminada, o &oacute;rg&atilde;o ambiental competente adotar&aacute; as seguintes provid&ecirc;ncias:\n\r\n I - cadastrar a &aacute;rea no Cadastro de &Aacute;reas Contaminadas como uma &Aacute;rea Contaminada;\n\r\n II - informar os &oacute;rg&atilde;os de sa&uacute;de, quando houver riscos &agrave; sa&uacute;de humana;\n\r\n III - determinar ao respons&aacute;vel legal pela &aacute;rea contaminada que proceda, no prazo de at&eacute; 5 (cinco) dias, &agrave; averba&ccedil;&atilde;o da informa&ccedil;&atilde;o da contamina&ccedil;&atilde;o da &a",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 25,
+     "text": "Artigo 25 - O respons&aacute;vel legal pela &aacute;rea contaminada dever&aacute; apresentar Plano de Remedia&ccedil;&atilde;o que contenha um cronograma das fases e respectivos prazos para a sua implementa&ccedil;&atilde;o, devendo submet&ecirc;-lo &agrave; aprova&ccedil;&atilde;o do &oacute;rg&atilde;o ambiental competente.\n\r\n &sect; 1&ordm; - A implementa&ccedil;&atilde;o do Plano de Remedia&ccedil;&atilde;o ser&aacute; acompanhada pelo Poder P&uacute;blico.\n\r\n &sect; 2&ordm; - O respons&aacute;vel legal pela &aacute;rea contaminada dever&aacute; apresentar uma das garantias previstas nos i",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 26,
+     "text": "Artigo 26 - A &aacute;rea contaminada ser&aacute; classificada como &Aacute;rea Remediada para o Uso Declarado quando for restabelecido n&iacute;vel de risco aceit&aacute;vel para o uso declarado.\n\r \nPar&aacute;grafo &uacute;nico - Na classifica&ccedil;&atilde;o a que se refere o &ldquo;caput&rdquo; deste artigo, dever&aacute; sempre ser respeitada a legisla&ccedil;&atilde;o de uso e ocupa&ccedil;&atilde;o do solo.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 27,
+     "text": "Artigo 27 - Classificada a &aacute;rea como &Aacute;rea Remediada para o Uso Declarado, o &oacute;rg&atilde;o ambiental competente dever&aacute;:\n\r\n I - cadastrar a &aacute;rea no Cadastro de &Aacute;reas Contaminadas como &Aacute;rea Remediada para o Uso Declarado;\n\r\n II - determinar ao respons&aacute;vel legal pela &aacute;rea contaminada que proceda, no prazo de at&eacute; 5 (cinco) dias, &agrave; averba&ccedil;&atilde;o, na respectiva matr&iacute;cula imobili&aacute;ria, da informa&ccedil;&atilde;o quanto &agrave; contamina&ccedil;&atilde;o da &aacute;rea;\n\r\n III - notificar os &oacute;rg&",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 28,
+     "text": "Artigo 28 - Para a altera&ccedil;&atilde;o do uso ou ocupa&ccedil;&atilde;o de uma &Aacute;rea Remediada para o Uso Declarado, dever&aacute; ser efetuada pelo respons&aacute;vel nova avalia&ccedil;&atilde;o de risco para o uso pretendido, a qual ser&aacute; submetida &agrave; aprova&ccedil;&atilde;o do &oacute;rg&atilde;o ambiental competente.\n\r \nPar&aacute;grafo &uacute;nico - O novo uso autorizado para a &aacute;rea remediada dever&aacute; atender &agrave; legisla&ccedil;&atilde;o de uso e ocupa&ccedil;&atilde;o do solo e ser&aacute; averbado pelo Cart&oacute;rio de Registro de Im&oacute;vei",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 29,
+     "text": "Artigo 29 - Os respons&aacute;veis legais por empreendimentos sujeitos ao licenciamento ambiental e potenciais geradores de contamina&ccedil;&atilde;o, a serem total ou parcialmente desativados ou desocupados, dever&atilde;o comunicar a suspens&atilde;o ou o encerramento das atividades aos &oacute;rg&atilde;os do SEAQUA.\n\r\n &sect; 1&ordm; - A comunica&ccedil;&atilde;o a que se refere o &ldquo;caput&rdquo; deste artigo dever&aacute; ser acompanhada de Plano de Desativa&ccedil;&atilde;o do Empreendimento que contemple a situa&ccedil;&atilde;o ambiental existente, em especial quanto &agrave; poss",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 30,
+     "text": "Artigo 30 - Fica criado o Fundo Estadual para Preven&ccedil;&atilde;o e Remedia&ccedil;&atilde;o de &Aacute;reas Contaminadas - FEPRAC, fundo de investimento vinculado &agrave; Secretaria do Meio Ambiente e destinado &agrave; prote&ccedil;&atilde;o do solo contra altera&ccedil;&otilde;es prejudiciais &agrave;s suas fun&ccedil;&otilde;es, bem como &agrave; identifica&ccedil;&atilde;o e &agrave; remedia&ccedil;&atilde;o de &aacute;reas contaminadas.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 31,
+     "text": "Artigo 31 - Constituem receitas do FEPRAC:\n\r\n I - dota&ccedil;&otilde;es ou cr&eacute;ditos espec&iacute;ficos, consignados no or&ccedil;amento do Estado;\n\r\n II - transfer&ecirc;ncias de outros fundos estaduais ou de suas subcontas, cujos recursos se destinem &agrave; execu&ccedil;&atilde;o de projetos, planos, programas, atividades e a&ccedil;&otilde;es relacionados com a preven&ccedil;&atilde;o e o controle da polui&ccedil;&atilde;o, de interesse comum;\n\r\n III - transfer&ecirc;ncia da Uni&atilde;o, dos Estados e dos Munic&iacute;pios para a execu&ccedil;&atilde;o de planos, programas, ativid",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 32,
+     "text": "Artigo 32 - Os recursos de que trata o artigo 31, ser&atilde;o aplicados em opera&ccedil;&otilde;es financeiras destinadas a apoiar e a incentivar a execu&ccedil;&atilde;o de a&ccedil;&otilde;es relacionadas com a identifica&ccedil;&atilde;o e remedia&ccedil;&atilde;o de &aacute;reas contaminadas.\n\r\n &sect; 1&ordm; - Os recursos do FEPRAC poder&atilde;o ser aplicados a fundo perdido, quando o tomador for o Estado e os recursos forem utilizados visando &agrave; interven&ccedil;&atilde;o em &aacute;rea contaminada, para remo&ccedil;&atilde;o de perigo iminente &agrave; sa&uacute;de p&uacute;blic",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 33,
+     "text": "Artigo 33 - O FEPRAC ter&aacute; Conselho de Orienta&ccedil;&atilde;o composto paritariamente por representantes do Estado, Munic&iacute;pios e Sociedade Civil, com 8 (oito) membros titulares e 8 (oito) membros suplentes de cada um dos segmentos.\n\r\n &sect; 1&ordm; - As fun&ccedil;&otilde;es de Conselheiro n&atilde;o ser&atilde;o remuneradas, devendo ser consideradas de interesse p&uacute;blico relevante.\n\r\n &sect; 2&ordm; - O Conselho poder&aacute; solicitar a &oacute;rg&atilde;os e entidades p&uacute;blicos e privados pareceres de m&eacute;rito sobre a viabilidade t&eacute;cnica dos planos, p",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 34,
+     "text": "Artigo 34 - Compete ao Conselho de Orienta&ccedil;&atilde;o do FEPRAC:\n\r\n I - orientar e aprovar a capta&ccedil;&atilde;o e a aplica&ccedil;&atilde;o dos recursos do Fundo;\n\r\n II - aprovar normas, crit&eacute;rios, prioridades e programas para a aplica&ccedil;&atilde;o dos recursos do Fundo, fixando seus respectivos limites;\n\r\n III - aprovar os crit&eacute;rios para verifica&ccedil;&atilde;o da viabilidade t&eacute;cnica, econ&ocirc;mica e financeira dos projetos;\n\r\n IV - aprovar o or&ccedil;amento de aplica&ccedil;&atilde;o dos recursos do Fundo;\n\r\n V - elaborar o seu regimento interno;\n\r\n VI",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 35,
+     "text": "Artigo 35 - A CETESB - Companhia Ambiental do Estado de S&atilde;o Paulo exercer&aacute; as fun&ccedil;&otilde;es de agente t&eacute;cnico e de secretaria executiva do FEPRAC, disponibilizando todo o suporte t&eacute;cnico-administrativo necess&aacute;rio ao seu funcionamento, mediante solicita&ccedil;&atilde;o do Conselho de Orienta&ccedil;&atilde;o, sem preju&iacute;zo do exerc&iacute;cio das demais atribui&ccedil;&otilde;es previstas em lei.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 36,
+     "text": "Artigo 36 - O Banco Nossa Caixa S.A. ser&aacute; o Agente Financeiro do FEPRAC e atuar&aacute; como mandat&aacute;rio do Estado, em conformidade com o estabelecido nas normas legais e nas delibera&ccedil;&otilde;es do Conselho de Orienta&ccedil;&atilde;o.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 37,
+     "text": "Artigo 37 - O FEPRAC reger-se-&aacute; pelas normas do Decreto-lei Complementar n&ordm; 18, de 17 de abril de 1970 , e altera&ccedil;&otilde;es posteriores.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 38,
+     "text": "Artigo 38 - O dirigente da Unidade de Despesa &agrave; qual se encontra vinculado o Fundo submeter&aacute;, anualmente, &agrave; aprecia&ccedil;&atilde;o do Secret&aacute;rio do Meio Ambiente e do CONSEMA, o relat&oacute;rio das atividades desenvolvidas.\n\r \nPar&aacute;grafo &uacute;nico - O relat&oacute;rio das atividades de que trata este artigo dever&aacute; ser encaminhado &agrave;s Comiss&otilde;es de Fiscaliza&ccedil;&atilde;o e Controle e de Defesa do Meio Ambiente da Assembl&eacute;ia Legislativa do Estado.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 39,
+     "text": "Artigo 39 - Dever&aacute; ser publicado, trimestralmente, no Di&aacute;rio Oficial do Estado, o relat&oacute;rio financeiro do Fundo.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 40,
+     "text": "Artigo 40 - Para atender &agrave;s despesas decorrentes da aplica&ccedil;&atilde;o desta lei, fica o Poder Executivo autorizado a:\n\r\n I - efetuar as transfer&ecirc;ncias a que se refere o artigo 31, inciso II, desta lei;\n\r\n II - abrir cr&eacute;ditos adicionais especiais at&eacute; o limite de R$ 100,00 (cem reais), incluindo as classifica&ccedil;&otilde;es or&ccedil;ament&aacute;rias que se fizerem necess&aacute;rias.\n\r\n \r\n \n\r\n \r\nCAP&Iacute;TULO V \r\n \r\nDas Infra&ccedil;&otilde;es e Penalidades",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 41,
+     "text": "Artigo 41 - Toda a&ccedil;&atilde;o ou omiss&atilde;o contr&aacute;ria &agrave;s disposi&ccedil;&otilde;es desta lei e seu regulamento ser&aacute; considerada infra&ccedil;&atilde;o administrativa ambiental classificada em leve, grave ou grav&iacute;ssima, levando-se em conta:\n\r\n I - a intensidade do dano, efetivo ou potencial;\n\r\n II - as circunst&acirc;ncias atenuantes ou agravantes;\n\r\n III - os antecedentes do infrator.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 42,
+     "text": "Artigo 42 - As infra&ccedil;&otilde;es administrativas ambientais de que trata o artigo 41 ser&atilde;o punidas com as seguintes penalidades:\n\r\n I - advert&ecirc;ncia;\n\r\n II - multa;\n\r\n III - embargo;\n\r\n IV - demoli&ccedil;&atilde;o;\n\r\n V - suspens&atilde;o de financiamento e benef&iacute;cios fiscais.\n\r\n &sect; 1&ordm; - A penalidade de advert&ecirc;ncia ser&aacute; imposta quando se tratar de primeira infra&ccedil;&atilde;o pelo descumprimento das exig&ecirc;ncias t&eacute;cnicas formuladas pelo &oacute;rg&atilde;o ambiental competente, em qualquer fase do processo de remedia&ccedil;&atilde;",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 43,
+     "text": "Artigo 43 - As infra&ccedil;&otilde;es administrativas ambientais ser&atilde;o objeto de auto de infra&ccedil;&atilde;o a ser lavrado pela autoridade competente, e ser&atilde;o apuradas em processo administrativo pr&oacute;prio, assegurado o direito de ampla defesa e o contradit&oacute;rio, observadas as disposi&ccedil;&otilde;es desta lei e seu regulamento.\n\r\n &sect; 1&ordm; - Responder&aacute; pela infra&ccedil;&atilde;o quem por qualquer modo a cometer, concorrer para sua pr&aacute;tica ou dela se beneficiar.\n\r\n &sect; 2&ordm; - Tratando-se de &aacute;rea contaminada que acarrete perigo imi",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 44,
+     "text": "Artigo 44 - Da aplica&ccedil;&atilde;o das penalidades administrativas previstas nesta lei caber&aacute; recurso &agrave; autoridade imediatamente superior, no prazo de 20 (vinte) dias contados da data do auto de infra&ccedil;&atilde;o, ouvida a autoridade recorrida, que poder&aacute; reconsiderar sua decis&atilde;o, justificando-a.\n\r\n \r\n \n\r\n \r\nCAP&Iacute;TULO VI \r\n \r\nDas Disposi&ccedil;&otilde;es Finais",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 45,
+     "text": "Artigo 45 - O &oacute;rg&atilde;o competente do SEAQUA poder&aacute; estabelecer procedimentos diferenciados para a identifica&ccedil;&atilde;o e remedia&ccedil;&atilde;o das &aacute;reas contaminadas, aglutinando etapas, em fun&ccedil;&atilde;o das peculiaridades da atividade ou do empreendimento ou da extens&atilde;o da contamina&ccedil;&atilde;o, desde que garantidos os princ&iacute;pios e finalidades estabelecidos nesta lei.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 46,
+     "text": "Artigo 46 - vetado.\n\r \nPar&aacute;grafo &uacute;nico - vetado.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 47,
+     "text": "Artigo 47 - O licenciamento de empreendimentos em &aacute;reas que anteriormente abrigaram atividades com potencial de contamina&ccedil;&atilde;o, ou suspeitas de estarem contaminadas, dever&aacute; ser precedido de estudo de passivo ambiental, submetido previamente ao &oacute;rg&atilde;o ambiental competente.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 48,
+     "text": "Artigo 48 - Os Planos Diretores Municipais e respectiva legisla&ccedil;&atilde;o de uso e ocupa&ccedil;&atilde;o do solo sempre dever&atilde;o levar em conta as &aacute;reas com potencial ou suspeita de contamina&ccedil;&atilde;o e as &aacute;reas contaminadas.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 49,
+     "text": "Artigo 49 - A aprova&ccedil;&atilde;o de projetos de parcelamento do solo e de edifica&ccedil;&atilde;o, pelo Poder P&uacute;blico, dever&aacute; garantir o uso seguro das &aacute;reas com potencial ou suspeita de contamina&ccedil;&atilde;o e das &aacute;reas contaminadas.",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 50,
+     "text": "Artigo 50 - A Secretaria do Meio Ambiente e a Secretaria da Sa&uacute;de dever&atilde;o estabelecer procedimentos e rotinas comuns para a&ccedil;&otilde;es conjuntas visando prevenir a forma&ccedil;&atilde;o de &aacute;reas contaminadas, bem como identificar e remediar as j&aacute; existentes.\n\r \nPar&aacute;grafo &uacute;nico - Fica estabelecido como documento de refer&ecirc;ncia para a defini&ccedil;&atilde;o de prioridades de a&ccedil;&otilde;es integradas entre a Secretaria do Meio Ambiente e a Secretaria da Sa&uacute;de o Cadastro de &Aacute;reas Contaminadas, previsto no artigo 4&ordm;, i",
+     "verdict": "",
+     "note": ""
+    },
+    {
+     "block_index": 51,
+     "text": "Artigo 51 - Esta lei entra em vigor na data de sua publica&ccedil;&atilde;o.\n\r\nPal&aacute;cio dos Bandeirantes, 8 de julho de 2009\n\r\nALBERTO GOLDMAN\n\r\nFrancisco Graziano Neto\n\r\nSecret&aacute;rio do Meio Ambiente\n\r\nDilma Seli Pena\n\r\nSecret&aacute;ria de Saneamento e Energia\n\r\nGeraldo Alckmin\n\r\nSecret&aacute;rio de Desenvolvimento\n\r\nMauro Ricardo Machado Costa\n\r\nSecret&aacute;rio da Fazenda\n\r\nFrancisco Vidal Luna\n\r\nSecret&aacute;rio de Economia e Planejamento\n\r\nAloysio Nunes Ferreira Filho\n\r\nSecret&aacute;rio-Chefe da Casa Civil\n\r\nPublicada na Assessoria T&eacute;cnico-Legislativa, aos 8 de julh",
+     "verdict": "",
+     "note": ""
+    }
+   ]
+  }
+ ]
+}

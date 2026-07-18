@@ -1,0 +1,50 @@
+{
+ "rule_id": "BR-SP-DAT-001",
+ "pack_id": "brazil_new_energy",
+ "version": "0.1.0",
+ "title_zh": "LGPD 适用范围与处理合法性基础",
+ "title_pt": "Aplicação da LGPD e bases legais",
+ "legal_sources": [
+  {
+   "citation_id": "urn:lex:br:federal:lei:2018-08-14;13709",
+   "urn": "urn:lex:br:federal:lei:2018-08-14;13709",
+   "article": "arts. 1º-3º, 7º",
+   "label": "Lei 13.709/2018 (LGPD)"
+  }
+ ],
+ "elements": [
+  {
+   "element_id": "personal_data",
+   "description_zh": "在巴西境内处理个人数据（含雇员数据）",
+   "description_pt": "tratamento de dados pessoais no Brasil",
+   "fact_fields": [
+    "employee_count",
+    "description"
+   ]
+  }
+ ],
+ "exceptions": [
+  "纯匿名化数据处理"
+ ],
+ "consequences": [
+  "违规处理：警告、罚款（最高营业额2%）、处理活动中止"
+ ],
+ "red_flags": [
+  {
+   "flag_id": "RF-DAT-001a",
+   "condition_zh": "涉跨境传输雇员/客户数据且无合法性基础安排",
+   "severity": "medium"
+  }
+ ],
+ "certification_status": "provisional",
+ "production_tracks": {
+  "forward_done": true,
+  "reverse_done": false,
+  "divergence_types": []
+ },
+ "checklist_codes": [
+  "DAT-001",
+  "DAT-002"
+ ],
+ "notes": "provisional：待巴西法律研究者核验（见 docs/recruitment/）。"
+}

@@ -33,6 +33,16 @@ const settings = ref<LlmSettings>({
 const apiKeyInput = ref('')
 const enabledToggle = ref(true)
 
+type TaskModelKey = keyof LlmSettings['task_models']
+
+const taskModelLabels: Record<TaskModelKey, string> = {
+  extract: '材料抽取',
+  issue_id: '议题识别',
+  gap: '缺口说明',
+  red_team: 'Red Team',
+  polish: '简报润色',
+}
+
 const providerOptions = [
   { id: 'qwen', label: '通义千问 (Qwen)' },
   { id: 'deepseek', label: 'DeepSeek' },
@@ -154,15 +164,9 @@ async function runTest() {
       <details class="task-models-details">
         <summary>按任务选模型（高级，留空则用默认 model）</summary>
         <div class="task-models-grid">
-          <label v-for="(label, key) in {
-            extract: '材料抽取',
-            issue_id: '议题识别',
-            gap: '缺口说明',
-            red_team: 'Red Team',
-            polish: '简报润色',
-          }" :key="key">
+          <label v-for="(label, key) in taskModelLabels" :key="key">
             {{ label }}
-            <input v-model="settings.task_models[key as keyof typeof settings.task_models]" type="text" />
+            <input v-model="settings.task_models[key as TaskModelKey]" type="text" />
           </label>
         </div>
       </details>

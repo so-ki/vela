@@ -420,25 +420,25 @@ async function nextStep() {
         >
           <label class="upload-label">
             <span class="upload-title">
-              {{ current.upload_field.label }}
+              {{ current.upload_field!.label }}
               <span v-if="uploadRequired(current)" class="req-tag">必传</span>
             </span>
-            <span class="upload-hint">{{ current.upload_field.hint }}</span>
+            <span class="upload-hint">{{ current.upload_field!.hint }}</span>
             <input
               type="file"
-              :accept="current.upload_field.accept || '.docx,.pdf,.txt,.md'"
-              :disabled="uploadBusy[current.upload_field.purpose]"
+              :accept="current.upload_field!.accept || '.docx,.pdf,.txt,.md'"
+              :disabled="uploadBusy[current.upload_field!.purpose]"
               @change="onUploadChange($event, current.upload_field!)"
             />
-            <span v-if="uploadBusy[current.upload_field.purpose]" class="upload-status">正在上传并解析…</span>
-            <span v-else-if="uploadFiles[current.upload_field.purpose]" class="upload-file">
-              已上传：{{ uploadFiles[current.upload_field.purpose] }}
+            <span v-if="uploadBusy[current.upload_field!.purpose]" class="upload-status">正在上传并解析…</span>
+            <span v-else-if="uploadFiles[current.upload_field!.purpose]" class="upload-file">
+              已上传：{{ uploadFiles[current.upload_field!.purpose] }}
             </span>
-            <p v-if="uploadPreview[current.upload_field.purpose]" class="upload-preview muted">
-              解析预览：{{ uploadPreview[current.upload_field.purpose] }}
+            <p v-if="uploadPreview[current.upload_field!.purpose]" class="upload-preview muted">
+              解析预览：{{ uploadPreview[current.upload_field!.purpose] }}
             </p>
-            <p v-if="uploadErrors[current.upload_field.purpose]" class="upload-error">
-              {{ uploadErrors[current.upload_field.purpose] }}
+            <p v-if="uploadErrors[current.upload_field!.purpose]" class="upload-error">
+              {{ uploadErrors[current.upload_field!.purpose] }}
             </p>
           </label>
         </div>

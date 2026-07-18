@@ -1,0 +1,57 @@
+{
+ "rule_id": "BR-SP-TAX-001",
+ "pack_id": "brazil_new_energy",
+ "version": "0.1.0",
+ "title_zh": "ICMS 州税登记与纳税义务",
+ "title_pt": "Inscrição estadual e ICMS",
+ "legal_sources": [
+  {
+   "citation_id": "urn:lex:br:federal:lei.complementar:1996-09-13;87",
+   "urn": "urn:lex:br:federal:lei.complementar:1996-09-13;87",
+   "article": "arts. 1º-2º",
+   "label": "Lei Complementar 87/1996 (Lei Kandir)"
+  }
+ ],
+ "elements": [
+  {
+   "element_id": "goods_circulation",
+   "description_zh": "存在货物流转/生产销售行为（制造+销售触发 ICMS）",
+   "description_pt": "circulação de mercadorias",
+   "fact_fields": [
+    "project_content_scale",
+    "description"
+   ]
+  },
+  {
+   "element_id": "state_registration",
+   "description_zh": "在圣保罗州完成州税登记（inscrição estadual）",
+   "description_pt": "inscrição estadual em SP",
+   "fact_fields": [
+    "investment_destination"
+   ]
+  }
+ ],
+ "exceptions": [
+  "出口销售免 ICMS（LC 87/1996 art. 3º II）"
+ ],
+ "consequences": [
+  "未登记经营：补税+罚息，发票开具受阻直接冻结销售"
+ ],
+ "red_flags": [
+  {
+   "flag_id": "RF-TAX-001a",
+   "condition_zh": "投产时间表早于税务登记可完成时点",
+   "severity": "medium"
+  }
+ ],
+ "certification_status": "provisional",
+ "production_tracks": {
+  "forward_done": true,
+  "reverse_done": false,
+  "divergence_types": []
+ },
+ "checklist_codes": [
+  "TAX-002"
+ ],
+ "notes": "provisional：待巴西法律研究者核验（见 docs/recruitment/）。"
+}

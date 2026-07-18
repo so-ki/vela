@@ -342,6 +342,10 @@ class ScenarioResponse(BaseModel):
     red_team: Optional[dict] = None
     unverified_facts: List[dict] = Field(default_factory=list)
     agent_steps: List[dict] = Field(default_factory=list)
+    answerability: Optional[dict] = None
+    claims: Optional[dict] = None
+    coverage: Optional[dict] = None
+    material_ledger: Optional[list] = None
 
     model_config = {"from_attributes": True}
 

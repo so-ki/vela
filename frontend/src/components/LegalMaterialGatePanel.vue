@@ -20,7 +20,6 @@ const retrievalTopK = ref(3)
 const submitting = ref(false)
 const error = ref<string | null>(null)
 const dimensionsLocked = ref(false)
-const legalHitsExpanded = ref<Record<string, boolean>>({})
 
 let generateTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -29,20 +28,6 @@ const materialFindings = computed(() => props.scenario.material_scope_findings ?
 const issueSuggestions = computed(() => props.scenario.issue_suggestions ?? [])
 const unverifiedFacts = computed(() => props.scenario.unverified_facts ?? [])
 const docConflicts = computed(() => props.scenario.document_extract?.field_conflicts ?? [])
-
-const gapSummary = computed(() => {
-  const adequacy = props.scenario.investigation_adequacy
-  if (adequacy?.gap_summary) return adequacy.gap_summary
-  const missing = materialFindings.value.filter((f) => f.risk === 'RED').length
-  const yellow = materialFindings.value.filter((f) => f.risk === 'YELLOW').length
-  return {
-    missing_count: missing,
-    at_risk_count: yellow,
-    s2_count: 0,
-    s3_count: 0,
-    zero_hit_count: 0,
-  }
-})
 
 async function downloadArchivedFile(storedName: string, filename: string) {
   await downloadScenarioMaterialFile(props.scenario.id, storedName, filename)
@@ -151,9 +136,6 @@ async function generatePack() {
   }
 }
 
-function toggleLegalHits(code: string) {
-  legalHitsExpanded.value = { ...legalHitsExpanded.value, [code]: !legalHitsExpanded.value[code] }
-}
 </script>
 
 <template>
@@ -217,7 +199,7 @@ function toggleLegalHits(code: string) {
       <strong>材料冲突</strong>
       <ul>
         <li v-for="c in docConflicts" :key="c.field">
-          {{ c.field }}：{{ c.values?.map((v: { value: string }) => v.value).join(' / ') }}
+          {{ c.label || c.field }}：{{ c.sources.map((s) => s.value).join(' / ') }}
         </li>
       </ul>
     </div>

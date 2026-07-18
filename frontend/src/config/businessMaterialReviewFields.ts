@@ -432,7 +432,7 @@ export function reviewFieldsForDimensions(
   return allFields.filter((field) => keys.has(field.key))
 }
 
-export function isReviewFieldEmpty(key: string, value: unknown, field?: ReviewFieldDef): boolean {
+export function isReviewFieldEmpty(_key: string, value: unknown, field?: ReviewFieldDef): boolean {
   if (value === null || value === undefined) return true
   if (typeof value === 'string') {
     const trimmed = value.trim()

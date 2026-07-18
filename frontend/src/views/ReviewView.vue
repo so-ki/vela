@@ -18,6 +18,7 @@ import {
 } from '@/api/client'
 import LegalMaterialGatePanel from '@/components/LegalMaterialGatePanel.vue'
 import InvestigationAdequacyPanel from '@/components/InvestigationAdequacyPanel.vue'
+import MechanismPanel from '@/components/MechanismPanel.vue'
 import { useAuthStore } from '@/stores/auth'
 import type { BriefItem, LegalHit, ReviewItem, ReviewState, RiskBrief, RulesCatalog, Scenario } from '@/types/scenario'
 
@@ -366,8 +367,9 @@ async function runFinalize() {
   finalizing.value = true
   error.value = null
   try {
-    review.value = await finalizeReview(scenario.value.id)
-    scenario.value.status = `review_${review.value.status}`
+    const finalized = await finalizeReview(scenario.value.id)
+    review.value = finalized
+    scenario.value.status = `review_${finalized.status}`
   } catch (e: unknown) {
     error.value = extractError(e)
   } finally {
@@ -477,7 +479,9 @@ async function ensureInlineSnippet(code: string) {
     if (!briefCache.value) {
       briefCache.value = await fetchBrief(scenario.value.id)
     }
-    const match = findBriefItem(briefCache.value, code)
+    const cachedBrief = briefCache.value
+    if (!cachedBrief) return
+    const match = findBriefItem(cachedBrief, code)
     if (!match) {
       snippetErrors.value = {
         ...snippetErrors.value,
@@ -620,6 +624,8 @@ function openFullBrief(code: string) {
         :incremental-regen="scenario.incremental_regen"
         @materials-returned="onMaterialsReturned"
       />
+
+      <MechanismPanel :scenario="scenario" />
 
       <section v-if="scenario.gap_explanations?.items?.length" class="panel gap-explanations-section">
         <h2>缺口说明 / 待办问题（只读）</h2>

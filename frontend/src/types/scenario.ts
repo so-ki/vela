@@ -149,6 +149,8 @@ export interface LegalHit {
   vector_similarity: number
   keyword_overlap: number
   requires_review: boolean
+  citation_status?: string
+  grounding_score?: number
 }
 
 export interface ChecklistItem {
@@ -239,6 +241,84 @@ export interface Scenario {
   red_team?: RedTeamResult | null
   unverified_facts?: UnverifiedFact[]
   agent_steps?: AgentStep[]
+  answerability?: Answerability | null
+  claims?: ClaimsProjection | null
+  coverage?: CoverageProjection | null
+  material_ledger?: MaterialLedgerBlock[] | null
+}
+
+export interface Answerability {
+  answerable: boolean
+  reason_code?: string | null
+  message?: string | null
+  degraded_mode?: boolean
+  signals?: {
+    grounding_rate?: number | null
+    hard_blocked_codes?: string[]
+    is_investigation_ready?: boolean | null
+  }
+}
+
+export interface ClaimItem {
+  claim_id: string
+  code: string
+  verdict: 'supported' | 'needs_review' | 'blocked' | 'unanswerable' | string
+  verdict_reason?: string | null
+  evidence_count: number
+  verified_fact_count: number
+}
+
+export interface ClaimsProjection {
+  items: ClaimItem[]
+  summary: {
+    total: number
+    by_verdict: Record<string, number>
+    unsupported: number
+  }
+}
+
+export interface CoverageTask {
+  task_id: string | number
+  kind: string
+  origin: string
+  dimension?: string | null
+  element_id?: string | null
+  checklist_code?: string | null
+  status: string
+}
+
+export interface CoverageProof {
+  proof_id: string | number
+  denominator_source: string
+  denominator_count: number
+  covered_count: number
+  open_count: number
+  proof_hash: string
+  generated_at?: string | null
+}
+
+export interface CoverageProjection {
+  tasks: CoverageTask[]
+  open_count: number
+  proof: CoverageProof | null
+}
+
+export interface MaterialLedgerBlock {
+  block_id: string | number
+  block_uid: string
+  kind: 'file' | 'field_set' | 'extract_snapshot' | string
+  filename?: string | null
+  state:
+    | 'raw_archived'
+    | 'extracted'
+    | 'verified'
+    | 'unverified'
+    | 'in_use'
+    | 'returned'
+    | 'superseded'
+    | string
+  content_hash?: string | null
+  updated_at?: string | null
 }
 
 export interface MaterialScopeFinding {
@@ -475,6 +555,8 @@ export interface DocumentExtractSnapshot {
   facts: Array<{ field: string; value: string; source_snippet?: string | null; source_filename?: string | null }>
   disclaimer?: string
   llm_skipped?: string | null
+  scan_or_empty?: boolean
+  extraction_warning?: string | null
   field_conflicts?: ExtractFieldConflict[]
   archived_files?: Array<{
     id: string
@@ -624,6 +706,8 @@ export interface BriefCitation {
   url: string
   match_score: number
   requires_review: boolean
+  citation_status?: string
+  grounding_score?: number
 }
 
 export interface BriefItem {

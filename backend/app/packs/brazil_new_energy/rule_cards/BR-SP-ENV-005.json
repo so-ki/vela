@@ -1,0 +1,49 @@
+{
+ "rule_id": "BR-SP-ENV-005",
+ "pack_id": "brazil_new_energy",
+ "version": "0.1.0",
+ "title_zh": "取排水须取得水资源使用许可（outorga）",
+ "title_pt": "Uso de recursos hídricos exige outorga",
+ "legal_sources": [
+  {
+   "citation_id": "urn:lex:br;sao.paulo:estadual:lei:1991-12-30;7663",
+   "urn": "urn:lex:br;sao.paulo:estadual:lei:1991-12-30;7663",
+   "article": "arts. 9º-13",
+   "label": "Lei 7.663/1991 (SP)"
+  }
+ ],
+ "elements": [
+  {
+   "element_id": "water_use",
+   "description_zh": "生产工艺需取用地表/地下水或向水体排放",
+   "description_pt": "captação ou lançamento em corpos hídricos",
+   "fact_fields": [
+    "description",
+    "capacity_notes"
+   ]
+  }
+ ],
+ "exceptions": [
+  "无实质取排水的用水（市政供水且排入市政管网）通常豁免单独 outorga"
+ ],
+ "consequences": [
+  "无证取排水：行政处罚并可致环境许可受阻"
+ ],
+ "red_flags": [
+  {
+   "flag_id": "RF-ENV-005a",
+   "condition_zh": "高耗水工艺（电池/电镀/冷却）无取水许可安排",
+   "severity": "medium"
+  }
+ ],
+ "certification_status": "provisional",
+ "production_tracks": {
+  "forward_done": true,
+  "reverse_done": false,
+  "divergence_types": []
+ },
+ "checklist_codes": [
+  "ENV-004"
+ ],
+ "notes": "provisional：待巴西法律研究者核验（见 docs/recruitment/）。"
+}

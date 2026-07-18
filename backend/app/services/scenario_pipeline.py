@@ -258,6 +258,51 @@ def run_generate_investigation_pack(
     if draft_history:
         checklist_payload["investigation_draft_history"] = draft_history
 
+    refused_decision = None
+    try:
+        from app.core.statuses import MaterialBlockState
+        from app.services.answerability_gate import assess_answerability
+        from app.services.claim_compiler import claims_summary, compile_claims
+        from app.services.coverage_service import (
+            build_scenario_proof,
+            coverage_projection,
+            sync_tasks_from_payload,
+        )
+        from app.services.material_ledger_service import bulk_transition, ledger_projection
+
+        claim_projs = compile_claims(db, scenario.id, checklist_payload.get("brief") or {})
+        checklist_payload["claims"] = {
+            "items": claim_projs,
+            "summary": claims_summary(claim_projs),
+        }
+        sync_tasks_from_payload(db, scenario.id, checklist_payload)
+        build_scenario_proof(db, scenario.id, checklist_payload, claim_projections=claim_projs)
+        checklist_payload["coverage"] = coverage_projection(db, scenario.id)
+        decision = assess_answerability(
+            pack_resolved=True,
+            grounding_report=checklist_payload.get("grounding_report"),
+            tier_report=checklist_payload.get("tier_report"),
+            adequacy=checklist_payload.get("investigation_adequacy"),
+        )
+        checklist_payload["answerability"] = decision.as_dict()
+        if not decision.answerable:
+            refused_decision = decision
+        bulk_transition(
+            db,
+            scenario.id,
+            MaterialBlockState.IN_USE,
+            actor_user_id=user.id,
+            reason="investigation pack generated",
+        )
+        checklist_payload["material_ledger"] = ledger_projection(db, scenario.id)
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "mechanism layer attach failed for scenario %s", scenario.id
+        )
+        checklist_payload["mechanism_error"] = True
+
     record_match_threshold_choice(user.id, match_threshold)
     effective_top_k = int((checklist_payload.get("investigation_settings") or {}).get("retrieval_top_k") or retrieval_top_k or 3)
     record_retrieval_top_k_choice(user.id, effective_top_k)
@@ -294,6 +339,15 @@ def run_generate_investigation_pack(
             f"{mode_note}"
         ),
     )
+    if refused_decision is not None:
+        write_audit_log(
+            db,
+            user=user,
+            action="answerability.refused",
+            resource_type="scenario",
+            resource_id=str(scenario.id),
+            detail=f"{refused_decision.reason_code}: {refused_decision.message}",
+        )
     return scenario
 
 
@@ -457,6 +511,25 @@ def run_return_materials(
     payload.pop("legal_retrieved", None)
     payload.pop("selected_dimensions", None)
 
+    try:
+        from app.core.statuses import MaterialBlockState
+        from app.services.material_ledger_service import bulk_transition, ledger_projection
+
+        bulk_transition(
+            db,
+            scenario.id,
+            MaterialBlockState.RETURNED,
+            actor_user_id=user.id,
+            reason="materials returned for revision",
+        )
+        payload["material_ledger"] = ledger_projection(db, scenario.id)
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "material ledger return transition failed for scenario %s", scenario.id
+        )
+
     scenario.status = "returned_for_revision"
     scenario.checklist.payload = payload
     flag_modified(scenario.checklist, "payload")
@@ -583,6 +656,32 @@ def run_revise_and_resubmit(
 
     if not scenario.checklist:
         raise ValueError("场景缺少核查清单")
+
+    try:
+        from app.core.statuses import MaterialBlockState
+        from app.services.material_ledger_service import bulk_transition
+        from app.services.scenario_service import attach_intake_ledger
+
+        bulk_transition(
+            db,
+            scenario.id,
+            MaterialBlockState.SUPERSEDED,
+            actor_user_id=user.id,
+            reason="superseded by resubmission",
+        )
+        materials_payload = attach_intake_ledger(
+            db,
+            scenario,
+            materials_payload,
+            pack_id=scenario.rules_pack_id,
+            uploads=uploads,
+        )
+    except Exception:
+        import logging
+
+        logging.getLogger(__name__).exception(
+            "material ledger resubmit transition failed for scenario %s", scenario.id
+        )
 
     scenario.checklist.title = materials_payload["title"]
     scenario.checklist.payload = materials_payload
