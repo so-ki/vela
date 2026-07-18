@@ -230,3 +230,33 @@
 - **提交 SHA**: 见本轮提交(fix(capability-packs): preserve inactive exact version identity)
 - **是否已复现**: 单轮;每项命令一次通过。
 - **限制和不确定性**: 行为变化披露:此前 get_exact 对"仅存在 inactive live-root 且身份失配"抛 CapabilityPackInactiveError,现统一抛 "version/hash 与冻结身份不一致";全库无依赖旧行为的调用方(全量测试绿)。
+
+## EV-0022
+
+- **claim**: WS-1C/C2 真实归档已创建且 byte-identical。归档结构:`backend/app/capability_packs/archive/brazil_new_energy_greenfield/1.3.1/bundle/{capability_packs/brazil_new_energy_greenfield/manifest.json, rules/brazil_new_energy.json, data/brazil_legal_corpus.json}`,以 `shutil.copyfile` 原始字节复制,无任何重新序列化。**冻结常量(本轮实测)**:manifest raw-file SHA-256 = `dd69255f56e9b4589f27987f11d7e3cf2b471de0c8293b25867aa4257dbba108`(新登记);rules = `351c7d6f6f71a5d1cedd3527a10a8b89f1cd72d3079d4b41d42b827aeba62c9c`(与 manifest 内 content_hash 一致);corpus = `b91783bc354d57a84453b7c064d8bb413939a2693109835fbcc5b20ce54c787f`(一致);semantic = `dd26e226ea600fd05e23d6141dab8a051881b3ed3723abcf718ddf3bc81e808b`;身份:pack 1.3.1 / rules 2.9 / corpus 1.13。
+- **文件与精确行号**: 上述 3 个归档文件;backend/tests/test_capability_pack_real_archive.py(8 测试)
+- **命令与结果**:
+  1. 复制前后 `sha256sum` 源三文件:两次输出完全一致(manifest dd69255f…、rules 351c7d6f…、corpus b91783bc…),源文件未被改动;
+  2. 归档三文件 `sha256sum` 与源逐一相同;Python bytes 比较 `byte_equal=True` ×3;`cmp -s` ×3 全部相同(CMP_MANIFEST_OK/CMP_RULES_OK/CMP_CORPUS_OK);
+  3. 长期回归测试只依赖冻结常量(不依赖 active 与归档永远相同):raw hash ×3、semantic hash、pack/rules/corpus 版本标识、discover/load、加载路径在 bundle 内、active+archive 同身份无 collision、list_versions 单一 1.3.1 身份、不进 public/active/routing、无 active 时可 get_exact 但 get/match 失败、单字节篡改(保持 JSON 合法)命中 rules content hash 校验、删除 rules/corpus 副本 fail-closed。
+- **提交 SHA**: 见 C2 提交(chore(capability-packs): archive brazil pack 1.3.1 artifacts),分支 claude/vela-ws-1c-c2-real-archive(基于 730b9fd)
+- **是否已复现**: 哈希三重验证(sha256sum、Python bytes、cmp);测试单轮通过。
+- **限制和不确定性**: 一次性创建证据(源==归档)只在 C2 时点成立,后续 active 升级后仅冻结常量有效——测试已按此设计。
+
+## EV-0023
+
+- **claim**: 【C2 打包包含性发现与修复】两个 backend Dockerfile 为逐文件 COPY allowlist + backend/.dockerignore 默认拒绝:(1) 归档目录默认被排除于后端镜像;(2) **C1 打包回归**——`version_index.py` 不在 COPY/dockerignore 允许清单,registry.py 导入它,镜像内应用将 ImportError(CI production-compose-smoke 会拦截,但属 C1 遗漏)。最小修复:backend/.dockerignore 增加 4 行放行(version_index.py + 3 个归档文件);两个 Dockerfile 的 capability_packs COPY 行加入 version_index.py,并新增 `COPY app/capability_packs/archive ./app/capability_packs/archive`;scripts/release_safety.py 的 EXPLICIT_RUNTIME_FILES 加 version_index.py、PACKAGE_TREES 加 archive 树(仅新增条目,未放宽任何既有边界);新增边界测试 test_backend_image_allowlists_include_version_index_and_archive。
+- **文件与精确行号**: docker/Dockerfile.backend:18-20;docker/Dockerfile.backend.prod:18-20;backend/.dockerignore(capability_packs 段);scripts/release_safety.py(EXPLICIT_RUNTIME_FILES/PACKAGE_TREES);backend/tests/test_release_safety.py(新增测试)
+- **命令与结果**: `bash scripts/check_release_boundaries.sh` → 全 OK,backend COPY 候选 127(dev)/137(prod),较修复前 +4,恰为 version_index.py + 3 归档文件;fixtures/pending corpus 排除检查保持 OK。
+- **提交 SHA**: 见 C2 提交
+- **是否已复现**: 单轮。
+- **限制和不确定性**: 容器内探针结果见 EV-0024(镜像构建另记)。
+
+## EV-0024
+
+- **claim**: 【未验证项,如实登记】后端镜像构建与容器内探针在本执行环境**未完成验证**。已用 CI 真实命令尝试:`docker build --pull -f docker/Dockerfile.backend.prod -t vela-backend:ci backend`(与 .github/workflows/ci.yml:113 完全一致;本地先行启动 dockerd)。失败于 Dockerfile 第 6 行 `pip install -r requirements.lock`:pypi.org 连接被环境的透明 TLS 拦截代理终结,证书链含自签 CA,`SSLCertVerificationError: self-signed certificate in certificate chain`;实测即使清空代理环境变量,容器直连仍被同一 MITM 拦截。修复该错误需在构建容器内禁用证书校验或改造 Dockerfile/构建方式,两者均被纪律禁止(环境:不得禁用 TLS 校验;任务书:不得发明不同构建方式)。
+- **文件与精确行号**: docker/Dockerfile.backend.prod:6;.github/workflows/ci.yml:113
+- **命令与结果**: build 退出码 1;pip 报错原文以及直连测试输出已记录于本会话;`docker system prune -af` 已清理残留。
+- **提交 SHA**: 见 C2 提交
+- **是否已复现**: 失败模式两次复现(代理与直连)。
+- **限制和不确定性**: **镜像包含 archive、容器内 registry 发现/加载、archive 不参与 routing 四项容器级断言均为未验证**;当前包含性证据仅为静态双重验证:(1) release_safety check-docker 按真实 dockerignore+COPY 语义计算的传输/候选集合含 version_index.py 与 3 个归档文件(EV-0023);(2) 等效加载逻辑在宿主机测试中通过(EV-0022)。待具备可信出网或 CI 环境时,应由远端 GitHub Actions production-compose-smoke(真实构建+烟测)闭环,其结果以具体 commit 的 Actions run 为准。

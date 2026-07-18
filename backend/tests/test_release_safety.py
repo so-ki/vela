@@ -127,3 +127,26 @@ def test_production_smoke_streams_seed_into_read_only_backend() -> None:
 
     assert '"${COMPOSE[@]}" cp ' not in content
     assert release_safety.PRODUCTION_SMOKE_SEED_COMMAND in content
+
+
+def test_backend_image_allowlists_include_version_index_and_archive() -> None:
+    """WS-1C/C2: 归档与版本索引必须进入后端镜像与提交包 allowlist。"""
+
+    dockerignore = (release_safety.ROOT / "backend/.dockerignore").read_text(encoding="utf-8")
+    for needed in (
+        "!app/capability_packs/version_index.py",
+        "!app/capability_packs/archive/brazil_new_energy_greenfield/1.3.1/bundle/capability_packs/brazil_new_energy_greenfield/manifest.json",
+        "!app/capability_packs/archive/brazil_new_energy_greenfield/1.3.1/bundle/rules/brazil_new_energy.json",
+        "!app/capability_packs/archive/brazil_new_energy_greenfield/1.3.1/bundle/data/brazil_legal_corpus.json",
+    ):
+        assert needed in dockerignore
+    for name in ("docker/Dockerfile.backend", "docker/Dockerfile.backend.prod"):
+        content = (release_safety.ROOT / name).read_text(encoding="utf-8")
+        assert "app/capability_packs/version_index.py" in content
+        assert "COPY app/capability_packs/archive ./app/capability_packs/archive" in content
+    files = release_safety._collect_package_files()
+    assert "backend/app/capability_packs/version_index.py" in files
+    assert (
+        "backend/app/capability_packs/archive/brazil_new_energy_greenfield/1.3.1/bundle/rules/brazil_new_energy.json"
+        in files
+    )

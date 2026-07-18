@@ -1,0 +1,62 @@
+{
+  "manifest_schema_version": "1.1",
+  "pack_id": "brazil_new_energy_greenfield",
+  "version": "1.3.1",
+  "status": "active",
+  "content_status": "provisional",
+  "display_name": "巴西 · 新能源制造 · 绿地设厂",
+  "description": "面向巴西新能源制造绿地设厂项目的受控试点能力包。工程链路可审计；法律内容仍为 provisional，须巴西法务逐项复核，不得视为正式法律意见。",
+  "country": "BR",
+  "state": "sao_paulo",
+  "industry": "new_energy_manufacturing",
+  "action_type": "greenfield_plant",
+  "languages": ["zh-CN", "pt-BR"],
+  "issue_modules": ["labor", "foreign_investment", "tax", "environment", "industry_access", "data_compliance"],
+  "rules_artifact": {
+    "artifact_id": "brazil_new_energy",
+    "version": "2.9",
+    "content_hash": "351c7d6f6f71a5d1cedd3527a10a8b89f1cd72d3079d4b41d42b827aeba62c9c",
+    "resource": "rules://brazil_new_energy.json"
+  },
+  "corpus_artifact": {
+    "artifact_id": "brazil_legal_corpus",
+    "version": "1.13",
+    "content_hash": "b91783bc354d57a84453b7c064d8bb413939a2693109835fbcc5b20ce54c787f",
+    "resource": "corpus://brazil_legal_corpus.json"
+  },
+  "artifact_binding": {
+    "country": "brazil",
+    "state": "sao_paulo",
+    "industry": "new_energy",
+    "action_type": "greenfield_plant"
+  },
+  "routing_hints": {
+    "country": ["BR", "Brazil", "Brasil", "brazil", "巴西"],
+    "state": ["SP", "São Paulo", "Sao Paulo", "Estado de São Paulo", "Estado de Sao Paulo", "圣保罗州"],
+    "industry": ["new_energy", "new_energy_manufacturing", "new energy", "new energy manufacturing", "new-energy manufacturing", "clean energy manufacturing", "clean-energy manufacturing", "renewable energy manufacturing", "energia renovável", "energia renovavel", "fabricação de baterias", "fabricacao de baterias", "manufatura de energia limpa", "新能源", "新能源制造", "电池", "储能", "光伏", "电动汽车"],
+    "action_type": ["greenfield_plant", "greenfield", "greenfield plant", "greenfield factory", "new factory", "new manufacturing plant", "planta greenfield", "fábrica greenfield", "fabrica greenfield", "nova fábrica", "nova fabrica", "implantação de nova planta industrial", "implantacao de nova planta industrial", "新建工厂", "新建生产基地", "绿地工厂", "绿地设厂"],
+    "excluded_states": ["RJ", "Rio", "Rio de Janeiro", "Estado do Rio de Janeiro", "里约热内卢州"],
+    "excluded_action_types": ["acquisition", "acquire", "merger", "M&A", "brownfield", "expansion", "expand existing", "existing factory", "existing plant", "retrofit", "aquisição", "aquisicao", "fusão", "fusao", "expansão", "expansao", "ampliar fábrica", "ampliar fabrica", "fábrica existente", "fabrica existente", "planta existente", "收购", "并购", "扩建", "扩产", "改扩建", "现有工厂", "既有工厂", "已有工厂", "现有厂房"]
+  },
+  "retrieval_config": {
+    "match_threshold_default": 70,
+    "match_threshold_min": 50,
+    "match_threshold_max": 95,
+    "top_k_default": 3,
+    "top_k_min": 0,
+    "top_k_max": 10,
+    "expansion_enabled": true,
+    "expansion_candidate_extra": 2,
+    "expansion_min_keyword_score": 18.0,
+    "expansion_context_limit": 800
+  },
+  "output_profile": {
+    "profile_id": "bilingual_investigation_brief",
+    "version": "1.0",
+    "brief_languages": ["zh-CN", "pt-BR"],
+    "brief_title": "拉美投资合规专项协查简报",
+    "export_template": "law_school",
+    "disclaimer": "本能力包生成内容仅供企业法务协查与复核，不构成正式法律意见。"
+  },
+  "semantic_hash": "dd26e226ea600fd05e23d6141dab8a051881b3ed3723abcf718ddf3bc81e808b"
+}
