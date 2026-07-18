@@ -4,8 +4,8 @@
 - Product baseline SHA: 65f0b398f94af72680f8c1139aa59f7df6b88d71
 - Target base branch: codex/vela-release-hardening(不得直接推送)
 - Checkpoint branch: claude/gracious-brahmagupta-bbg2dw(仅承载交接文件提交)
-- Last verified product-code SHA: 65f0b398f94af72680f8c1139aa59f7df6b88d71(产品代码与基线零差异;checkpoint 分支提交只触碰下列允许文件)
-- Allowed checkpoint-only commits: 仅 `AGENTS.md`、`CLAUDE.md`、`docs/ai-review/ACTIVE_HANDOFF.md`、`docs/ai-review/DECISION_LOG.md`、`docs/ai-review/EVIDENCE_LEDGER.md`
+- Last verified product-code SHA: 65f0b398f94af72680f8c1139aa59f7df6b88d71 + 已批准的 WS-1C/C1 产品提交(仅 `backend/app/capability_packs/registry.py`、新增 `backend/app/capability_packs/version_index.py`、新增 `backend/tests/test_capability_pack_version_archive.py`;其余产品代码与基线零差异)
+- Allowed commits: 5 个交接文件 + 经用户逐项批准的 workstream 产品提交(当前仅 WS-1C/C1)
 - Resume 时必须执行的 Git 核验命令:
   ```
   git status --short
@@ -13,16 +13,16 @@
   git rev-parse HEAD
   git fetch origin
   git rev-parse origin/codex/vela-release-hardening        # 必须 = 65f0b398...
-  git diff --stat 65f0b398f94af72680f8c1139aa59f7df6b88d71 HEAD  # 差异必须仅含上述 5 个允许文件
+  git diff --stat 65f0b398f94af72680f8c1139aa59f7df6b88d71 HEAD  # 差异只允许:5 个交接文件 + 已批准的 WS-1C/C1 三个产品文件
   ```
 - 注意:Git 的实时 HEAD 只能在恢复时通过 `git rev-parse HEAD` 获取;本文件不记录、也不得用文件记录替代 Git 实时查询(D-0004)。
 
 ## Current Phase
-- Phase: Phase 0.6 — 决定落账 + 基线动态验证 + WS-1C 方案冻结(只读)——已完成,等待用户批准 WS-1C 实施
-- Workstream: WS-1C(设计冻结完毕,未实施)
-- Status: complete_pending_approval
-- Allowed file scope: 仅上述 5 个交接文件
-- Prohibited actions: 修改产品代码/规则/语料/manifest/迁移/测试;创建 Alembic migration;开始 WS-1A/B/D/E;推送 Draft 分支;创建或合并 PR
+- Phase: WS-1C/C1 — Capability Pack 历史版本索引与精确寻址基础——已实施并全量验证,等待用户复核
+- Workstream: WS-1C(C1 完成;C2~C5 未开始,未获批准)
+- Status: complete_pending_review
+- Allowed file scope(C1 已批准范围): registry.py、新增 version_index.py、新增 test_capability_pack_version_archive.py、5 个交接文件
+- Prohibited actions: 修改 active manifest/生产 rules/生产 corpus/真实归档制品/loader scheme 语义/机制层模型/Claim-Coverage/compiler-proof-release evaluator/Alembic/前端/产品文档/startup-readiness/release 行为;开始 C2~C5 与 WS-1A/B/D/E;创建 PR;合并;推送 Draft 分支
 
 ## Frozen Product Definition
 - 见 `AGENTS.md` 第 2–4 节与 D-0006;产品语义新增冻结决定:**D-0007(分母 A+ 方案)、D-0008(多版本不可变共存)、D-0009(ResearchItem 与 ClaimRecord 分离)、D-0010(外证矩阵采用状态修正)**——以 DECISION_LOG 原文为准,不得再列为 unresolved。
@@ -48,7 +48,9 @@
 - **ultracode 建议**:WS-1C 实施本身**不建议**进入 ultracode(范围收敛、提交线性、测试脚手架强);建议 WS-1A(模型+迁移+双版本 compiler)与 WS-5(对抗验证)采用多代理编排。
 
 ## Files Changed
-- 仅 5 个交接文件;产品代码/规则/语料/manifest/迁移/测试/UI:零改动。
+- WS-1C/C1 产品提交:`backend/app/capability_packs/registry.py`(修改)、`backend/app/capability_packs/version_index.py`(新增)、`backend/tests/test_capability_pack_version_archive.py`(新增)。
+- 交接文件:5 个(持续更新)。
+- 未触碰:active manifest、生产 rules/corpus JSON、loader.py、机制层、evaluator、Alembic、前端、产品文档;仓库内未创建任何真实 archive 目录(C1 仅用临时目录合成 bundle)。
 
 ## Tests and Commands(本轮,EV-0018)
 - environment: 远程受管容器 Linux;Python 3.12.3(uv venv,scratchpad;未用系统 3.11);Node v22.22.2;npm 10.9.7;Docker 29.3.1
@@ -64,7 +66,7 @@
 2. ResearchItem 模型命名偏好:`ResearchItem` vs `ClaimCompilationItem`(D-0009 两候选,WS-1A 冻结方案时定,可由实施者建议)。
 
 ## Next Exact Action
-- 等待用户批准 WS-1C 实施(C1~C5)。获批后按 commit 计划实施并在每个 commit 后运行靶向+全量测试,证据逐条登记;WS-1C 完成验收后再进入 WS-1A 冻结方案。
+- 等待用户复核 WS-1C/C1(证据:EV-0020;全量 309 passed)。经复核通过后,请求批准 C2(真实 1.3.1/2.9/1.13 归档 + byte-identity 测试);C2 前不得创建真实 archive 制品。
 
 ## Stop Conditions
 - 远端基线移动、产品代码出现非授权改动、或操作将超出 5 个允许文件 → 立即停止并报告。

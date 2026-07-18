@@ -199,3 +199,19 @@
 - **提交 SHA**: 65f0b398
 - **是否已复现**: 静态复核;关键路径(loader 哈希验证、get_exact)另有本轮实测通过的 test_capability_packs.py 佐证(EV-0018)。
 - **限制和不确定性**: rules_registry.py 传统加载路径(无哈希校验)与 material fields 的耦合程度需实施时确认。
+
+## EV-0020
+
+- **claim**: WS-1C/C1(Capability Pack 历史版本索引与精确寻址基础)已实施并全量验证通过。实现:(1) `version_index.py`(新增):归档发现 `discover_archived_versions`(结构校验:bundle 唯一 manifest、内目录=pack ID)、`load_archived_pack`(经现有 loader 全量哈希重验后,再校验归档目录名与 manifest 的 pack ID/version 相等)、`PackVersionIdentity`(semantic/rules/corpus 三哈希)、`CapabilityPackVersionIndex.register` 只增注册(同 key 不同身份 → `CapabilityPackVersionCollisionError`);(2) `registry.py`:`archive_root` 属性、`_manifest_paths` 显式排除 archive 目录、`get_exact` 先 active 后 archive(同 key 身份冲突即抛,不回退 active/current/最近版本/其他 hash;pack 与版本均不存在时保留原 NotFound/Inactive 语义)、`build_version_index()` 与 `list_versions()`;(3) loader/`resolve_server_resource`/`rules://`/`corpus://` 语义零改动——归档 bundle 的 `capability_packs` 目录作为 capability_root 传入现有 loader。archive 不进入 list_active/list_public_active/match 路由。
+- **文件与精确行号**: backend/app/capability_packs/version_index.py(新,约 180 行);backend/app/capability_packs/registry.py(get_exact 重写与新增方法);backend/tests/test_capability_pack_version_archive.py(新,14 测试,含 12 项任务书要求场景 + archive/archive 冲突单元测试 + 生产 registry 行为不变)
+- **命令与结果**(环境:Python 3.12.3 uv venv,Node/npm 未涉及):
+  1. `pytest -q tests/test_capability_pack_version_archive.py` → **14 passed**(1.00s)
+  2. `pytest -q tests/test_capability_pack_api.py tests/test_country_independent_fixture_flow.py tests/test_capability_pack_version_archive.py` → **27 passed**(24.29s)
+  3. `python -m compileall -q app tests` → 通过
+  4. `ruff check app/capability_packs/registry.py app/capability_packs/version_index.py tests/test_capability_pack_version_archive.py` → All checks passed
+  5. 全量 `pytest tests -q` → **309 passed**(92.72s;基线 295 + 新增 14,零失败零跳过,未修改任何既有测试)
+  6. `bash scripts/check_release_boundaries.sh` → 全部 OK;`git diff --check` → 干净
+- **原始结果摘要**: 见上;真实 1.3.1/2.9/1.13 归档未创建(留给 C2,仓库内无 archive 目录,C1 测试仅用 tmp_path 合成 bundle)。
+- **提交 SHA**: 见本轮提交(feat(capability-packs): add exact archived version lookup)
+- **是否已复现**: 单轮;每项命令一次通过。
+- **限制和不确定性**: 动态验证仍限 SQLite 测试库;startup 扫描(C4)、消费方版本注册表(C3)未实施;`list_versions`/`build_version_index` 暂无生产调用方(为 C2~C4 与未来 startup 扫描准备)。

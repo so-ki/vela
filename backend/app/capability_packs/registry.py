@@ -5,6 +5,15 @@ from functools import lru_cache
 from pathlib import Path
 
 from app.capability_packs.loader import LoadedCapabilityPack, load_capability_pack
+from app.capability_packs.version_index import (
+    ARCHIVE_DIR_NAME,
+    ArchivedPackVersion,
+    CapabilityPackVersionCollisionError,
+    CapabilityPackVersionIndex,
+    discover_archived_versions,
+    identity_of,
+    load_archived_pack,
+)
 
 
 CAPABILITY_PACKS_ROOT = Path(__file__).resolve().parent
@@ -47,11 +56,15 @@ class CapabilityPackRegistry:
         if include_test_fixtures and self.app_env != "test":
             raise CapabilityPackFixtureDisabledError("测试 fixture 只能在 test 环境显式开启")
 
+    @property
+    def archive_root(self) -> Path:
+        return self.root / ARCHIVE_DIR_NAME
+
     def _manifest_paths(self) -> list[tuple[Path, bool]]:
         paths = [
             (path, False)
             for path in sorted(self.root.glob("*/manifest.json"))
-            if path.parent.name != "fixtures"
+            if path.parent.name not in {"fixtures", ARCHIVE_DIR_NAME}
         ]
         if self.include_test_fixtures:
             paths.extend((path, True) for path in sorted((self.root / "fixtures").glob("*/manifest.json")))
@@ -85,11 +98,99 @@ class CapabilityPackRegistry:
             raise CapabilityPackInactiveError(f"Capability Pack 未启用：{pack_id}")
         return pack
 
+    def _archived_entries(self) -> list[ArchivedPackVersion]:
+        return discover_archived_versions(self.archive_root)
+
+    def _load_archived_exact(self, pack_id: str, version: str) -> LoadedCapabilityPack | None:
+        entry = next(
+            (
+                item
+                for item in self._archived_entries()
+                if item.pack_id == pack_id and item.version == version
+            ),
+            None,
+        )
+        if entry is None:
+            return None
+        return load_archived_pack(entry)
+
     def get_exact(self, pack_id: str, version: str, semantic_hash: str) -> LoadedCapabilityPack:
-        pack = self.get(pack_id)
-        if pack.manifest.version != version or pack.manifest.semantic_hash != semantic_hash:
-            raise CapabilityPackRegistryError("Capability Pack version/hash 与冻结身份不一致")
-        return pack
+        """Exact (pack_id, version, semantic_hash) lookup: active first, then archive.
+
+        Archived versions are only reachable here; they never join active,
+        public or routing results. No fallback to active/current/nearest
+        version or any other hash is performed.
+        """
+        if not _PACK_ID.fullmatch(pack_id):
+            raise CapabilityPackNotFoundError("Capability Pack ID 非法")
+        active_pack: LoadedCapabilityPack | None = None
+        active_error: CapabilityPackRegistryError | None = None
+        try:
+            active_pack = self.get(pack_id)
+        except (CapabilityPackNotFoundError, CapabilityPackInactiveError) as exc:
+            active_error = exc
+        archived_pack = self._load_archived_exact(pack_id, version)
+        if (
+            active_pack is not None
+            and archived_pack is not None
+            and active_pack.manifest.version == version
+            and identity_of(active_pack) != identity_of(archived_pack)
+        ):
+            raise CapabilityPackVersionCollisionError(
+                f"Capability Pack 版本身份冲突：{pack_id}@{version}"
+                "（active 与 archive 的 semantic/rules/corpus hash 不一致）"
+            )
+        if (
+            active_pack is not None
+            and active_pack.manifest.version == version
+            and active_pack.manifest.semantic_hash == semantic_hash
+        ):
+            return active_pack
+        if archived_pack is not None and archived_pack.manifest.semantic_hash == semantic_hash:
+            return archived_pack
+        if active_pack is None and archived_pack is None and active_error is not None:
+            raise active_error
+        raise CapabilityPackRegistryError("Capability Pack version/hash 与冻结身份不一致")
+
+    def build_version_index(self) -> CapabilityPackVersionIndex:
+        """Full (pack_id, version) -> immutable identity index with collision checks.
+
+        Registers every live-root pack (any status) and every archived bundle;
+        the same key may appear in both only with a byte-identical artifact
+        identity, otherwise a version-collision error is raised.
+        """
+        index = CapabilityPackVersionIndex()
+        for pack in self._all():
+            index.register(
+                pack_id=pack.pack_id,
+                version=pack.manifest.version,
+                identity=identity_of(pack),
+                source="active",
+            )
+        for entry in self._archived_entries():
+            pack = load_archived_pack(entry)
+            index.register(
+                pack_id=pack.pack_id,
+                version=pack.manifest.version,
+                identity=identity_of(pack),
+                source="archive",
+            )
+        return index
+
+    def list_versions(self, pack_id: str) -> list[dict]:
+        """All known exact versions of one pack (live root + archive), no routing."""
+        mapping = self.build_version_index().as_mapping()
+        return [
+            {
+                "pack_id": key[0],
+                "version": key[1],
+                "semantic_hash": identity.semantic_hash,
+                "rules_content_hash": identity.rules_content_hash,
+                "corpus_content_hash": identity.corpus_content_hash,
+            }
+            for key, identity in sorted(mapping.items())
+            if key[0] == pack_id
+        ]
 
     def match(
         self,
