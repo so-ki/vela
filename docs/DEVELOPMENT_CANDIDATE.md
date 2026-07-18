@@ -2,9 +2,9 @@
 
 日期：2026-07-18（Asia/Shanghai）
 分支：`codex/vela-release-hardening`
-状态：`local-verified / remote-CI-pending / draft-review-only`
+状态：`local-verified / remote-CI-green / draft-review-only / external-evidence-blocked`
 
-本文件记录当前开发分支相对上一冻结 RC 的新增工程事实。它不是新的发布放行声明；提交、推送、Draft PR CI、独立人工审查和生产镜像烟测全部完成前，上一 RC 的远端绿色证据不能移植到本分支。
+本文件记录当前开发分支相对上一冻结 RC 的新增工程事实。它不是新的发布放行声明；远端工程 CI 已通过，但独立人工/法律审查、真实客户证据和目标环境验收仍不得由 CI 代替。
 
 ## 本批已实现
 
@@ -27,11 +27,12 @@
 | Python 编译 | `app` 与 `tests` compileall 通过 |
 | 前端组件 | `27 passed` |
 | 前端 TypeScript/Vite | 生产构建通过，158 modules |
-| 锁定依赖审计 | `pip-audit: No known vulnerabilities found`；`npm audit --offline: 0 vulnerabilities`；远端在线审计待 CI |
+| 锁定依赖审计 | 本地 `pip-audit: No known vulnerabilities found`、`npm audit --offline: 0 vulnerabilities`；远端在线审计通过 |
 | Alembic | base → `20260718_0005` → base → `20260718_0005` 通过；`alembic check` 无漂移 |
 | 法律质量门 | controlled pilot 通过；GA 按设计失败，`expert_verified=0` |
 | 发布边界 | Docker context/COPY allowlist、测试 fixture 排除、密钥边界与 GitHub Actions SHA pins 通过 |
 | 差异格式 | `git diff --check` 通过 |
+| Draft PR 远端 CI | commit `4ec6c5a` 的 [CI run 29635681320](https://github.com/so-ki/vela/actions/runs/29635681320) 5/5 jobs 通过：依赖审计、293 tests、迁移、27 tests/构建、发布边界、API golden path、三镜像 CVE/SBOM、PostgreSQL Compose 与 Playwright smoke |
 
 ## 尚未完成，不能对外宣称
 
@@ -40,7 +41,7 @@
 - 新法规模块没有官方源调度、唯一 current 指针、自动 corpus 发布或回滚。
 - OCR、多语 embedding、向量存储和 RAG 评测尚处于实验路线。
 - 巴西法律内容没有具名律师认证；第二法域和第二行业能力包尚不存在。
-- 新分支尚未完成远端在线依赖审计、三生产镜像 CVE/SBOM、PostgreSQL 迁移、Playwright 和 API 黄金路径。
+- CI 的隔离 Compose smoke 不是客户目标环境证据；客户 IdP/KMS、TLS、备份恢复、WORM、监控、LGPD/DPA、真实 runtime probe 与运维演练仍未完成。
 
 ## 审查入口
 
@@ -49,4 +50,4 @@
 - Claude Code 提示词：[`ai-review/CLAUDE_CODE_ARGUE_PROMPT.md`](./ai-review/CLAUDE_CODE_ARGUE_PROMPT.md)
 - 上一冻结 RC：[`RELEASE_CANDIDATE.md`](./RELEASE_CANDIDATE.md)
 
-Draft PR 远端 CI 绿色后，应把运行 URL、head SHA、镜像/SBOM 结果与独立审查裁决补入本文件，再讨论是否形成新的冻结 RC。
+Draft PR #1 必须继续保持 draft，直到独立代码审查与外部法律/客户证据完成。CI 绿色只证明该 commit 的工程流水线，不授权合并、部署或客户交付。
