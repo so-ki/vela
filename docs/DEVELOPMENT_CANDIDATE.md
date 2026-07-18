@@ -2,7 +2,7 @@
 
 日期：2026-07-18（Asia/Shanghai）
 分支：`codex/vela-release-hardening`
-状态：`local-verified / remote-CI-pending / draft-review-only / external-evidence-blocked`
+状态：`local-verified / remote-CI-green / draft-review-only / external-evidence-blocked`
 
 本文件记录当前开发分支相对上一冻结 RC 的新增工程事实。它不是新的发布放行声明；远端工程 CI 已通过，但独立人工/法律审查、真实客户证据和目标环境验收仍不得由 CI 代替。
 
@@ -34,7 +34,7 @@
 | 法律质量门 | controlled pilot 通过；GA 按设计失败，`expert_verified=0` |
 | 发布边界 | Docker context/COPY allowlist、测试 fixture 排除、密钥边界与 GitHub Actions SHA pins 通过 |
 | 差异格式 | `git diff --check` 通过 |
-| Draft PR 远端 CI | 本批尚未推送；上一基线 commit 的 CI 绿色不代表本批已通过 |
+| Draft PR 远端 CI | 功能 commit `4e1afe0c9c3c6ec0c09bb070285e7632d549d8f8` 的 [CI run 29639389415](https://github.com/so-ki/vela/actions/runs/29639389415) 5/5 jobs 通过：依赖审计、295 tests、Alembic `0006` 往返、29 tests/构建、发布边界、API golden path、三镜像 CVE/SBOM、PostgreSQL Compose 与 Playwright smoke |
 
 ## 尚未完成，不能对外宣称
 
