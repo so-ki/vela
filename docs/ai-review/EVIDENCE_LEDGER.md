@@ -288,3 +288,12 @@
 - **提交 SHA**: 061be1e(C3.0)、dafc96e(C3.1)、e39edf0(C3.2),分支 claude/vela-ws-1c-c3a-versioned-readers(基于 efc76e0)
 - **是否已复现**: goldens 双次生成一致;测试单轮全绿。
 - **限制和不确定性**: C3-B 范围(snapshot/release reader、Alembic 0007)未实施;golden 再生成需经批准的新决定。
+
+## EV-0028
+
+- **claim**: C3-A.1(持久化 JSON 结构验证 + Registry 自洽性 + writer 版本单一事实源)完成。**修复前三类可 500 的失败模式**:(1) `compilation.input_snapshot` 被 raw SQL 改为 list(哈希同步重算)→ gate `stored_snapshot.get()` AttributeError → 500;(2) snapshot.drafts 含标量/缺字段(哈希同步重算)→ v0_2 `draft["checklist_code"]` TypeError → 500;(3) `proof.proof` 改为 list/字符串或当前 checklist payload 改为非对象 → `.get()`/reader 内部 AttributeError → 500。**修复**:gate reader 调用边界显式结构验证(无宽泛 except):snapshot 非对象/draft 结构非法 → 422 `compiler_input_snapshot_invalid`;当前 payload 非法形状(payload/sections/items/legal_hits/brief 逐层检查)→ 422 `compiler_current_payload_invalid`;proof body 非对象或 schema 非字符串/未注册 → 422 `coverage_proof_schema_unsupported`;已知 0.1 schema 但 denominator/covered/uncovered 结构非法(含 uncovered 元素 checklist_code/status/unanswerable_reasons 类型)→ 422 `coverage_proof_body_invalid`;即使攻击者同步重算 hash 仍被阻断(全部有对抗测试)。**Registry 自检**:`validate_registry_configuration` 纯函数(key==reader.version、CURRENT 写版本已注册、兼容矩阵对已注册版本封闭、必需历史条目 0.2/0.1/(0.2,0.1)、重复即抛),模块装载时执行一次,违规抛 `VersionedRegistryConfigurationError`,不自动修复/忽略/fallback。**writer 单一事实源**:compile_claims 持久化 `writer.version`(经 current_compiler_writer()),COMPILER_VERSION 仅为只读兼容别名并注释禁止用于写库身份;合成 0.3 writer 测试证明新 compilation 保存 "0.3" 且 input/output hash 用该 writer 的 hash 函数(未把 0.3 加入生产 Registry)。
+- **文件与精确行号**: backend/app/services/answerability_gate_service.py(_drafts_structure_ok/_checklist_payload_structure_ok/_coverage_proof_body_structure_ok + 两处边界插入);backend/app/services/versioned/registry.py(validate_registry_configuration + 装载自检);backend/app/services/mechanism_service.py(compile_claims writer.version);backend/tests/test_versioned_payload_validation.py(新增 21 测试:4 组 compiler 结构、3+4+1 组 proof 结构、真实 gate 排除 (0.2,0.1) 组合 → version_combination_unsupported:0.2+0.1、5 组配置自检、生产 registry 自洽、writer 单源)
+- **命令与结果**(Python 3.12.3):新专项 **21 passed**;靶向 4 文件 39 passed;compileall/ruff 过;全量 **380 passed**(359+21,零删改降级);check_release_boundaries OK(无新增运行时模块,Docker allowlist 未动);git diff --check 干净;**golden 四文件 raw SHA-256 与 EV-0027 冻结值逐一相同**(frozen v0_2/v0_1/goldens 未触碰)。
+- **提交 SHA**: b41921e(fix(versioning): validate persisted reader identities),分支 claude/vela-ws-1c-c3a-versioned-readers
+- **是否已复现**: 单轮全绿;21 个对抗测试均先按"攻击者重算哈希"构造。
+- **限制和不确定性**: compile 写路径(payload 服务器生成)未加同套结构验证——gate 是唯一交付边界;PostgreSQL 动态验证仍属 WS-4/WS-5。
