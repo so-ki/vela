@@ -189,3 +189,13 @@
 - **提交 SHA**: 产品代码 65f0b398(工作树含 5 个交接文件,不影响 backend/frontend 测试对象)
 - **是否已复现**: 本轮单次运行;未做二次复现。
 - **限制和不确定性**: 测试库为 SQLite/测试配置,PostgreSQL 并发/事务结论仍属 experiment_required(WS-4);Alembic 升降级往返未在本轮运行(需一次性 PostgreSQL,后续专项);passlib 的 Py3.13 弃用警告提示未来升级 3.13 需换 bcrypt 直连或升级 passlib。
+
+## EV-0019
+
+- **claim**: WS-1C 设计前提事实(静态复核,两路只读采集):(1) Pack 发现为文件系统 glob `capability_packs/*/manifest.json`,排除 fixtures(registry.py:50-58);`get_exact(pack_id, version, semantic_hash)` 已存在但只校验当前唯一 manifest(registry.py:88-92);active 状态仅存于 manifest.status,无 DB 表。(2) 冻结快照只存 id/version/hash(scenario_scope_service.py:377-419),不嵌入内容;运行时经 require_generation_config→load_frozen_capability_pack→load_capability_pack **每次从单一可变磁盘文件重读并重验 SHA-256**(loader.py:135-140;generation_guard.py:181-214);检索时 load_corpus 直接 json.load(legal_ingest.py:34-37),完整性依赖上游 manifest 重验。(3) 无任何历史版本归档(无 DB 表、无文件归档):磁盘文件被修改后旧场景在 loader.py:137-140 / registry.py:90-91 fail-closed,**不可重现**。(4) 当前版本号:pack 1.3.1、rules_artifact brazil_new_energy 2.9(hash 351c7d6f…62c9c)、corpus 1.13(hash b91783bc…c787f)、semantic_hash dd26e226…808b、manifest_schema_version 1.1(manifest.json:2-61)。(5) 消费方全部为"当前代码重算+stable_hash 相等"式 fail-closed:唯一显式版本分支是 compiler_version=="0.2" 字符串相等(answerability_gate_service.py:111-116)与 resolution evidence schema_version=="1.0"(legal_quality_eval.py:126);proof body "0.1"、release body "1.1"、bundle "1.4"、gate "1.0" 等字面量只被写入哈希体,从不回读分支——**任何格式变更都会使全部历史制品 hash 失配而 fail-closed**。(6) Alembic 线性链 0001→0006,head=20260718_0006;PostgreSQL DDL 仅 Alembic(test_database_initialization 断言 init_db 不 create_all);测试为逐测试 SQLite create_all,无 conftest.py;fixture pack 经构造器旗标+monkeypatch 注入。(7) legal_quality_eval 经硬编码默认磁盘路径加载 rules/corpus,绕过 Pack registry(legal_quality_eval.py:28-30,135-142)。(8) 前端在 sceneClassification.ts:113-118 做 pack id/version/hash 与 snapshot 的相等校验。(9) 现有 superseded/archived/history 概念均非制品版本归档(delivery 状态机、软删除、审计轨迹)。
+- **文件与精确行号**: 见 claim 内逐条
+- **命令**: 两个只读子代理(Read/Grep/Glob)
+- **原始结果摘要**: 见 claim;完整报告存于本会话。
+- **提交 SHA**: 65f0b398
+- **是否已复现**: 静态复核;关键路径(loader 哈希验证、get_exact)另有本轮实测通过的 test_capability_packs.py 佐证(EV-0018)。
+- **限制和不确定性**: rules_registry.py 传统加载路径(无哈希校验)与 material fields 的耦合程度需实施时确认。
