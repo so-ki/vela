@@ -18,9 +18,10 @@
 - 注意:Git 的实时 HEAD 只能在恢复时通过 `git rev-parse HEAD` 获取;本文件不记录、也不得用文件记录替代 Git 实时查询(D-0004)。
 
 ## Current Phase
-- Phase: WS-1C/C3 — 多版本 reader 架构只读设计冻结——已完成,等待用户批准实施
-- Workstream: WS-1C(C1、C1.1、C2、C2.1 完成;C3 设计已冻结待批;C4/C5 未开始)
-- Status: design_frozen_pending_approval
+- Phase: WS-1C/C3-A — goldens + canonical hash v1 + compiler 0.2 / proof 0.1 reader registry + Answerability 分发——已实施并全量验证,等待用户复核
+- Workstream: WS-1C(C1、C1.1、C2、C2.1、C3-A 完成;C3-B/C4/C5 未开始,未获批准)
+- Status: complete_pending_review
+- 分支说明: C3-A 在独立分支 `claude/vela-ws-1c-c3a-versioned-readers`(基于 efc76e0);产品提交 061be1e/dafc96e/e39edf0
 - 分支说明: C2 在独立分支 `claude/vela-ws-1c-c2-real-archive`(基于 C1.1 提交 730b9fd);checkpoint 分支 `claude/gracious-brahmagupta-bbg2dw` 停在 C1.1
 - Allowed file scope(本轮 C3 设计轮): 仅 5 个交接文件(产品代码零改动)
 - Prohibited actions: 修改产品代码/测试/迁移/规则/语料/归档制品/Docker/前端;新增 version registry;移动函数;开始 ResearchItem 与 C4/C5;创建 PR;合并;推送 Draft 分支
@@ -79,7 +80,7 @@
 - **ultracode 建议**:C3 实施为 hash 冻结高精度重构,建议**单线实施+每 commit 全量测试**,不切换 ultracode;实施完成后的对抗验证(WS-5 式)可用多代理。
 
 ## Next Exact Action
-- 等待用户:(1) 批准 C3 实施(C3.0~C3.5);(2) 裁决迁移方案 A(C3 用 Alembic 0007,WS-1A 顺延 0008)vs 方案 B(零迁移 hash 试算);(3) 确认 gate 语义扩展口径:已注册的历史 compiler 版本经对应 reader 验证通过(不再一律 compiler_version_stale 拒绝)——D-0008 的直接推论,当前仅存 0.2 数据故无可观察行为变化。
+- 等待用户复核 WS-1C/C3-A(证据 EV-0027;全量 359 passed;goldens raw SHA 已冻结)。经复核通过后请求批准 C3-B(delivery snapshot 1.0 / release 1.1 reader + Alembic 0007 迁移裁决仍悬置:方案 A vs 方案 B)。C3-A 未复核前不得开始 C3-B。
 
 ## Stop Conditions
 - 远端基线移动、产品代码出现非授权改动、或操作将超出 5 个允许文件 → 立即停止并报告。

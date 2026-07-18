@@ -123,3 +123,31 @@
 - **影响范围**: 外证矩阵;WS-1D 验收标准;WS-6/OCR 排期。
 - **谁批准**: 用户。
 - **是否可逆**: 可逆(需新决定)。
+
+## D-0013(C3 分批实施)
+
+- **Decision ID**: D-0013
+- **日期**: 2026-07-18
+- **问题**: C3 实施批次划分。
+- **最终决定**: C3 分为 **C3-A**(goldens + canonical hash v1 + compiler 0.2 reader + proof 0.1 reader + Answerability reader dispatch)与 **C3-B**(Gate/Snapshot 1.0 抽离 + Release 1.1 reader + Alembic 0007 + runtime packaging)。C3-A 通过复核前不得开始 C3-B。
+- **依据**: 用户批示(C3-A 任务书)。
+- **谁批准**: 用户。
+- **是否可逆**: 批次划分可调整(需新决定)。
+
+## D-0014(未知版本错误语义)
+
+- **Decision ID**: D-0014
+- **日期**: 2026-07-18
+- **最终决定**: 持久化身份无法解释或版本组合不自洽 → **HTTP 422**:`compiler_version_unsupported`、`coverage_proof_schema_unsupported`、`version_combination_unsupported`;不得提示"重新编译即可解决"。既有 stale 类(`compiler_input_snapshot_stale`、`coverage_proof_stale`、事实/checklist/evidence 变化)保持 **HTTP 409**。Release 未知 schema 由 evaluator 返回 `delivery_release_schema_unsupported`(C3-B),正式下载仍经现有 delivery gate 阻断。gate 的 `compilation.compiler_version != CURRENT` 一揽子 `compiler_version_stale` 拒绝被按版本分发取代。
+- **依据**: 用户批示;EV-0026(compiler_version_stale 无测试覆盖、当前仅 0.2 数据,无可观察行为变化)。
+- **谁批准**: 用户。
+- **是否可逆**: 错误语义冻结,变更需新决定。
+
+## D-0015(canonical hash v1)
+
+- **Decision ID**: D-0015
+- **日期**: 2026-07-18
+- **最终决定**: 历史 hash reader 不得依赖未来可变的通用 `stable_hash()`。冻结当前算法为 `canonical_hash_v1(payload)` = `sha256(json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")).hexdigest()`。Compiler 0.2 与 CoverageProof 0.1 的 writer/reader 使用该函数(input/output/proof/denominator 四类 hash)。现有 `stable_hash()` 本批不得发生行为变化,可委托 `canonical_hash_v1()`,但必须以 golden 测试证明所有当前 hash 完全相同。其他未版本化服务继续使用 `stable_hash()`,不做全仓替换。
+- **依据**: 用户批示;generation_guard 现行实现。
+- **谁批准**: 用户。
+- **是否可逆**: v1 算法不可变;未来算法以 v2 追加。

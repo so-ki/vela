@@ -279,3 +279,12 @@
 - **提交 SHA**: ace91d2(C2 分支)
 - **是否已复现**: 三路独立分析对关键事实(gate 嵌入链、release 无版本列、无历史 reader)相互印证。
 - **限制和不确定性**: 静态分析;golden vector 生成待 C3.0 实施。
+
+## EV-0027
+
+- **claim**: WS-1C/C3-A 实施完成并全量验证。(1) **C3.0 goldens**(commit 061be1e):四组合成 golden 从重构前行为(efc76e0)生成,固定 uuid 序列与时间戳,两次生成 byte-identical;raw SHA-256:compiler_v0_2.json=8787a1644a0c6fe4076978e3b181caa9f3072e29db1e71d3b5670415df4679b4、coverage_proof_v0_1.json=206cb55372dcdb7d00a12d4af38b69a95e10ec57d662f538498c64e138807ffb、answerability_v1_0.json=e40f68050c8e3f56c26ea20fb19772a6fe78109c76d2f5d29d98efc5426f257a、delivery_release_v1_1.json=6cdce303c806ff36e804f01d67e42595d6307984a83312efe211a50f4fdac256;冻结的六个关键 hash:compiler input 5e566256…ded0b / output e731487b…458ab、proof 08536aca…29184、denominator 9a1dbe05…8c6ac、snapshot e3dfe751…01f88、release 92a35172…aad73;测试与冻结 JSON/hash 常量比较,非函数对函数。(2) **C3.1**(dafc96e):canonical_hash_v1(D-0015,与 stable_hash 算法逐字符等价,测试覆盖中文/排序/list/datetime/None-bool-number/嵌套+全部 golden hash)、静态只增 registry(唯一性构造器,重复/空即抛)、claim_compiler/v0_2 冻结模块(不 import mechanism/gate,私有 FactRecord 查询序)、mechanism_service 薄 wrapper(writer 仍写 0.2,hash 与 golden 一致)、gate 按持久化 compiler_version 分发:未注册→422 compiler_version_unsupported(D-0014),取代旧 compiler_version_stale 一揽子拒绝;既有 stale/tamper 409/422 语义不变;Docker/.dockerignore/边界测试同 commit。(3) **C3.2**(e39edf0):coverage_proof/v0_1 纯冻结模块、SUPPORTED_COVERAGE_PROOF_READERS、显式兼容矩阵 (0.2,0.1)、gate 回读 proof.schema_version:缺失/未注册→422 coverage_proof_schema_unsupported,注册但矩阵外→422 version_combination_unsupported:<c>+<p>;重算/哈希全部经存储版本 reader。(4) **验证**:靶向 53 passed;全量 **359 passed**(基线 324+35 新增,零删改降级);compileall、ruff(全部新增/修改文件)、check_release_boundaries、git diff --check 全过;写默认前移模拟(CURRENT→"0.3")后存储 0.2 仍经 0.2 reader 验证;无网络 FROM scratch context 探针确认 8 个 versioned .py 全部进入 backend 构建 context(探针产物已删)。完整生产镜像仍按 EV-0024 未验证(TLS 拦截)。
+- **文件与精确行号**: backend/app/services/versioned/{__init__,registry,canonical_hash/v1,claim_compiler/v0_2,coverage_proof/v0_1}.py;mechanism_service.py(薄 wrapper);answerability_gate_service.py(双分发);backend/tests/{goldens/versioned/*,test_versioned_goldens.py,test_versioned_registry.py};backend/.dockerignore;docker/Dockerfile.backend{,.prod};test_release_safety.py
+- **命令与结果**: 见 claim;环境 Python 3.12.3 uv venv。
+- **提交 SHA**: 061be1e(C3.0)、dafc96e(C3.1)、e39edf0(C3.2),分支 claude/vela-ws-1c-c3a-versioned-readers(基于 efc76e0)
+- **是否已复现**: goldens 双次生成一致;测试单轮全绿。
+- **限制和不确定性**: C3-B 范围(snapshot/release reader、Alembic 0007)未实施;golden 再生成需经批准的新决定。
