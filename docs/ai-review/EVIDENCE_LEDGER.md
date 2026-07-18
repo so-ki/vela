@@ -124,3 +124,43 @@
 - **提交 SHA**: 65f0b398
 - **是否已复现**: 静态复核已确认。
 - **限制和不确定性**: CI 绿色与否需以远端 Actions 具体 run 为准,本轮未查询。
+
+## EV-0013
+
+- **claim**: 【修正 EV-0007/0008 的定性】规则触发词具有真实行为影响,不是"纯装饰/从不门控":(1) 每个 trigger 命中 +2 分(rule_engine.py:172-175);(2) 非 always_include 条目 score=0 时返回 None 被丢弃(:180-181),全部 30 项中仅 5 项 always_include(FOR-001/002/003、TAX-001/002),其余 25 项完全依赖触发词决定是否进入 checklist;(3) 子行业不匹配条目在 generate_checklist:334 直接跳过(8 项带 sub_sectors);(4) relevance_score 是排序第三键(:387-394),触发命中改变同维度同优先级内的排序。因此 "450"(LAB-001/LAB-005 触发词)、"1000"(IND-005/IND-006 触发词,且是 electric_bus 子行业关键词)、"比亚迪"(FOR-004 触发词)、"坎皮纳斯"(LAB-003/TAX-003 触发词)都能改变 checklist 组成与排序。
+- **文件与精确行号**: backend/app/services/rule_engine.py:166-188,306,334,387-394;backend/app/rules/brazil_new_energy.json(LAB-001/LAB-003/LAB-005/IND-005/IND-006/FOR-004/TAX-003 triggers;industries.new_energy.sub_sector_defs)
+- **命令**: 本会话直接 Read + python json 解析(计数脚本输出:total=30、always_include=5、sub_sectors 条目=8)
+- **原始结果摘要**: 见命令输出;另注意 corpus 包含 str(employee_count)(:306),子串匹配意味着 "1450" 含 "450"、"1000" 会把任意含该数字的文本误判为 electric_bus 子行业。
+- **提交 SHA**: 65f0b398
+- **是否已复现**: 静态代码复核(本会话亲自验证);动态执行待 experiment_required。
+- **限制和不确定性**: 未运行 generate_checklist 实测;排序影响幅度未量化。
+
+## EV-0014
+
+- **claim**: 【confirmed bug】detect_sub_sectors 为纯子串匹配、无否定处理(rule_engine.py:250-253:`kw.lower() in normalized or kw in corpus`)。静态推演四个否定/不确定表述:"不生产电池"、"不涉及任何电池生产或包装活动"、"设备供应给电池厂,但本项目本身不生产电池"、"未说明是否生产电池"——全部含子串"电池",全部误判 battery_pack 子行业,连带使 IND-005/ENV-003/FOR-004/LAB-005/IND-008 等电池条目进入评分。另 sub_sector_defs 含泛化关键词:"系统"(energy_storage)、"1000"(electric_bus)、"回收/防火"(battery_pack),误判面不限于电池。
+- **文件与精确行号**: backend/app/services/rule_engine.py:237-261;backend/app/rules/brazil_new_energy.json industries.new_energy.sub_sector_defs
+- **命令**: 本会话 Read + json 解析
+- **原始结果摘要**: sub_sector_defs.battery_pack.keywords=['电池','磷酸铁锂','铁锂','battery','pack','lithium','回收','防火'];energy_storage 含 '系统';electric_bus 含 '1000'。
+- **提交 SHA**: 65f0b398
+- **是否已复现**: 静态确认(匹配逻辑为无上下文子串包含,结论不依赖运行)。
+- **限制和不确定性**: 动态复现与误判率量化待 WS-1B 实验。
+
+## EV-0015
+
+- **claim**: 【P0/P1】"30 项稳定研究分母"在线不成立。完整链路追踪:(1) 规则文件恰有 30 条定义;(2) 仅 5 条 always_include,25 条依赖触发词、其中 8 条再受子行业门控、且全部受法务选维过滤——真实项目生成数随文本措辞浮动,test_demo_onboarding.py:570 仅断言 >=15,无任何测试断言真实场景生成 30;(3) score=0 条目消失(rule_engine.py:180-181);(4) 未识别子行业条目消失(:334);(5) Claim 分母 = 生成后 payload sections 的去重子集(mechanism_service.py:202-211,381,464),被丢弃条目永不进入 Claim/CoverageProof 记账;(6) A-02 "30 项稳定生成" 与在线代码不一致——稳定 30 分母仅存在于离线 CI 评测(legal_quality_eval.py:228-244 直接遍历规则文件 30 项,test_legal_quality_eval.py:24 断言 30)。后果:措辞不同但法律上等价的项目获得不同的研究分母与覆盖分母,且缩减不可见。
+- **文件与精确行号**: 见 claim 内逐条;另 backend/app/services/mechanism_service.py:568-607(CoverageProof denominator = claims 集合)
+- **命令**: 本会话 Read + json 解析 + grep 测试断言
+- **原始结果摘要**: grep 结果:唯一 "==30" 断言在 eval/ingestion(离线);在线断言为 >=15。
+- **提交 SHA**: 65f0b398
+- **是否已复现**: 静态确认;动态浮动幅度待四合成案例动态回归。
+- **限制和不确定性**: "稳定"的产品语义(30 全量研究分母 vs 生成子集为适用子集)需产品决定,见 Unresolved。
+
+## EV-0016
+
+- **claim**: 无 draft 的 checklist 条目会以占位文案 `待核验事项:{title}` 存为 ClaimRecord.statement(mechanism_service.py:442-446),数据模型无 research_item/legal_claim 类型区分;缓解:此类记录因无 fact/evidence refs 必然 status=refused(:438,447),confirm_claim 仅接受 awaiting_human_confirmation(:552 附近 CAS),故不可能被确认为 supported,也无法通过 Answerability 的正向结论绑定;风险为语义混淆——研究占位以 "refused claim" 形态进入 CoverageProof.uncovered 与审计视图,把"尚未研究"与"法务拒答"混在同一状态。
+- **文件与精确行号**: backend/app/services/mechanism_service.py:422-453,541-560,568-607
+- **命令**: grep "待核验" + Read
+- **原始结果摘要**: 全库仅 mechanism_service.py:445 一处生成该文案。
+- **提交 SHA**: 65f0b398
+- **是否已复现**: 静态确认。
+- **限制和不确定性**: 前端如何呈现 refused 占位与真实拒答的区别未复核(属 WS-2/WS-10)。
