@@ -20,6 +20,7 @@ from typing import Any, Callable, Iterable, Mapping
 from sqlalchemy.orm import Session
 
 from app.services.versioned.claim_compiler import v0_2 as claim_compiler_v0_2
+from app.services.versioned.coverage_proof import v0_1 as coverage_proof_v0_1
 
 
 class VersionedRegistryError(ValueError):
@@ -37,7 +38,17 @@ class UnsupportedVersionError(VersionedRegistryError):
         super().__init__(f"未注册的 {unit} 版本：{version!r}")
 
 
+class UnsupportedCombinationError(VersionedRegistryError):
+    def __init__(self, compiler_version: object, proof_version: object) -> None:
+        self.compiler_version = compiler_version
+        self.proof_version = proof_version
+        super().__init__(
+            f"不受支持的版本组合：compiler {compiler_version!r} + proof {proof_version!r}"
+        )
+
+
 CURRENT_COMPILER_WRITE_VERSION = "0.2"
+CURRENT_COVERAGE_PROOF_WRITE_VERSION = "0.1"
 
 
 @dataclass(frozen=True)
@@ -93,6 +104,79 @@ def get_compiler_reader(version: object) -> CompilerReader:
     if not isinstance(version, str) or version not in SUPPORTED_COMPILER_READERS:
         raise UnsupportedVersionError("claim_compiler", version)
     return SUPPORTED_COMPILER_READERS[version]
+
+
+@dataclass(frozen=True)
+class CoverageProofReader:
+    """One frozen coverage-proof schema version."""
+
+    version: str
+    build_proof_body: Callable[..., tuple[list[dict[str, Any]], dict[str, Any]]]
+    hash_payload: Callable[[Any], str]
+
+
+_COVERAGE_PROOF_V0_1 = CoverageProofReader(
+    version=coverage_proof_v0_1.VERSION,
+    build_proof_body=coverage_proof_v0_1.build_proof_body,
+    hash_payload=coverage_proof_v0_1.hash_payload,
+)
+
+
+SUPPORTED_COVERAGE_PROOF_READERS: Mapping[str, CoverageProofReader] = build_unique_version_map(
+    "coverage_proof",
+    (
+        ("0.1", _COVERAGE_PROOF_V0_1),
+    ),
+)
+
+
+def build_unique_combination_set(
+    entries: Iterable[tuple[str, str]]
+) -> frozenset[tuple[str, str]]:
+    """Explicit compatibility pairs; duplicates are a configuration error."""
+
+    pairs: set[tuple[str, str]] = set()
+    for pair in entries:
+        if pair in pairs:
+            raise DuplicateVersionError(f"版本组合重复注册：{pair}")
+        pairs.add(pair)
+    if not pairs:
+        raise VersionedRegistryError("版本兼容矩阵不得为空")
+    return frozenset(pairs)
+
+
+SUPPORTED_COMPILER_PROOF_COMBINATIONS: frozenset[tuple[str, str]] = (
+    build_unique_combination_set(
+        (
+            ("0.2", "0.1"),
+        )
+    )
+)
+
+
+def get_coverage_reader(version: object) -> CoverageProofReader:
+    """Exact lookup by the persisted proof schema version. No fallback."""
+
+    if not isinstance(version, str) or version not in SUPPORTED_COVERAGE_PROOF_READERS:
+        raise UnsupportedVersionError("coverage_proof", version)
+    return SUPPORTED_COVERAGE_PROOF_READERS[version]
+
+
+def require_supported_combination(
+    compiler_version: str,
+    proof_version: str,
+    *,
+    combinations: frozenset[tuple[str, str]] | None = None,
+) -> None:
+    """Registered versions may still be mutually incompatible; fail closed."""
+
+    allowed = SUPPORTED_COMPILER_PROOF_COMBINATIONS if combinations is None else combinations
+    if (compiler_version, proof_version) not in allowed:
+        raise UnsupportedCombinationError(compiler_version, proof_version)
+
+
+def current_coverage_proof_writer() -> CoverageProofReader:
+    return get_coverage_reader(CURRENT_COVERAGE_PROOF_WRITE_VERSION)
 
 
 def current_compiler_writer() -> CompilerReader:

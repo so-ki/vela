@@ -423,42 +423,14 @@ def build_coverage_proof_body(
     claims: list[ClaimRecord],
     denominator_ref: str,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Build the deterministic body committed by a CoverageProof."""
+    """Build the CoverageProof body (current write version)."""
 
-    denominator = [
-        {"checklist_code": claim.checklist_code, "statement": claim.statement}
-        for claim in sorted(claims, key=lambda value: value.checklist_code)
-    ]
-    covered = [claim.checklist_code for claim in claims if claim.status == "supported"]
-    uncovered = [
-        {
-            "checklist_code": claim.checklist_code,
-            "status": claim.status,
-            "unanswerable_reasons": (
-                list(claim.reason_codes)
-                if claim.status == "refused"
-                else ["human_confirmation_pending"]
-            ),
-        }
-        for claim in claims
-        if claim.status != "supported"
-    ]
-    proof_body = {
-        "schema_version": "0.1",
-        "scenario_id": scenario_id,
-        "compilation_id": compilation.id,
-        "compiler_input_hash": compilation.input_hash,
-        "compiler_output_hash": compilation.output_hash,
-        "denominator_ref": denominator_ref.strip(),
-        "denominator": denominator,
-        "covered_checklist_codes": sorted(covered),
-        "uncovered": sorted(uncovered, key=lambda item: item["checklist_code"]),
-        "answerability_rule": (
-            "covered 仅计入经法务人工确认的 supported Claim；"
-            "awaiting/refused 均不得作为已覆盖结论。"
-        ),
-    }
-    return denominator, proof_body
+    return versioned_registry.current_coverage_proof_writer().build_proof_body(
+        scenario_id=scenario_id,
+        compilation=compilation,
+        claims=claims,
+        denominator_ref=denominator_ref,
+    )
 
 
 def create_coverage_proof(
@@ -485,13 +457,13 @@ def create_coverage_proof(
         scenario_id=scenario.id,
         compilation_id=compilation.id,
         denominator_ref=denominator_ref.strip(),
-        denominator_hash=stable_hash(denominator),
+        denominator_hash=versioned_registry.current_coverage_proof_writer().hash_payload(denominator),
         denominator_count=len(denominator),
         covered_count=len(covered),
         uncovered_count=len(uncovered),
         unanswerable_count=sum(1 for claim in claims if claim.status == "refused"),
         proof=proof_body,
-        proof_hash=stable_hash(proof_body),
+        proof_hash=versioned_registry.current_coverage_proof_writer().hash_payload(proof_body),
         created_by=user.id,
     )
     db.add(proof)

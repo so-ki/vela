@@ -163,3 +163,83 @@ def test_existing_stale_and_tamper_codes_unchanged(golden_state) -> None:
         require_delivery_answerability(db, scenario=scenario)
     assert exc.value.http_status == 409
     assert exc.value.reason_codes == ("compiler_input_snapshot_stale",)
+
+
+# --- coverage proof registry & compatibility matrix (C3.2) -------------------
+
+
+def test_proof_registry_and_combination_matrix_minimum_entries() -> None:
+    assert "0.1" in versioned_registry.SUPPORTED_COVERAGE_PROOF_READERS
+    assert versioned_registry.CURRENT_COVERAGE_PROOF_WRITE_VERSION == "0.1"
+    assert ("0.2", "0.1") in versioned_registry.SUPPORTED_COMPILER_PROOF_COMBINATIONS
+    reader = versioned_registry.get_coverage_reader("0.1")
+    assert reader.version == "0.1"
+
+
+@pytest.mark.parametrize("bad", ["0.9", "", None, "latest"])
+def test_unknown_proof_schema_never_falls_back(bad) -> None:
+    with pytest.raises(UnsupportedVersionError):
+        versioned_registry.get_coverage_reader(bad)
+
+
+def test_known_but_incompatible_combination_fails_closed() -> None:
+    isolated = versioned_registry.build_unique_combination_set((("0.2", "0.1"),))
+    versioned_registry.require_supported_combination("0.2", "0.1", combinations=isolated)
+    with pytest.raises(versioned_registry.UnsupportedCombinationError):
+        versioned_registry.require_supported_combination("0.3", "0.1", combinations=isolated)
+    with pytest.raises(versioned_registry.UnsupportedCombinationError):
+        versioned_registry.require_supported_combination("0.2", "0.2", combinations=isolated)
+
+
+def test_duplicate_combination_registration_fails() -> None:
+    with pytest.raises(DuplicateVersionError):
+        versioned_registry.build_unique_combination_set((("0.2", "0.1"), ("0.2", "0.1")))
+
+
+def _tamper_proof_body(db, scenario_id: int, mutate) -> None:
+    from app.models.mechanism import CoverageProof
+
+    proof = (
+        db.query(CoverageProof)
+        .filter(CoverageProof.scenario_id == scenario_id)
+        .order_by(CoverageProof.created_at.desc())
+        .first()
+    )
+    body = json.loads(json.dumps(proof.proof))
+    mutate(body)
+    db.execute(
+        update(CoverageProof).where(CoverageProof.id == proof.id).values(proof=body)
+    )
+    db.flush()
+    db.expire_all()
+
+
+def test_missing_proof_schema_version_fails_closed_422(golden_state) -> None:
+    _prepare_gate_state(golden_state)
+    db = golden_state["db"]
+    _tamper_proof_body(db, 1, lambda body: body.pop("schema_version"))
+    with pytest.raises(AnswerabilityGateError) as exc:
+        require_delivery_answerability(db, scenario=golden_state["scenario"])
+    assert exc.value.http_status == 422
+    assert exc.value.reason_codes == ("coverage_proof_schema_unsupported",)
+
+
+def test_unknown_proof_schema_version_fails_closed_422(golden_state) -> None:
+    _prepare_gate_state(golden_state)
+    db = golden_state["db"]
+    _tamper_proof_body(db, 1, lambda body: body.__setitem__("schema_version", "0.9"))
+    with pytest.raises(AnswerabilityGateError) as exc:
+        require_delivery_answerability(db, scenario=golden_state["scenario"])
+    assert exc.value.http_status == 422
+    assert exc.value.reason_codes == ("coverage_proof_schema_unsupported",)
+
+
+def test_proof_writer_still_writes_0_1(golden_state) -> None:
+    _prepare_gate_state(golden_state)
+    db = golden_state["db"]
+    from app.models.mechanism import CoverageProof
+
+    proof = db.query(CoverageProof).filter(CoverageProof.scenario_id == 1).first()
+    assert proof.proof["schema_version"] == "0.1"
+    gate = require_delivery_answerability(db, scenario=golden_state["scenario"])
+    assert gate["coverage_proof_hash"] == proof.proof_hash

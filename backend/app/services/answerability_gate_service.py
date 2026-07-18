@@ -16,13 +16,15 @@ from app.models.mechanism import ClaimCompilation, ClaimRecord, CoverageProof
 from app.models.scenario import InvestigationScenario
 from app.services.generation_guard import stable_hash
 from app.services.mechanism_service import (
-    build_coverage_proof_body,
     latest_compilation,
     latest_coverage_proof,
 )
 from app.services.versioned.registry import (
+    UnsupportedCombinationError,
     UnsupportedVersionError,
     get_compiler_reader,
+    get_coverage_reader,
+    require_supported_combination,
 )
 
 
@@ -211,12 +213,39 @@ def _assert_coverage_integrity(
         )
 
     stored_body = proof.proof or {}
+    # Dispatch on the persisted proof schema version (D-0014). A missing,
+    # non-string or unregistered version is an unexplainable stored identity:
+    # fail closed with 422, never fall back to the current reader and never
+    # treat it as recompilable staleness.
+    stored_proof_version = stored_body.get("schema_version")
+    try:
+        proof_reader = get_coverage_reader(stored_proof_version)
+    except UnsupportedVersionError:
+        raise _integrity_error(
+            "CoverageProof 使用了未注册的 schema 版本，禁止交付。",
+            ["coverage_proof_schema_unsupported"],
+            compilation=compilation,
+            proof=proof,
+        ) from None
+    try:
+        require_supported_combination(compilation.compiler_version, proof_reader.version)
+    except UnsupportedCombinationError:
+        raise _integrity_error(
+            "Claim compiler 与 CoverageProof 的版本组合不受支持，禁止交付。",
+            [
+                "version_combination_unsupported:"
+                f"{compilation.compiler_version}+{proof_reader.version}"
+            ],
+            compilation=compilation,
+            proof=proof,
+        ) from None
+
     stored_denominator = list(stored_body.get("denominator") or [])
     stored_uncovered = list(stored_body.get("uncovered") or [])
     integrity_reasons: list[str] = []
-    if stable_hash(stored_body) != proof.proof_hash:
+    if proof_reader.hash_payload(stored_body) != proof.proof_hash:
         integrity_reasons.append("coverage_proof_stored_hash_invalid")
-    if proof.denominator_hash != stable_hash(stored_denominator):
+    if proof.denominator_hash != proof_reader.hash_payload(stored_denominator):
         integrity_reasons.append("coverage_denominator_hash_invalid")
     stored_counts = (
         len(stored_denominator),
@@ -248,17 +277,17 @@ def _assert_coverage_integrity(
             proof=proof,
         )
 
-    denominator, expected_body = build_coverage_proof_body(
+    denominator, expected_body = proof_reader.build_proof_body(
         scenario_id=scenario.id,
         compilation=compilation,
         claims=claims,
         denominator_ref=proof.denominator_ref,
     )
-    expected_hash = stable_hash(expected_body)
+    expected_hash = proof_reader.hash_payload(expected_body)
     if (
         proof.proof != expected_body
         or proof.proof_hash != expected_hash
-        or proof.denominator_hash != stable_hash(denominator)
+        or proof.denominator_hash != proof_reader.hash_payload(denominator)
     ):
         raise _conflict_error(
             "CoverageProof 已落后于当前 Claim 状态，请重新生成覆盖证明。",
