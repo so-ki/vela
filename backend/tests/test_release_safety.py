@@ -150,3 +150,28 @@ def test_backend_image_allowlists_include_version_index_and_archive() -> None:
         "backend/app/capability_packs/archive/brazil_new_energy_greenfield/1.3.1/bundle/rules/brazil_new_energy.json"
         in files
     )
+
+
+def test_backend_image_allowlists_include_versioned_readers() -> None:
+    """WS-1C/C3-A: versioned reader modules must ship in image and package."""
+
+    dockerignore = (release_safety.ROOT / "backend/.dockerignore").read_text(encoding="utf-8")
+    for needed in (
+        "!app/services/versioned/",
+        "!app/services/versioned/*.py",
+        "!app/services/versioned/canonical_hash/*.py",
+        "!app/services/versioned/claim_compiler/*.py",
+        "!app/services/versioned/coverage_proof/*.py",
+    ):
+        assert needed in dockerignore
+    for name in ("docker/Dockerfile.backend", "docker/Dockerfile.backend.prod"):
+        content = (release_safety.ROOT / name).read_text(encoding="utf-8")
+        assert "COPY app/services/versioned ./app/services/versioned" in content
+    files = release_safety._collect_package_files()
+    for expected in (
+        "backend/app/services/versioned/__init__.py",
+        "backend/app/services/versioned/registry.py",
+        "backend/app/services/versioned/canonical_hash/v1.py",
+        "backend/app/services/versioned/claim_compiler/v0_2.py",
+    ):
+        assert expected in files

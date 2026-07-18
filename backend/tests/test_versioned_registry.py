@@ -1,0 +1,165 @@
+"""WS-1C/C3-A: versioned reader registry, canonical hash v1 and gate dispatch."""
+
+from __future__ import annotations
+
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+
+import pytest
+from sqlalchemy import update
+
+from app.models.mechanism import ClaimCompilation
+from app.services import mechanism_service
+from app.services.answerability_gate_service import (
+    AnswerabilityGateError,
+    require_delivery_answerability,
+)
+from app.services.generation_guard import stable_hash
+from app.services.versioned import registry as versioned_registry
+from app.services.versioned.canonical_hash import canonical_hash_v1
+from app.services.versioned.registry import (
+    DuplicateVersionError,
+    UnsupportedVersionError,
+    build_unique_version_map,
+    get_compiler_reader,
+)
+
+from test_versioned_goldens import golden_state  # noqa: F401, F811  (shared fixture)
+
+GOLDEN_DIR = Path(__file__).parent / "goldens" / "versioned"
+
+
+def _golden(name: str) -> dict:
+    return json.loads((GOLDEN_DIR / name).read_text(encoding="utf-8"))
+
+
+# --- canonical hash v1 -------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"中文键": "中文值：许可路径", "nested": {"z": 1, "a": None}},
+        {"b": 2, "a": 1},
+        [3, 1, 2, [True, False, None]],
+        {"dt": datetime(2026, 7, 1, 12, 0, 0, tzinfo=timezone.utc)},
+        {"none": None, "bool": True, "int": 7, "float": 1.5},
+        {"outer": [{"inner": {"深": "层"}}]},
+    ],
+)
+def test_canonical_hash_v1_equals_stable_hash(payload) -> None:
+    assert canonical_hash_v1(payload) == stable_hash(payload)
+
+
+def test_canonical_hash_v1_reproduces_all_golden_hashes() -> None:
+    compiler = _golden("compiler_v0_2.json")["expected"]
+    assert canonical_hash_v1(compiler["input_snapshot"]) == compiler["input_hash"]
+    assert canonical_hash_v1(compiler["claim_values"]) == compiler["output_hash"]
+    proof = _golden("coverage_proof_v0_1.json")["expected"]
+    assert canonical_hash_v1(proof["proof_body"]) == proof["proof_hash"]
+    assert canonical_hash_v1(proof["proof_body"]["denominator"]) == proof["denominator_hash"]
+    release = _golden("delivery_release_v1_1.json")["expected"]
+    assert canonical_hash_v1(release["delivery_snapshot"]) == release["snapshot_hash"]
+    assert canonical_hash_v1(release["release_body"]) == release["release_hash"]
+
+
+# --- registry construction guards -------------------------------------------
+
+
+def test_registry_contains_required_historical_entries() -> None:
+    assert "0.2" in versioned_registry.SUPPORTED_COMPILER_READERS
+    assert versioned_registry.CURRENT_COMPILER_WRITE_VERSION == "0.2"
+    reader = get_compiler_reader("0.2")
+    assert reader.version == "0.2"
+
+
+def test_duplicate_version_registration_fails() -> None:
+    with pytest.raises(DuplicateVersionError):
+        build_unique_version_map("unit", (("0.2", object()), ("0.2", object())))
+
+
+def test_empty_registry_is_a_configuration_error() -> None:
+    with pytest.raises(versioned_registry.VersionedRegistryError):
+        build_unique_version_map("unit", ())
+
+
+@pytest.mark.parametrize("bad", ["9.9", "", None, "latest", "0.20"])
+def test_unknown_compiler_version_never_falls_back(bad) -> None:
+    with pytest.raises(UnsupportedVersionError):
+        get_compiler_reader(bad)
+
+
+def test_current_write_version_not_used_for_reader_selection(monkeypatch) -> None:
+    """Simulating a future write default must not change historical dispatch."""
+
+    monkeypatch.setattr(versioned_registry, "CURRENT_COMPILER_WRITE_VERSION", "0.3")
+    reader = get_compiler_reader("0.2")
+    assert reader.version == "0.2"
+    with pytest.raises(UnsupportedVersionError):
+        get_compiler_reader("0.3")
+
+
+# --- gate dispatch (uses the golden fixture state) ---------------------------
+
+
+def _prepare_gate_state(golden_state) -> None:
+    db = golden_state["db"]
+    env_claim = next(c for c in golden_state["claims"] if c.checklist_code == "ENV-001")
+    mechanism_service.confirm_claim(
+        db, claim=env_claim, decision="confirmed",
+        confirmation_note="confirmed by golden counsel", user=golden_state["legal"],
+    )
+    mechanism_service.create_coverage_proof(
+        db,
+        scenario=golden_state["scenario"],
+        compilation=golden_state["compilation"],
+        claims=mechanism_service.compilation_claims(db, golden_state["compilation"].id),
+        denominator_ref="manual:golden-denominator",
+        user=golden_state["legal"],
+    )
+
+
+def test_gate_passes_current_versions_and_ignores_future_write_default(
+    golden_state, monkeypatch
+) -> None:
+    _prepare_gate_state(golden_state)
+    db = golden_state["db"]
+    gate = require_delivery_answerability(db, scenario=golden_state["scenario"])
+    assert gate["compiler_version"] == "0.2"
+
+    # A stored 0.2 compilation keeps validating through the 0.2 reader even
+    # after the write default moves on (D-0008).
+    monkeypatch.setattr(versioned_registry, "CURRENT_COMPILER_WRITE_VERSION", "0.3")
+    gate_again = require_delivery_answerability(db, scenario=golden_state["scenario"])
+    assert gate_again["compiler_version"] == "0.2"
+
+
+def test_unknown_stored_compiler_version_fails_closed_422(golden_state) -> None:
+    _prepare_gate_state(golden_state)
+    db = golden_state["db"]
+    db.execute(
+        update(ClaimCompilation)
+        .where(ClaimCompilation.id == golden_state["compilation"].id)
+        .values(compiler_version="9.9")
+    )
+    db.flush()
+    db.expire_all()
+    with pytest.raises(AnswerabilityGateError) as exc:
+        require_delivery_answerability(db, scenario=golden_state["scenario"])
+    assert exc.value.http_status == 422
+    assert exc.value.reason_codes == ("compiler_version_unsupported",)
+
+
+def test_existing_stale_and_tamper_codes_unchanged(golden_state) -> None:
+    _prepare_gate_state(golden_state)
+    db = golden_state["db"]
+    scenario = golden_state["scenario"]
+    payload = json.loads(json.dumps(scenario.checklist.payload))
+    payload["sections_with_legal"][0]["items"][0]["title"] = "环境许可路径（已修改）"
+    scenario.checklist.payload = payload
+    db.flush()
+    with pytest.raises(AnswerabilityGateError) as exc:
+        require_delivery_answerability(db, scenario=scenario)
+    assert exc.value.http_status == 409
+    assert exc.value.reason_codes == ("compiler_input_snapshot_stale",)

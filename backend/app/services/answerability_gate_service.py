@@ -16,13 +16,13 @@ from app.models.mechanism import ClaimCompilation, ClaimRecord, CoverageProof
 from app.models.scenario import InvestigationScenario
 from app.services.generation_guard import stable_hash
 from app.services.mechanism_service import (
-    COMPILER_VERSION,
-    _checklist_items,
-    build_compiler_claim_values,
-    build_compiler_input_snapshot,
     build_coverage_proof_body,
     latest_compilation,
     latest_coverage_proof,
+)
+from app.services.versioned.registry import (
+    UnsupportedVersionError,
+    get_compiler_reader,
 )
 
 
@@ -108,13 +108,18 @@ def _assert_compiler_integrity(
 ) -> None:
     reasons: list[str] = []
     stored_snapshot = compilation.input_snapshot or {}
-    if compilation.compiler_version != COMPILER_VERSION:
-        raise _conflict_error(
-            "Claim compilation 使用了旧版编译器，请基于当前材料重新编译。",
-            ["compiler_version_stale"],
+    # Dispatch on the persisted compiler version — never on the current write
+    # default (D-0008/D-0014). Unknown persisted versions are unexplainable
+    # stored identities, not "stale" state: fail closed with 422.
+    try:
+        reader = get_compiler_reader(compilation.compiler_version)
+    except UnsupportedVersionError:
+        raise _integrity_error(
+            "Claim compilation 使用了未注册的编译器版本，禁止交付。",
+            ["compiler_version_unsupported"],
             compilation=compilation,
-        )
-    if stable_hash(stored_snapshot) != compilation.input_hash:
+        ) from None
+    if reader.hash_payload(stored_snapshot) != compilation.input_hash:
         reasons.append("compiler_input_hash_invalid")
 
     drafts = stored_snapshot.get("drafts")
@@ -127,12 +132,12 @@ def _assert_compiler_integrity(
             reasons,
             compilation=compilation,
         )
-    current_snapshot = build_compiler_input_snapshot(
+    current_snapshot = reader.build_input_snapshot(
         db,
         scenario=scenario,
         drafts=drafts,
     )
-    if stable_hash(current_snapshot) != compilation.input_hash:
+    if reader.hash_payload(current_snapshot) != compilation.input_hash:
         raise _conflict_error(
             (
                 "当前 checklist、双语结论、事实或法源证据已变化，"
@@ -142,14 +147,14 @@ def _assert_compiler_integrity(
             compilation=compilation,
         )
 
-    items = _checklist_items(scenario.checklist.payload if scenario.checklist else {})
-    expected_values = build_compiler_claim_values(
+    items = reader.checklist_items(scenario.checklist.payload if scenario.checklist else {})
+    expected_values = reader.build_claim_values(
         items,
         drafts=drafts,
         facts=current_snapshot["facts"],
         evidence=current_snapshot["evidence"],
     )
-    if stable_hash(expected_values) != compilation.output_hash:
+    if reader.hash_payload(expected_values) != compilation.output_hash:
         reasons.append("compiler_output_hash_invalid")
     if compilation.denominator_count != len(expected_values) or len(claims) != len(expected_values):
         reasons.append("claim_denominator_mismatch")

@@ -28,6 +28,14 @@ app/schemas/**
 !app/services/
 app/services/**
 !app/services/*.py
+!app/services/versioned/
+!app/services/versioned/*.py
+!app/services/versioned/canonical_hash/
+!app/services/versioned/canonical_hash/*.py
+!app/services/versioned/claim_compiler/
+!app/services/versioned/claim_compiler/*.py
+!app/services/versioned/coverage_proof/
+!app/services/versioned/coverage_proof/*.py
 !app/rules/
 app/rules/**
 !app/rules/brazil_new_energy.json

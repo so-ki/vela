@@ -13,6 +13,7 @@ COPY app/core/*.py ./app/core/
 COPY app/models/*.py ./app/models/
 COPY app/schemas/*.py ./app/schemas/
 COPY app/services/*.py ./app/services/
+COPY app/services/versioned ./app/services/versioned
 COPY app/rules/brazil_new_energy.json app/rules/index.json ./app/rules/
 COPY app/data/brazil_legal_corpus.json app/data/brazil_official_portals.json app/data/cold_start_interview.json app/data/contract_house_rules.json app/data/material_house_rules.json ./app/data/
 COPY app/capability_packs/__init__.py app/capability_packs/loader.py app/capability_packs/registry.py app/capability_packs/schemas.py app/capability_packs/version_index.py ./app/capability_packs/
