@@ -4,8 +4,8 @@
 - Product baseline SHA: 65f0b398f94af72680f8c1139aa59f7df6b88d71
 - Target base branch: codex/vela-release-hardening(不得直接推送)
 - Checkpoint branch: claude/gracious-brahmagupta-bbg2dw(仅承载交接文件提交)
-- Last verified product-code SHA: 65f0b398f94af72680f8c1139aa59f7df6b88d71 + 已批准的 WS-1C/C1 产品提交(仅 `backend/app/capability_packs/registry.py`、新增 `backend/app/capability_packs/version_index.py`、新增 `backend/tests/test_capability_pack_version_archive.py`;其余产品代码与基线零差异)
-- Allowed commits: 5 个交接文件 + 经用户逐项批准的 workstream 产品提交(当前仅 WS-1C/C1)
+- Last verified product-code SHA: 65f0b398 基线 + 已批准的 WS-1C 产品提交:C1(362a0c0)、C1.1(730b9fd)、C2(f120b00)、C2.1(ace91d2);实施基线 = ace91d2c95295ef36e5c7c5e53ad512cc099b8f8(C2 分支)
+- Allowed commits: 5 个交接文件 + 经用户逐项批准的 workstream 产品提交(当前 C1/C1.1/C2/C2.1)
 - Resume 时必须执行的 Git 核验命令:
   ```
   git status --short
@@ -13,17 +13,17 @@
   git rev-parse HEAD
   git fetch origin
   git rev-parse origin/codex/vela-release-hardening        # 必须 = 65f0b398...
-  git diff --stat 65f0b398f94af72680f8c1139aa59f7df6b88d71 HEAD  # 差异只允许:5 个交接文件 + 已批准的 WS-1C/C1 三个产品文件
+  git diff --stat 65f0b398f94af72680f8c1139aa59f7df6b88d71 HEAD  # 差异只允许:5 个交接文件 + 已批准的 C1/C1.1/C2/C2.1 产品文件
   ```
 - 注意:Git 的实时 HEAD 只能在恢复时通过 `git rev-parse HEAD` 获取;本文件不记录、也不得用文件记录替代 Git 实时查询(D-0004)。
 
 ## Current Phase
-- Phase: WS-1C/C2 + C2.1(长期测试去 active 依赖 + 无网络 Docker context 实探针)——已实施并验证,等待用户复核
-- Workstream: WS-1C(C1、C1.1、C2、C2.1 完成;C3~C5 未开始,未获批准)
-- Status: complete_pending_review
+- Phase: WS-1C/C3 — 多版本 reader 架构只读设计冻结——已完成,等待用户批准实施
+- Workstream: WS-1C(C1、C1.1、C2、C2.1 完成;C3 设计已冻结待批;C4/C5 未开始)
+- Status: design_frozen_pending_approval
 - 分支说明: C2 在独立分支 `claude/vela-ws-1c-c2-real-archive`(基于 C1.1 提交 730b9fd);checkpoint 分支 `claude/gracious-brahmagupta-bbg2dw` 停在 C1.1
-- Allowed file scope(C1 已批准范围): registry.py、新增 version_index.py、新增 test_capability_pack_version_archive.py、5 个交接文件
-- Prohibited actions: 修改 active manifest/生产 rules/生产 corpus/真实归档制品/loader scheme 语义/机制层模型/Claim-Coverage/compiler-proof-release evaluator/Alembic/前端/产品文档/startup-readiness/release 行为;开始 C2~C5 与 WS-1A/B/D/E;创建 PR;合并;推送 Draft 分支
+- Allowed file scope(本轮 C3 设计轮): 仅 5 个交接文件(产品代码零改动)
+- Prohibited actions: 修改产品代码/测试/迁移/规则/语料/归档制品/Docker/前端;新增 version registry;移动函数;开始 ResearchItem 与 C4/C5;创建 PR;合并;推送 Draft 分支
 
 ## Frozen Product Definition
 - 见 `AGENTS.md` 第 2–4 节与 D-0006;产品语义新增冻结决定:**D-0007(分母 A+ 方案)、D-0008(多版本不可变共存)、D-0009(ResearchItem 与 ClaimRecord 分离)、D-0010(外证矩阵采用状态修正)**——以 DECISION_LOG 原文为准,不得再列为 unresolved。
@@ -66,8 +66,20 @@
 1. WS-1C 实施批准(按上节冻结方案与 commit 计划 C1~C5)。
 2. ResearchItem 模型命名偏好:`ResearchItem` vs `ClaimCompilationItem`(D-0009 两候选,WS-1A 冻结方案时定,可由实施者建议)。
 
+## C3 Frozen Plan(v1,待批准;完整版见本轮会话报告,证据 EV-0026)
+- **四个版本单元**(reader 只增不减,显式静态 mapping,无动态 import):`versioned/claim_compiler/v0_2`(七个 builder 函数+FactRecord 查询序+全部 hash 承载字符串)、`versioned/coverage_proof/v0_1`(纯函数,零依赖)、`versioned/delivery_snapshot/v1_0`(build_delivery_snapshot+_current_mechanism_snapshot+gate 字典 1.0 形状——gate 无独立持久化身份,其字典被嵌入 snapshot 散列,故随 snapshot 冻结)、`versioned/delivery_release/v1_1`(_release_body+六个 evidence helper+私有 _iso/_as_utc)。
+- **registry.py**:`SUPPORTED_*_READERS` 静态 dict + `CURRENT_*_WRITE_VERSION` 常量;注册重复即抛;枚举测试守护历史条目不可删;COMPAT 显式矩阵:compiler 0.2→proof 0.1→gate 1.0→snapshot 1.0→release 1.1;不在矩阵内的组合 fail-closed `version_combination_unsupported`(422)。
+- **分发点**:gate `_assert_compiler_integrity` 按 `compilation.compiler_version` 查 reader,未知→`compiler_version_unsupported`(409);`_assert_coverage_integrity` 回读 `proof.proof["schema_version"]`,缺失/未知→`coverage_proof_schema_unsupported`(409);release 按持久化 schema_version 分发,未知→`delivery_release_schema_unsupported`(evaluate blocking_reason,导出经 DeliveryGateBlocked 409)。绝不 fallback 当前 reader/最大版本/静默重算。
+- **迁移判断**:ClaimCompilation/CoverageProof/GenerationInput/attestation 均已有可靠版本身份,不加重复字段;**唯一缺失是 ScenarioDeliveryRelease**(body 弃存只留 hash)→ 需最小迁移 `scenario_delivery_releases.schema_version String(16) NOT NULL server_default '1.1'`。不占用 0007:方案 A(推荐)C3 用 0007、WS-1A 顺延 0008;方案 B 零迁移(按已注册 reader 逐版本试算 hash,恰一匹配即验证,零匹配 fail-closed,但无法区分未知版本与篡改)。待用户裁决。
+- **共享安全边界**:stable_hash/models/validity-policy 检查可共享(输出不进任何存储 hash 体);_iso/_as_utc/evidence dicts/schema 字面量/answerability_rule 中文串/待核验前缀/reason code 串全部 hash 承载,必须随版本模块冻结。
+- **characterization(C3.0,先于一切移动)**:四组 golden vector(compiler 0.2 快照/values/双 hash/分母/reason 排序;proof 0.1 body/proof_hash/denominator_hash/四计数;gate 1.0 字典含 included_conclusions_hash;release 1.1 body/hash+snapshot 1.0)——由固定合成 fixture 生成、人工审查、连同哈希登记 EVIDENCE_LEDGER 后提交;重构前后 hash-for-hash 相等。
+- **commit 计划**:C3.0 goldens;C3.1 registry+claim_compiler v0_2+gate compiler 分发;C3.2 coverage_proof v0_1+兼容矩阵;C3.3 delivery_snapshot v1_0;C3.4 delivery_release v1_1(+迁移,视裁决);C3.5 Docker/.dockerignore/release_safety 允许清单(注意:`COPY app/services/*.py` 不含子目录,versioned/ 必须显式加入 COPY 与 dockerignore,否则镜像 ImportError——C2 教训)+文档。每个 commit 独立可回滚、全量测试保持绿。
+- **测试矩阵**:12 项(现版本组合通过、写默认不变、模拟 0.3 写默认后 0.2 仍由 0.2 reader 验证、三类未知版本 fail-closed、不兼容组合 fail-closed、篡改 version 字段/body fail-closed、reader 不可删、空 registry 可发现、324 基线不删不降)。另补 `compiler_version_stale` 现状无测试的缺口。
+- **API/前端影响**:DeliveryGateStatusResponse `Literal["1.1"]` 保持(写版本升级时扩为多值 Literal);gate 错误 detail 不含版本字段,不变;前端零运行时版本分支,无需改动。
+- **ultracode 建议**:C3 实施为 hash 冻结高精度重构,建议**单线实施+每 commit 全量测试**,不切换 ultracode;实施完成后的对抗验证(WS-5 式)可用多代理。
+
 ## Next Exact Action
-- 等待用户复核 WS-1C/C2 + C2.1(证据:EV-0022~EV-0025;全量 324 passed;context 探针四路径 PRESENT)。完整生产镜像运行验证仍由远端 CI production-compose-smoke 闭环(EV-0024)。经复核通过后请求批准 C3(消费方版本注册表)。
+- 等待用户:(1) 批准 C3 实施(C3.0~C3.5);(2) 裁决迁移方案 A(C3 用 Alembic 0007,WS-1A 顺延 0008)vs 方案 B(零迁移 hash 试算);(3) 确认 gate 语义扩展口径:已注册的历史 compiler 版本经对应 reader 验证通过(不再一律 compiler_version_stale 拒绝)——D-0008 的直接推论,当前仅存 0.2 数据故无可观察行为变化。
 
 ## Stop Conditions
 - 远端基线移动、产品代码出现非授权改动、或操作将超出 5 个允许文件 → 立即停止并报告。
