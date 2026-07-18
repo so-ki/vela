@@ -146,7 +146,7 @@ export interface CoverageProof {
 }
 
 export interface DeliveryGateStatus {
-  schema_version: '1.0'
+  schema_version: '1.1'
   scenario_id: number
   evaluated_at: string
   delivery_allowed: boolean

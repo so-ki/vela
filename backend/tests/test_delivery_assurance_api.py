@@ -51,6 +51,14 @@ def delivery_api_db(tmp_path):
                     role="legal",
                     disclaimer_accepted=True,
                 ),
+                User(
+                    id=4,
+                    email="admin@example.com",
+                    full_name="Release Admin",
+                    organization="Acme",
+                    role="admin",
+                    disclaimer_accepted=True,
+                ),
             ]
         )
         scenario = InvestigationScenario(
@@ -156,3 +164,57 @@ def test_candidate_manifest_hash_matches_returned_manifest(delivery_api_db):
         assert body["artifact_manifest_hash"] == stable_hash(body["artifact_manifest"])
     finally:
         client.close()
+
+
+def test_evidence_object_api_freezes_exact_bytes_and_enforces_scope(delivery_api_db):
+    owner = _client(delivery_api_db, 1)
+    other_customer = _client(delivery_api_db, 2)
+    admin = _client(delivery_api_db, 4)
+    content = b'{"plan":"customer acceptance","version":1}'
+    try:
+        invalid = owner.post(
+            "/api/v1/delivery-assurance/evidence-objects",
+            data={"evidence_kind": "uat_test_plan", "scenario_id": "1"},
+            files={"file": ("broken.json", b"{not-json}", "application/json")},
+        )
+        assert invalid.status_code == 422, invalid.text
+
+        response = owner.post(
+            "/api/v1/delivery-assurance/evidence-objects",
+            data={"evidence_kind": "uat_test_plan", "scenario_id": "1"},
+            files={"file": ("uat-plan.json", content, "application/json")},
+        )
+        assert response.status_code == 201, response.text
+        evidence = response.json()
+        assert evidence["content_sha256"] == hashlib.sha256(content).hexdigest()
+        assert evidence["content_length"] == len(content)
+        assert evidence["scenario_id"] == 1
+        assert evidence["uploaded_by"] == 1
+        assert evidence["status"] == "available"
+
+        listed = owner.get("/api/v1/delivery-assurance/evidence-objects")
+        assert listed.status_code == 200, listed.text
+        assert [item["id"] for item in listed.json()] == [evidence["id"]]
+        assert other_customer.get(
+            f"/api/v1/delivery-assurance/evidence-objects/{evidence['id']}/download"
+        ).status_code == 403
+
+        downloaded = admin.get(
+            f"/api/v1/delivery-assurance/evidence-objects/{evidence['id']}/download"
+        )
+        assert downloaded.status_code == 200, downloaded.text
+        assert downloaded.content == content
+        assert downloaded.headers["cache-control"] == "no-store"
+        assert downloaded.headers["x-content-type-options"] == "nosniff"
+        assert downloaded.headers["x-content-sha256"] == evidence["content_sha256"]
+
+        revoked = owner.post(
+            f"/api/v1/delivery-assurance/evidence-objects/{evidence['id']}/revoke",
+            json={"reason": "Customer withdrew this obsolete UAT test plan."},
+        )
+        assert revoked.status_code == 200, revoked.text
+        assert revoked.json()["status"] == "revoked"
+    finally:
+        owner.close()
+        other_customer.close()
+        admin.close()

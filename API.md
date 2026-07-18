@@ -73,16 +73,20 @@ Authorization: Bearer <JWT>
 
 Answerability Gate 通过仍然**不能**下载正式制品。最终端点还会调用统一的 Customer Delivery Release Gate，依次要求：
 
-1. `legal` 专家提交 OAB CNA/ConfirmADV 凭证；另一 `admin` 依据官方证据核验为 `regular`，持证人不能自核验；
-2. 两名不同、凭证当前有效的巴西律师对精确 Capability Pack、rules、corpus、gold dataset/policy/run 哈希完成内容发布认证；
-3. 法务冻结 DOCX、PDF 和 canonical audit JSON 的精确 bytes；API 返回元数据、manifest/hash，并只向场景业务提交人、legal、admin 提供带 `X-Customer-Delivery-Authorized: false` 的候选件审阅下载，不构成对客发布；
-4. 场景律师用 PAdES/CAdES/XAdES 覆盖三个 artifact manifest，另一管理员核验 ITI VALIDAR 报告；该签名只证明签署身份与签后完整性，不证明内容正确；
-5. 项目业务提交人提交客户 UAT，绑定客户组织、测试证据和目标环境 ID；
-6. 管理员提交 production commit、三镜像 digest、migration head、CI、SBOM、CVE/安全、provenance、runtime probe 与同一 gold run 证据；
-7. 另一发布动作把上述对象绑定为有时效、可撤回的 `ScenarioDeliveryRelease`。任一依赖过期、撤回、哈希变化或环境错绑，最终下载返回 `409`。
+1. 参与者先把按角色允许的证据 exact bytes 上传为不可变、内容寻址的 `DeliveryEvidenceObject`；后续提交只能引用系统重算得到的 SHA-256；
+2. `legal` 专家提交 OAB CNA/ConfirmADV 凭证；另一 `admin` 依据官方报告原件核验为 `regular`，持证人不能自核验，同一报告不得复用于另一凭证；
+3. 两名不同、凭证当前有效的巴西律师对精确 Capability Pack、rules、corpus、gold dataset/policy/run 哈希完成内容发布认证；
+4. 法务冻结 DOCX、PDF 和 canonical audit JSON 的精确 bytes；API 返回元数据、manifest/hash，并只向场景业务提交人、legal、admin 提供带 `X-Customer-Delivery-Authorized: false` 的候选件审阅下载，不构成对客发布；
+5. 场景律师用 PAdES/CAdES/XAdES 覆盖三个 artifact manifest，另一管理员核验 ITI VALIDAR 报告；该签名只证明签署身份与签后完整性，不证明内容正确；
+6. 项目业务提交人提交客户 UAT，绑定客户组织、测试证据和目标环境 ID；
+7. 管理员提交 production commit、三镜像 digest、migration head、CI、构建描述符/回执、SBOM、CVE/安全、provenance、runtime probe 与同一 gold run 证据；descriptor 与 receipt JSON 必须同时绑定当前 commit、迁移、环境和三镜像 digest，receipt 另外绑定 descriptor hash；
+8. 另一发布动作把上述对象及证据原件 manifest 绑定为有时效、可撤回的 `ScenarioDeliveryRelease`。任一依赖过期、撤回、bytes/哈希变化或环境错绑，最终下载返回 `409`。
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
+| POST / GET | `/delivery-assurance/evidence-objects` | 按角色上传/列出受控证据原件；服务器限制 25MB、安全文件名与允许容器，计算 SHA-256 并冻结 bytes。 |
+| GET | `/delivery-assurance/evidence-objects/{id}/download` | 仅原上传人或 admin 可下载核对；响应 `no-store`/`nosniff` 并返回 `X-Content-SHA256`。 |
+| POST | `/delivery-assurance/evidence-objects/{id}/revoke` | 原上传人或 admin 撤回原件；所有引用它的 release 实时失效。 |
 | POST / GET | `/delivery-assurance/credentials` | legal 提交并查看本人执业凭证；admin 可查看全部；business 无权读取。 |
 | POST | `/delivery-assurance/credentials/{id}/decisions` | admin 独立核验、拒绝或撤回；`verified` 必须有 OAB 官方引用、证据哈希、`regular` 状态和有效期。 |
 | POST | `/delivery-assurance/legal-content-certifications/manifest` | legal/admin 生成唯一规范化 rules/corpus/gold 签名清单及 SHA-256；此 hash 必须被双签覆盖。 |

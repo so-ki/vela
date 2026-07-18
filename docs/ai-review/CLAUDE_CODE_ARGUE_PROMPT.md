@@ -31,6 +31,8 @@ L. 两律师法律内容认证是否确实使用不同、current、regular 凭�
 M. UAT target environment、production runtime probe、三镜像 digest、provenance 与当前 Capability Pack 是否可错绑；
 N. 任一 credential/content certification/signature/UAT/deployment/release 过期或撤回后，旧 release 是否立即失效；release 有效期能否越过任一证据有效期。
 O. 保持对象 ID 不变，用 ORM 绕过或 raw SQL 修改 UAT、签名报告、内容双签、部署证据或 release note，schema 1.1 release checkpoint 是否仍 fail-closed。
+P. 能否不上传原件而只传任意 hash/URL；证据 kind、角色、场景、上传人、到期与 exact bytes 是否在每个创建/核验/发布/下载点重算；复用他人 OAB 报告、篡改或撤回原件是否立即阻断。
+Q. build artifact hash 是否只是 receipt 内的自说自话；独立 descriptor bytes 是否存在，receipt 是否绑定其哈希、commit、migration head、target environment 和三镜像 digest。
 
 输出必须包含：
 1. 执行摘要：可接受范围、不可接受范围；

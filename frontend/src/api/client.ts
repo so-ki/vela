@@ -24,6 +24,8 @@ import type {
 import type {
   ArtifactManifest,
   DeliveryArtifact,
+  DeliveryEvidenceKind,
+  DeliveryEvidenceObject,
   DeliveryRelease,
   DeploymentEvidence,
   ExpertAttestation,
@@ -497,6 +499,63 @@ export async function fetchDeliveryGateStatus(
 ): Promise<DeliveryGateStatus> {
   const { data } = await api.get<DeliveryGateStatus>(
     `/scenarios/${scenarioId}/delivery-assurance/status`,
+  )
+  return data
+}
+
+export async function fetchDeliveryEvidenceObjects(
+  scenarioId?: number,
+): Promise<DeliveryEvidenceObject[]> {
+  const { data } = await api.get<DeliveryEvidenceObject[]>(
+    '/delivery-assurance/evidence-objects',
+    { params: { scenario_id: scenarioId } },
+  )
+  return data
+}
+
+export async function uploadDeliveryEvidenceObject(payload: {
+  evidenceKind: DeliveryEvidenceKind
+  file: File
+  scenarioId?: number
+  sourceUrl?: string
+  expiresAt?: string
+}): Promise<DeliveryEvidenceObject> {
+  const form = new FormData()
+  form.append('evidence_kind', payload.evidenceKind)
+  form.append('file', payload.file)
+  if (payload.scenarioId !== undefined) form.append('scenario_id', String(payload.scenarioId))
+  if (payload.sourceUrl) form.append('source_url', payload.sourceUrl)
+  if (payload.expiresAt) form.append('expires_at', payload.expiresAt)
+  const { data } = await api.post<DeliveryEvidenceObject>(
+    '/delivery-assurance/evidence-objects',
+    form,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000,
+    },
+  )
+  return data
+}
+
+export async function downloadDeliveryEvidenceObject(evidenceId: string) {
+  const response = await api.get(
+    `/delivery-assurance/evidence-objects/${evidenceId}/download`,
+    { responseType: 'blob' },
+  )
+  return {
+    blob: response.data as Blob,
+    filename:
+      parseContentDisposition(response.headers['content-disposition']) || 'delivery-evidence.bin',
+  }
+}
+
+export async function revokeDeliveryEvidenceObject(
+  evidenceId: string,
+  reason: string,
+): Promise<DeliveryEvidenceObject> {
+  const { data } = await api.post<DeliveryEvidenceObject>(
+    `/delivery-assurance/evidence-objects/${evidenceId}/revoke`,
+    { reason },
   )
   return data
 }

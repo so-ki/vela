@@ -3,16 +3,19 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 from uuid import uuid4
 
-from sqlalchemy import update
+from sqlalchemy import func, update
 from sqlalchemy.orm import Session
 
 from app.core.roles import ROLE_ADMIN, ROLE_LEGAL
 from app.models.delivery_assurance import (
+    DELIVERY_EVIDENCE_KINDS,
     DeploymentEvidence,
+    DeliveryEvidenceObject,
     LegalContentCertification,
     LegalExpertCredential,
     ScenarioDeliveryRelease,
@@ -25,6 +28,14 @@ from app.models.legal_source_version import LegalChangeEvent, LegalSourceVersion
 from app.models.scenario import InvestigationScenario
 from app.models.user import User
 from app.services.generation_guard import GenerationConfig, stable_hash
+from app.services.upload_security import (
+    MAX_DELIVERY_EVIDENCE_BYTES_PER_INSTANCE,
+    MAX_DELIVERY_EVIDENCE_BYTES_PER_USER,
+    MAX_DELIVERY_EVIDENCE_OBJECTS_PER_INSTANCE,
+    MAX_DELIVERY_EVIDENCE_OBJECTS_PER_USER,
+    MAX_FILE_BYTES,
+    validate_evidence_container,
+)
 from app.services import mechanism_service
 from app.services.answerability_gate_service import (
     AnswerabilityGateError,
@@ -53,6 +64,42 @@ class DeliveryGateBlocked(DeliveryAssuranceError):
         super().__init__("真实客户交付门禁未通过：" + "; ".join(reasons))
 
 
+_SCENARIO_EVIDENCE_KINDS = {
+    "iti_signature_artifact",
+    "iti_validation_report",
+    "uat_test_plan",
+    "uat_test_evidence",
+}
+_EVIDENCE_KINDS_BY_ROLE = {
+    "business": {"uat_test_plan", "uat_test_evidence"},
+    ROLE_LEGAL: {
+        "oab_submission",
+        "iti_signature_artifact",
+        "iti_validation_report",
+        "content_primary_signature",
+        "content_primary_validation_report",
+        "content_secondary_signature",
+        "content_secondary_validation_report",
+    },
+    ROLE_ADMIN: {
+        "oab_verification_report",
+        "iti_validation_report",
+        "content_primary_validation_report",
+        "content_secondary_validation_report",
+        "gold_dataset",
+        "evaluation_policy",
+        "evaluation_run",
+        "build_artifact_descriptor",
+        "build_artifact_receipt",
+        "sbom",
+        "security_report",
+        "provenance",
+        "runtime_probe",
+        "config_schema",
+    },
+}
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -67,6 +114,379 @@ def _is_live(status: str, expires_at: datetime, *, now: datetime | None = None) 
     return status in {"verified", "active", "accepted", "certified"} and _as_utc(
         expires_at
     ) > (now or _now())
+
+
+def create_delivery_evidence_object(
+    db: Session,
+    *,
+    evidence_kind: str,
+    filename: str,
+    media_type: str,
+    content: bytes,
+    source_url: str | None,
+    expires_at: datetime | None,
+    user: User,
+    scenario: InvestigationScenario | None = None,
+) -> DeliveryEvidenceObject:
+    if evidence_kind not in DELIVERY_EVIDENCE_KINDS:
+        raise DeliveryAssuranceError("未知的客户交付证据类型")
+    if evidence_kind not in _EVIDENCE_KINDS_BY_ROLE.get(user.role, set()):
+        raise DeliveryAssurancePermissionError("当前角色不得上传该类客户交付证据")
+    requires_scenario = evidence_kind in _SCENARIO_EVIDENCE_KINDS
+    if requires_scenario != (scenario is not None):
+        raise DeliveryAssuranceError("该证据类型的场景绑定不正确")
+    if scenario is not None:
+        if user.role == "business" and scenario.user_id != user.id:
+            raise DeliveryAssurancePermissionError("只能为本人提交的场景上传 UAT 证据")
+        if user.role == ROLE_LEGAL and evidence_kind == "iti_signature_artifact":
+            _require_scenario_counsel(scenario, user)
+    if not content:
+        raise DeliveryAssuranceError("证据原件不能为空")
+    if len(content) > MAX_FILE_BYTES:
+        raise DeliveryAssuranceError("单个证据文件不能超过 25MB")
+    try:
+        validate_evidence_container(filename, content)
+    except ValueError as exc:
+        raise DeliveryAssuranceError(str(exc)) from exc
+    suffix = Path(filename).suffix.lower()
+    signature_kinds = {
+        "iti_signature_artifact",
+        "content_primary_signature",
+        "content_secondary_signature",
+    }
+    if evidence_kind in signature_kinds and suffix not in {".p7s", ".pdf", ".sig"}:
+        raise DeliveryAssuranceError("数字签名原件必须是 P7S、PDF 或 SIG")
+    if evidence_kind in {"build_artifact_descriptor", "build_artifact_receipt"} and suffix != ".json":
+        raise DeliveryAssuranceError("构建描述符与回执必须是 JSON")
+    now = _now()
+    if expires_at is not None and _as_utc(expires_at) <= now:
+        raise DeliveryAssuranceError("证据原件有效期必须晚于当前时间")
+    official_report_kinds = {
+        "oab_verification_report",
+        "iti_validation_report",
+        "content_primary_validation_report",
+        "content_secondary_validation_report",
+    }
+    if evidence_kind in official_report_kinds and not source_url:
+        raise DeliveryAssuranceError("官方核验报告必须记录官方 HTTPS 来源")
+    if source_url:
+        parsed_source = urlparse(source_url)
+        host = (parsed_source.hostname or "").lower().rstrip(".")
+        if parsed_source.scheme != "https" or not host:
+            raise DeliveryAssuranceError("证据来源必须是 HTTPS URL")
+        if evidence_kind == "oab_verification_report" and host not in {
+            "consulta.oab.org.br",
+            "confirmadv.oab.org.br",
+        }:
+            raise DeliveryAssuranceError("OAB 核验证据来源必须是 CNA 或 ConfirmADV")
+        if evidence_kind in {
+            "iti_validation_report",
+            "content_primary_validation_report",
+            "content_secondary_validation_report",
+        } and host != "validar.iti.gov.br":
+            raise DeliveryAssuranceError("签名核验证据来源必须是 ITI VALIDAR")
+    # Serialize quota checks for one uploader on databases that support row
+    # locks. SQLite ignores FOR UPDATE but still serializes writes.
+    db.query(User.id).filter(User.id == user.id).with_for_update().one()
+    digest = hashlib.sha256(content).hexdigest()
+    existing = (
+        db.query(DeliveryEvidenceObject)
+        .filter(
+            DeliveryEvidenceObject.evidence_kind == evidence_kind,
+            DeliveryEvidenceObject.content_sha256 == digest,
+        )
+        .first()
+    )
+    if existing is not None:
+        if (
+            existing.status == "available"
+            and existing.uploaded_by == user.id
+            and existing.scenario_id == (scenario.id if scenario else None)
+        ):
+            return existing
+        raise DeliveryAssuranceConflict("相同证据 bytes 已由其他主体或状态记录")
+    user_count, user_bytes = (
+        db.query(
+            func.count(DeliveryEvidenceObject.id),
+            func.coalesce(func.sum(DeliveryEvidenceObject.content_length), 0),
+        )
+        .filter(DeliveryEvidenceObject.uploaded_by == user.id)
+        .one()
+    )
+    if (
+        int(user_count) >= MAX_DELIVERY_EVIDENCE_OBJECTS_PER_USER
+        or int(user_bytes) + len(content) > MAX_DELIVERY_EVIDENCE_BYTES_PER_USER
+    ):
+        raise DeliveryAssuranceError("当前上传人的证据对象或总字节配额已用尽")
+    instance_count, instance_bytes = db.query(
+        func.count(DeliveryEvidenceObject.id),
+        func.coalesce(func.sum(DeliveryEvidenceObject.content_length), 0),
+    ).one()
+    if (
+        int(instance_count) >= MAX_DELIVERY_EVIDENCE_OBJECTS_PER_INSTANCE
+        or int(instance_bytes) + len(content)
+        > MAX_DELIVERY_EVIDENCE_BYTES_PER_INSTANCE
+    ):
+        raise DeliveryAssuranceError("当前实例的证据对象或总字节配额已用尽")
+    evidence = DeliveryEvidenceObject(
+        id=str(uuid4()),
+        scenario_id=scenario.id if scenario else None,
+        evidence_kind=evidence_kind,
+        filename=filename,
+        media_type=media_type,
+        content_sha256=digest,
+        content_length=len(content),
+        content=content,
+        source_url=source_url,
+        status="available",
+        uploaded_by=user.id,
+        uploaded_at=now,
+        expires_at=expires_at,
+    )
+    db.add(evidence)
+    db.flush()
+    return evidence
+
+
+def require_delivery_evidence_object(
+    db: Session,
+    *,
+    evidence_kind: str,
+    content_sha256: str,
+    scenario_id: int | None = None,
+    uploaded_by: int | None = None,
+    now: datetime | None = None,
+) -> DeliveryEvidenceObject:
+    evidence = (
+        db.query(DeliveryEvidenceObject)
+        .filter(
+            DeliveryEvidenceObject.evidence_kind == evidence_kind,
+            DeliveryEvidenceObject.content_sha256 == content_sha256,
+        )
+        .first()
+    )
+    checked_at = now or _now()
+    if (
+        evidence is None
+        or evidence.status != "available"
+        or evidence.scenario_id != scenario_id
+        or (uploaded_by is not None and evidence.uploaded_by != uploaded_by)
+        or (evidence.expires_at is not None and _as_utc(evidence.expires_at) <= checked_at)
+        or hashlib.sha256(evidence.content).hexdigest() != evidence.content_sha256
+        or len(evidence.content) != evidence.content_length
+    ):
+        raise DeliveryAssuranceError(
+            f"缺少当前有效且 bytes 可重算的 {evidence_kind} 证据原件"
+        )
+    return evidence
+
+
+def _require_expiry_covered_by_evidence(
+    expires_at: datetime,
+    evidence_objects: list[DeliveryEvidenceObject],
+) -> None:
+    if any(
+        item.expires_at is not None
+        and _as_utc(expires_at) > _as_utc(item.expires_at)
+        for item in evidence_objects
+    ):
+        raise DeliveryAssuranceError("业务证据有效期不得超过所引用证据原件有效期")
+
+
+def _require_release_evidence_objects(
+    db: Session,
+    *,
+    scenario: InvestigationScenario,
+    attestation: ScenarioExpertAttestation,
+    acceptance: ScenarioUATAcceptance,
+    deployment: DeploymentEvidence,
+    content_certification: LegalContentCertification,
+    scenario_credential: LegalExpertCredential,
+    primary_credential: LegalExpertCredential,
+    secondary_credential: LegalExpertCredential,
+    now: datetime,
+) -> list[DeliveryEvidenceObject]:
+    objects: list[DeliveryEvidenceObject] = []
+    credential_records = {
+        item.id: item
+        for item in (scenario_credential, primary_credential, secondary_credential)
+    }
+    for credential in credential_records.values():
+        objects.append(
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="oab_submission",
+                content_sha256=credential.submitted_evidence_hash,
+                uploaded_by=credential.user_id,
+                now=now,
+            )
+        )
+        if credential.verification_evidence_hash is None or credential.verified_by is None:
+            raise DeliveryAssuranceError("律师凭证缺少可追溯的 OAB 核验证据")
+        objects.append(
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="oab_verification_report",
+                content_sha256=credential.verification_evidence_hash,
+                uploaded_by=credential.verified_by,
+                now=now,
+            )
+        )
+    objects.extend(
+        [
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="iti_signature_artifact",
+                content_sha256=attestation.signature_artifact_hash,
+                scenario_id=scenario.id,
+                uploaded_by=attestation.signed_by,
+                now=now,
+            ),
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="iti_validation_report",
+                content_sha256=attestation.signature_validation_report_hash,
+                scenario_id=scenario.id,
+                now=now,
+            ),
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="uat_test_plan",
+                content_sha256=acceptance.test_plan_hash,
+                scenario_id=scenario.id,
+                uploaded_by=acceptance.accepted_by,
+                now=now,
+            ),
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="uat_test_evidence",
+                content_sha256=acceptance.test_evidence_hash,
+                scenario_id=scenario.id,
+                uploaded_by=acceptance.accepted_by,
+                now=now,
+            ),
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="content_primary_signature",
+                content_sha256=content_certification.primary_signature_hash,
+                uploaded_by=primary_credential.user_id,
+                now=now,
+            ),
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="content_primary_validation_report",
+                content_sha256=content_certification.primary_validation_report_hash,
+                now=now,
+            ),
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="content_secondary_signature",
+                content_sha256=content_certification.secondary_signature_hash,
+                uploaded_by=secondary_credential.user_id,
+                now=now,
+            ),
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="content_secondary_validation_report",
+                content_sha256=content_certification.secondary_validation_report_hash,
+                now=now,
+            ),
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="gold_dataset",
+                content_sha256=deployment.gold_dataset_sha256,
+                now=now,
+            ),
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="evaluation_policy",
+                content_sha256=deployment.evaluation_policy_sha256,
+                now=now,
+            ),
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="evaluation_run",
+                content_sha256=deployment.evaluation_run_sha256,
+                now=now,
+            ),
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="build_artifact_descriptor",
+                content_sha256=deployment.artifact_sha256,
+                now=now,
+            ),
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="build_artifact_receipt",
+                content_sha256=deployment.artifact_receipt_hash,
+                now=now,
+            ),
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="sbom",
+                content_sha256=deployment.sbom_sha256,
+                now=now,
+            ),
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="security_report",
+                content_sha256=deployment.security_evidence_sha256,
+                now=now,
+            ),
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="provenance",
+                content_sha256=deployment.provenance_sha256,
+                now=now,
+            ),
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="runtime_probe",
+                content_sha256=deployment.runtime_probe_sha256,
+                now=now,
+            ),
+            require_delivery_evidence_object(
+                db,
+                evidence_kind="config_schema",
+                content_sha256=deployment.config_schema_sha256,
+                now=now,
+            ),
+        ]
+    )
+    unique = {item.id: item for item in objects}
+    return list(unique.values())
+
+
+def revoke_delivery_evidence_object(
+    db: Session,
+    *,
+    evidence: DeliveryEvidenceObject,
+    reason: str,
+    user: User,
+) -> DeliveryEvidenceObject:
+    if user.id != evidence.uploaded_by and user.role != ROLE_ADMIN:
+        raise DeliveryAssurancePermissionError("只有原上传人或管理员可撤回证据原件")
+    if evidence.status != "available":
+        raise DeliveryAssuranceError("只有 available 证据原件可被撤回")
+    now = _now()
+    result = db.execute(
+        update(DeliveryEvidenceObject)
+        .where(
+            DeliveryEvidenceObject.id == evidence.id,
+            DeliveryEvidenceObject.status == "available",
+        )
+        .values(
+            status="revoked",
+            revoked_by=user.id,
+            revoked_at=now,
+            revocation_reason=reason.strip(),
+        )
+    )
+    if result.rowcount != 1:
+        raise DeliveryAssuranceConflict("证据原件状态已变化，请刷新后重试")
+    db.flush()
+    db.expire_all()
+    return db.get(DeliveryEvidenceObject, evidence.id)
 
 
 def _require_admin(user: User) -> None:
@@ -307,8 +727,10 @@ def _deployment_evidence_manifest(deployment: DeploymentEvidence) -> dict[str, A
         "migration_head",
         "ci_run_url",
         "artifact_sha256",
+        "artifact_receipt_hash",
         "sbom_sha256",
         "security_evidence_url",
+        "security_evidence_sha256",
         "provenance_url",
         "provenance_sha256",
         "runtime_probe_url",
@@ -338,6 +760,28 @@ def _deployment_evidence_manifest(deployment: DeploymentEvidence) -> dict[str, A
     return result
 
 
+def _delivery_evidence_manifest(
+    evidence_objects: list[DeliveryEvidenceObject],
+) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": item.id,
+            "scenario_id": item.scenario_id,
+            "evidence_kind": item.evidence_kind,
+            "filename": item.filename,
+            "media_type": item.media_type,
+            "content_sha256": item.content_sha256,
+            "content_length": item.content_length,
+            "source_url": item.source_url,
+            "status": item.status,
+            "uploaded_by": item.uploaded_by,
+            "uploaded_at": _iso(item.uploaded_at),
+            "expires_at": _iso(item.expires_at),
+        }
+        for item in sorted(evidence_objects, key=lambda value: value.id)
+    ]
+
+
 def _release_body(
     *,
     scenario_id: int,
@@ -349,6 +793,7 @@ def _release_body(
     scenario_credential: LegalExpertCredential,
     primary_credential: LegalExpertCredential,
     secondary_credential: LegalExpertCredential,
+    evidence_objects: list[DeliveryEvidenceObject],
     release_note: str,
     released_by: int,
     released_at: datetime,
@@ -381,6 +826,9 @@ def _release_body(
         ),
         "secondary_content_credential_evidence_hash": stable_hash(
             _credential_evidence(secondary_credential)
+        ),
+        "delivery_evidence_manifest_hash": stable_hash(
+            _delivery_evidence_manifest(evidence_objects)
         ),
         "release_note_hash": stable_hash({"release_note": release_note.strip()}),
         "released_by": released_by,
@@ -579,6 +1027,21 @@ def submit_credential(
     _require_legal(user)
     if _jurisdiction_matches("brazil", jurisdiction):
         _require_brazil_official_registry_url(official_register_url)
+    require_delivery_evidence_object(
+        db,
+        evidence_kind="oab_submission",
+        content_sha256=submitted_evidence_hash,
+        uploaded_by=user.id,
+    )
+    if (
+        db.query(LegalExpertCredential.id)
+        .filter(
+            LegalExpertCredential.submitted_evidence_hash == submitted_evidence_hash
+        )
+        .first()
+        is not None
+    ):
+        raise DeliveryAssuranceError("同一 OAB 申报原件不得重新绑定其他执业凭证")
     credential = LegalExpertCredential(
         id=str(uuid4()),
         user_id=user.id,
@@ -641,6 +1104,25 @@ def decide_credential(
             raise DeliveryAssuranceError("只有 OAB 状态 regular 的凭证可核验通过")
         if _as_utc(valid_until) <= now:
             raise DeliveryAssuranceError("凭证有效期必须晚于当前时间")
+        verification_evidence = require_delivery_evidence_object(
+            db,
+            evidence_kind="oab_verification_report",
+            content_sha256=verification_evidence_hash,
+            uploaded_by=user.id,
+            now=now,
+        )
+        reused_evidence = (
+            db.query(LegalExpertCredential.id)
+            .filter(
+                LegalExpertCredential.id != credential.id,
+                LegalExpertCredential.verification_evidence_hash
+                == verification_evidence_hash,
+            )
+            .first()
+        )
+        if reused_evidence is not None:
+            raise DeliveryAssuranceError("同一 OAB 核验报告不得复用于其他执业凭证")
+        _require_expiry_covered_by_evidence(valid_until, [verification_evidence])
         values.update(
             {
                 "verification_reference": verification_reference,
@@ -916,6 +1398,24 @@ def create_expert_attestation(
         raise DeliveryAssuranceError("数字签名验证必须来自 ITI VALIDAR 官方域名")
     if credential.holder_name.casefold() not in certificate_subject.casefold():
         raise DeliveryAssuranceError("签名证书主体与执业凭证持有人不匹配")
+    signature_evidence = require_delivery_evidence_object(
+        db,
+        evidence_kind="iti_signature_artifact",
+        content_sha256=signature_artifact_hash,
+        scenario_id=scenario.id,
+        uploaded_by=user.id,
+        now=now,
+    )
+    validation_evidence = require_delivery_evidence_object(
+        db,
+        evidence_kind="iti_validation_report",
+        content_sha256=signature_validation_report_hash,
+        scenario_id=scenario.id,
+        now=now,
+    )
+    _require_expiry_covered_by_evidence(
+        expires_at, [signature_evidence, validation_evidence]
+    )
     snapshot = build_delivery_snapshot(
         db, scenario=scenario, generation_config=generation_config
     )
@@ -931,6 +1431,25 @@ def create_expert_attestation(
         raise DeliveryAssuranceError(
             "外部签名覆盖的 artifact manifest hash 与当前冻结制品不一致"
         )
+    rebound_attestation = (
+        db.query(ScenarioExpertAttestation.id)
+        .filter(
+            (
+                (
+                    ScenarioExpertAttestation.signature_artifact_hash
+                    == signature_artifact_hash
+                )
+                | (
+                    ScenarioExpertAttestation.signature_validation_report_hash
+                    == signature_validation_report_hash
+                )
+            ),
+            ScenarioExpertAttestation.artifact_manifest_hash != manifest_hash,
+        )
+        .first()
+    )
+    if rebound_attestation is not None:
+        raise DeliveryAssuranceError("签名或核验报告原件已绑定其他 artifact manifest")
     attestation = ScenarioExpertAttestation(
         id=str(uuid4()),
         scenario_id=scenario.id,
@@ -990,6 +1509,21 @@ def decide_attestation_signature(
             raise DeliveryAssuranceError("核验时签署、签名证书或执业凭证已失效")
         _validate_attestation_artifacts(
             db, attestation=attestation, expected_status="candidate"
+        )
+        require_delivery_evidence_object(
+            db,
+            evidence_kind="iti_signature_artifact",
+            content_sha256=attestation.signature_artifact_hash,
+            scenario_id=attestation.scenario_id,
+            uploaded_by=attestation.signed_by,
+            now=now,
+        )
+        require_delivery_evidence_object(
+            db,
+            evidence_kind="iti_validation_report",
+            content_sha256=attestation.signature_validation_report_hash,
+            scenario_id=attestation.scenario_id,
+            now=now,
         )
     result = db.execute(
         update(ScenarioExpertAttestation)
@@ -1086,6 +1620,45 @@ def create_uat_acceptance(
         attestation.expires_at
     ):
         raise DeliveryAssuranceError("UAT 有效期必须晚于当前时间且不超过专家签署有效期")
+    test_plan_evidence = require_delivery_evidence_object(
+        db,
+        evidence_kind="uat_test_plan",
+        content_sha256=test_plan_hash,
+        scenario_id=scenario.id,
+        uploaded_by=user.id,
+        now=now,
+    )
+    test_result_evidence = require_delivery_evidence_object(
+        db,
+        evidence_kind="uat_test_evidence",
+        content_sha256=test_evidence_hash,
+        scenario_id=scenario.id,
+        uploaded_by=user.id,
+        now=now,
+    )
+    _require_expiry_covered_by_evidence(
+        expires_at, [test_plan_evidence, test_result_evidence]
+    )
+    normalized_target_environment_id = target_environment_id.strip()
+    rebound_uat = (
+        db.query(ScenarioUATAcceptance.id)
+        .filter(
+            (
+                (ScenarioUATAcceptance.test_plan_hash == test_plan_hash)
+                | (ScenarioUATAcceptance.test_evidence_hash == test_evidence_hash)
+            ),
+            (
+                (ScenarioUATAcceptance.snapshot_hash != attestation.snapshot_hash)
+                | (
+                    ScenarioUATAcceptance.target_environment_id
+                    != normalized_target_environment_id
+                )
+            ),
+        )
+        .first()
+    )
+    if rebound_uat is not None:
+        raise DeliveryAssuranceError("测试计划或 UAT 结果原件已绑定其他快照/环境")
     db.execute(
         update(ScenarioUATAcceptance)
         .where(
@@ -1105,7 +1678,7 @@ def create_uat_acceptance(
         test_evidence_hash=test_evidence_hash,
         evidence_reference=evidence_reference,
         environment=environment.strip(),
-        target_environment_id=target_environment_id.strip(),
+        target_environment_id=normalized_target_environment_id,
         acceptance_statement=acceptance_statement.strip(),
         status="accepted",
         accepted_at=now,
@@ -1180,6 +1753,52 @@ def create_legal_content_certification(
         secondary_credential=secondary_credential,
         now=now,
     )
+    content_evidence = [
+        require_delivery_evidence_object(
+            db,
+            evidence_kind="content_primary_signature",
+            content_sha256=primary_signature_hash,
+            uploaded_by=primary_credential.user_id,
+            now=now,
+        ),
+        require_delivery_evidence_object(
+            db,
+            evidence_kind="content_primary_validation_report",
+            content_sha256=primary_validation_report_hash,
+            now=now,
+        ),
+        require_delivery_evidence_object(
+            db,
+            evidence_kind="content_secondary_signature",
+            content_sha256=secondary_signature_hash,
+            uploaded_by=secondary_credential.user_id,
+            now=now,
+        ),
+        require_delivery_evidence_object(
+            db,
+            evidence_kind="content_secondary_validation_report",
+            content_sha256=secondary_validation_report_hash,
+            now=now,
+        ),
+        require_delivery_evidence_object(
+            db,
+            evidence_kind="gold_dataset",
+            content_sha256=gold_dataset_sha256,
+            now=now,
+        ),
+        require_delivery_evidence_object(
+            db,
+            evidence_kind="evaluation_policy",
+            content_sha256=evaluation_policy_sha256,
+            now=now,
+        ),
+        require_delivery_evidence_object(
+            db,
+            evidence_kind="evaluation_run",
+            content_sha256=evaluation_run_sha256,
+            now=now,
+        ),
+    ]
     if (
         urlparse(primary_validation_url).hostname or ""
     ).lower() != "validar.iti.gov.br" or (
@@ -1202,6 +1821,7 @@ def create_legal_content_certification(
     )
     if _as_utc(expires_at) <= now or _as_utc(expires_at) > max_expiry:
         raise DeliveryAssuranceError("内容认证有效期不得超过任一专家凭证有效期")
+    _require_expiry_covered_by_evidence(expires_at, content_evidence)
     if regression_status != "passed":
         raise DeliveryAssuranceError("冻结 gold regression 未通过")
     manifest = build_legal_content_manifest(
@@ -1223,6 +1843,41 @@ def create_legal_content_certification(
         raise DeliveryAssuranceError(
             "双专家签名未覆盖当前 rules/corpus/gold manifest hash"
         )
+    for content_evidence_hash in (
+        primary_signature_hash,
+        primary_validation_report_hash,
+        secondary_signature_hash,
+        secondary_validation_report_hash,
+    ):
+        reused_content_evidence = (
+            db.query(LegalContentCertification.id)
+            .filter(
+                (
+                    (
+                        LegalContentCertification.primary_signature_hash
+                        == content_evidence_hash
+                    )
+                    | (
+                        LegalContentCertification.primary_validation_report_hash
+                        == content_evidence_hash
+                    )
+                    | (
+                        LegalContentCertification.secondary_signature_hash
+                        == content_evidence_hash
+                    )
+                    | (
+                        LegalContentCertification.secondary_validation_report_hash
+                        == content_evidence_hash
+                    )
+                ),
+                LegalContentCertification.certification_manifest_hash != manifest_hash,
+            )
+            .first()
+        )
+        if reused_content_evidence is not None:
+            raise DeliveryAssuranceError(
+                "内容签名或核验报告原件已绑定其他内容 manifest"
+            )
     certification = LegalContentCertification(
         id=str(uuid4()),
         capability_pack_id=capability_pack_id.strip(),
@@ -1299,8 +1954,10 @@ def create_deployment_evidence(
     migration_head: str,
     ci_run_url: str,
     artifact_sha256: str,
+    artifact_receipt_hash: str,
     sbom_sha256: str,
     security_evidence_url: str,
+    security_evidence_sha256: str,
     provenance_url: str,
     provenance_sha256: str,
     runtime_probe_url: str,
@@ -1340,6 +1997,104 @@ def create_deployment_evidence(
         or certification.evaluation_run_sha256 != evaluation_run_sha256
     ):
         raise DeliveryAssuranceError("部署证据与法律内容双专家认证的哈希不一致")
+    deployment_evidence_objects = [
+        require_delivery_evidence_object(
+            db,
+            evidence_kind="build_artifact_descriptor",
+            content_sha256=artifact_sha256,
+            now=now,
+        ),
+        require_delivery_evidence_object(
+            db,
+            evidence_kind="build_artifact_receipt",
+            content_sha256=artifact_receipt_hash,
+            now=now,
+        ),
+        require_delivery_evidence_object(
+            db, evidence_kind="sbom", content_sha256=sbom_sha256, now=now
+        ),
+        require_delivery_evidence_object(
+            db,
+            evidence_kind="security_report",
+            content_sha256=security_evidence_sha256,
+            now=now,
+        ),
+        require_delivery_evidence_object(
+            db,
+            evidence_kind="provenance",
+            content_sha256=provenance_sha256,
+            now=now,
+        ),
+        require_delivery_evidence_object(
+            db,
+            evidence_kind="runtime_probe",
+            content_sha256=runtime_probe_sha256,
+            now=now,
+        ),
+        require_delivery_evidence_object(
+            db,
+            evidence_kind="config_schema",
+            content_sha256=config_schema_sha256,
+            now=now,
+        ),
+        require_delivery_evidence_object(
+            db,
+            evidence_kind="gold_dataset",
+            content_sha256=gold_dataset_sha256,
+            now=now,
+        ),
+        require_delivery_evidence_object(
+            db,
+            evidence_kind="evaluation_policy",
+            content_sha256=evaluation_policy_sha256,
+            now=now,
+        ),
+        require_delivery_evidence_object(
+            db,
+            evidence_kind="evaluation_run",
+            content_sha256=evaluation_run_sha256,
+            now=now,
+        ),
+    ]
+    try:
+        descriptor = json.loads(
+            deployment_evidence_objects[0].content.decode("utf-8")
+        )
+        receipt = json.loads(deployment_evidence_objects[1].content.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise DeliveryAssuranceError(
+            "构建 descriptor 与 receipt 必须是有效 UTF-8 JSON"
+        ) from exc
+    expected_descriptor = {
+        "schema_version": "1.0",
+        "target_environment_id": target_environment_id.strip(),
+        "commit_sha": commit_sha,
+        "migration_head": migration_head.strip(),
+        "backend_image_digest": backend_image_digest,
+        "frontend_image_digest": frontend_image_digest,
+        "database_image_digest": database_image_digest,
+    }
+    if not isinstance(descriptor, dict) or any(
+        descriptor.get(key) != value for key, value in expected_descriptor.items()
+    ):
+        raise DeliveryAssuranceError(
+            "构建 descriptor 未绑定当前 commit、镜像、迁移或目标环境"
+        )
+    expected_receipt = {
+        "schema_version": "1.0",
+        "target_environment_id": target_environment_id.strip(),
+        "commit_sha": commit_sha,
+        "migration_head": migration_head.strip(),
+        "artifact_sha256": artifact_sha256,
+        "backend_image_digest": backend_image_digest,
+        "frontend_image_digest": frontend_image_digest,
+        "database_image_digest": database_image_digest,
+    }
+    if not isinstance(receipt, dict) or any(
+        receipt.get(key) != value for key, value in expected_receipt.items()
+    ):
+        raise DeliveryAssuranceError("构建 receipt 未绑定当前 commit、镜像、迁移或目标环境")
+    _require_expiry_covered_by_evidence(expires_at, deployment_evidence_objects)
     evidence = DeploymentEvidence(
         id=str(uuid4()),
         legal_content_certification_id=certification.id,
@@ -1349,8 +2104,10 @@ def create_deployment_evidence(
         migration_head=migration_head.strip(),
         ci_run_url=ci_run_url,
         artifact_sha256=artifact_sha256,
+        artifact_receipt_hash=artifact_receipt_hash,
         sbom_sha256=sbom_sha256,
         security_evidence_url=security_evidence_url,
+        security_evidence_sha256=security_evidence_sha256,
         provenance_url=provenance_url,
         provenance_sha256=provenance_sha256,
         runtime_probe_url=runtime_probe_url,
@@ -1535,6 +2292,18 @@ def create_delivery_release(
     _validate_attestation_artifacts(
         db, attestation=attestation, expected_status="candidate"
     )
+    release_evidence_objects = _require_release_evidence_objects(
+        db,
+        scenario=scenario,
+        attestation=attestation,
+        acceptance=acceptance,
+        deployment=deployment,
+        content_certification=content_certification,
+        scenario_credential=credential,
+        primary_credential=primary_credential,
+        secondary_credential=secondary_credential,
+        now=now,
+    )
     snapshot = build_delivery_snapshot(
         db, scenario=scenario, generation_config=generation_config
     )
@@ -1558,6 +2327,7 @@ def create_delivery_release(
         raise DeliveryAssuranceError(
             "发布有效期不得超过证据链任一凭证、签名或验收的最早有效期"
         )
+    _require_expiry_covered_by_evidence(expires_at, release_evidence_objects)
     normalized_release_note = release_note.strip()
     release_body = _release_body(
         scenario_id=scenario.id,
@@ -1569,6 +2339,7 @@ def create_delivery_release(
         scenario_credential=credential,
         primary_credential=primary_credential,
         secondary_credential=secondary_credential,
+        evidence_objects=release_evidence_objects,
         release_note=normalized_release_note,
         released_by=user.id,
         released_at=now,
@@ -1887,6 +2658,22 @@ def evaluate_delivery_release(
             secondary_credential,
         )
         if all(item is not None for item in evidence_records):
+            try:
+                release_evidence_objects = _require_release_evidence_objects(
+                    db,
+                    scenario=scenario,
+                    attestation=attestation,
+                    acceptance=acceptance,
+                    deployment=deployment,
+                    content_certification=content_certification,
+                    scenario_credential=credential,
+                    primary_credential=primary_credential,
+                    secondary_credential=secondary_credential,
+                    now=now,
+                )
+            except DeliveryAssuranceError:
+                release_evidence_objects = []
+                reasons.append("delivery_evidence_objects_invalid")
             release_body = _release_body(
                 scenario_id=release.scenario_id,
                 snapshot_hash=release.snapshot_hash,
@@ -1897,6 +2684,7 @@ def evaluate_delivery_release(
                 scenario_credential=credential,
                 primary_credential=primary_credential,
                 secondary_credential=secondary_credential,
+                evidence_objects=release_evidence_objects,
                 release_note=release.release_note,
                 released_by=release.released_by,
                 released_at=release.released_at,

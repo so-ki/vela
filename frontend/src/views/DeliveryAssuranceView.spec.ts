@@ -8,9 +8,11 @@ const client = vi.hoisted(() => ({
   decideExpertSignature: vi.fn(),
   decideLegalCredential: vi.fn(),
   downloadCandidateArtifact: vi.fn(),
+  downloadDeliveryEvidenceObject: vi.fn(),
   fetchDeliveryArtifactManifest: vi.fn(),
   fetchDeliveryArtifacts: vi.fn(),
   fetchDeliveryGateStatus: vi.fn(),
+  fetchDeliveryEvidenceObjects: vi.fn(),
   fetchDeliveryReleases: vi.fn(),
   fetchDeploymentEvidence: vi.fn(),
   fetchExpertAttestations: vi.fn(),
@@ -22,6 +24,7 @@ const client = vi.hoisted(() => ({
   previewLegalContentManifest: vi.fn(),
   revokeDeliveryRelease: vi.fn(),
   revokeDeploymentEvidence: vi.fn(),
+  revokeDeliveryEvidenceObject: vi.fn(),
   revokeExpertAttestation: vi.fn(),
   revokeLegalContentCertification: vi.fn(),
   submitDeliveryRelease: vi.fn(),
@@ -30,6 +33,7 @@ const client = vi.hoisted(() => ({
   submitLegalContentCertification: vi.fn(),
   submitLegalCredential: vi.fn(),
   submitUATAcceptance: vi.fn(),
+  uploadDeliveryEvidenceObject: vi.fn(),
   withdrawUATAcceptance: vi.fn(),
 }))
 
@@ -93,7 +97,7 @@ describe('DeliveryAssuranceView', () => {
     }
     client.fetchScenario.mockResolvedValue(makeScenario({ status: 'review_approved' }))
     client.fetchDeliveryGateStatus.mockResolvedValue({
-      schema_version: '1.0',
+      schema_version: '1.1',
       scenario_id: 9,
       evaluated_at: '2026-07-18T00:00:00Z',
       delivery_allowed: false,
@@ -116,6 +120,25 @@ describe('DeliveryAssuranceView', () => {
     client.fetchExpertAttestations.mockResolvedValue([pendingAttestation])
     client.fetchUATAcceptances.mockResolvedValue([])
     client.fetchDeliveryReleases.mockResolvedValue([])
+    client.fetchDeliveryEvidenceObjects.mockResolvedValue([])
+    client.uploadDeliveryEvidenceObject.mockResolvedValue({
+      id: 'evidence-1',
+      scenario_id: 9,
+      evidence_kind: 'uat_test_plan',
+      filename: 'uat-plan.json',
+      media_type: 'application/json',
+      content_sha256: 'd'.repeat(64),
+      content_length: 16,
+      source_url: null,
+      status: 'available',
+      uploaded_by: 1,
+      uploaded_at: '2026-07-18T00:00:00Z',
+      expires_at: null,
+      revoked_by: null,
+      revoked_at: null,
+      revocation_reason: null,
+      created_at: '2026-07-18T00:00:00Z',
+    })
     client.fetchLegalCredentials.mockResolvedValue([])
     client.fetchLegalContentCertifications.mockResolvedValue([])
     client.fetchDeploymentEvidence.mockResolvedValue([])
@@ -136,6 +159,32 @@ describe('DeliveryAssuranceView', () => {
     expect(wrapper.text()).toContain('由场景提交人签署 UAT')
     expect(wrapper.text()).not.toContain('双律师内容认证与生产证据')
     expect(client.fetchLegalCredentials).not.toHaveBeenCalled()
+  })
+
+  it('uploads a business UAT original with the scenario binding', async () => {
+    const wrapper = mount(DeliveryAssuranceView, { global: { stubs: { RouterLink: true } } })
+    await flushPromises()
+
+    await wrapper.find('.evidence-upload-form select').setValue('uat_test_plan')
+    const file = new File(['{"plan":"uat"}'], 'uat-plan.json', {
+      type: 'application/json',
+    })
+    const input = wrapper.find<HTMLInputElement>('.evidence-upload-form input[type="file"]')
+    Object.defineProperty(input.element, 'files', { value: [file] })
+    await input.trigger('change')
+    const upload = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('计算 SHA-256 并冻结原件'))
+    await upload!.trigger('click')
+    await flushPromises()
+
+    expect(client.uploadDeliveryEvidenceObject).toHaveBeenCalledWith({
+      evidenceKind: 'uat_test_plan',
+      file,
+      scenarioId: 9,
+      sourceUrl: undefined,
+      expiresAt: undefined,
+    })
   })
 
   it('lets admin independently decide a pending signature and exposes production evidence controls', async () => {

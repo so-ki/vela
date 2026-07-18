@@ -14,10 +14,16 @@ from app.services.upload_security import (
     MAX_BATCH_BYTES,
     MAX_BATCH_FILES,
     MAX_EXTRACTED_CHARACTERS,
+    MAX_DELIVERY_EVIDENCE_BYTES_PER_INSTANCE,
+    MAX_DELIVERY_EVIDENCE_BYTES_PER_USER,
+    MAX_DELIVERY_EVIDENCE_OBJECTS_PER_INSTANCE,
+    MAX_DELIVERY_EVIDENCE_OBJECTS_PER_USER,
     MAX_FILE_BYTES,
     MAX_PROJECT_DOCUMENTS,
     enforce_project_document_quota,
+    read_evidence_upload_limited,
     read_upload_limited,
+    validate_evidence_container,
     validate_upload_container,
 )
 
@@ -39,6 +45,10 @@ def test_upload_limits_are_bounded_for_controlled_pilot():
     assert MAX_FILE_BYTES == 25 * 1024 * 1024
     assert MAX_BATCH_FILES == 10
     assert MAX_BATCH_BYTES == 100 * 1024 * 1024
+    assert MAX_DELIVERY_EVIDENCE_OBJECTS_PER_USER == 500
+    assert MAX_DELIVERY_EVIDENCE_BYTES_PER_USER == 1024 * 1024 * 1024
+    assert MAX_DELIVERY_EVIDENCE_OBJECTS_PER_INSTANCE == 5_000
+    assert MAX_DELIVERY_EVIDENCE_BYTES_PER_INSTANCE == 5 * 1024 * 1024 * 1024
 
 
 def test_chunked_upload_is_rejected_before_all_chunks_are_consumed():
@@ -51,6 +61,23 @@ def test_chunked_upload_is_rejected_before_all_chunks_are_consumed():
 def test_extension_and_magic_must_agree():
     with pytest.raises(ValueError, match="不是有效 PDF"):
         validate_upload_container("fake.pdf", b"this is not a PDF")
+
+
+def test_delivery_evidence_upload_is_bounded_and_container_checked():
+    upload = FakeUpload("report.json", [b'{"status":', b'"passed"}'])
+    assert asyncio.run(read_evidence_upload_limited(upload)) == b'{"status":"passed"}'
+    assert upload.closed is True
+
+    with pytest.raises(ValueError, match="UTF-8 JSON"):
+        validate_evidence_container("broken.json", b"{not-json}")
+    with pytest.raises(ValueError, match="DTD"):
+        validate_evidence_container(
+            "external-entity.xml",
+            b'<?xml version="1.0"?><!DOCTYPE x [<!ENTITY e SYSTEM "file:///etc/passwd">]><x>&e;</x>',
+        )
+    with pytest.raises(ValueError, match="主动内容"):
+        validate_evidence_container("active.pdf", b"%PDF-1.7\n/OpenAction")
+    validate_evidence_container("signature.p7s", b"opaque-pkcs7-container")
 
 
 @pytest.mark.parametrize(

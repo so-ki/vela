@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
@@ -20,6 +22,7 @@ from app.services.delivery_assurance_service import (
     DeliveryAssurancePermissionError,
     DeliveryGateBlocked,
     build_legal_content_manifest,
+    create_delivery_evidence_object,
     create_delivery_release,
     create_deployment_evidence,
     create_expert_attestation,
@@ -30,8 +33,10 @@ from app.services.delivery_assurance_service import (
     current_delivery_artifact_manifest,
     evaluate_delivery_release,
     require_released_delivery_artifact,
+    revoke_delivery_evidence_object,
     submit_credential,
 )
+from app.schemas.delivery_assurance import DeliveryGateStatusResponse
 from app.services.generation_guard import stable_hash
 import app.services.delivery_assurance_service as delivery_service
 
@@ -130,6 +135,47 @@ def _config() -> SimpleNamespace:
     )
 
 
+def _store_evidence(
+    db,
+    *,
+    kind: str,
+    label: str,
+    user: User,
+    scenario: InvestigationScenario | None = None,
+    expires_at: datetime | None = None,
+    source_url: str | None = None,
+    payload: dict | None = None,
+):
+    signature_kind = kind in {
+        "iti_signature_artifact",
+        "content_primary_signature",
+        "content_secondary_signature",
+    }
+    if signature_kind:
+        filename = f"{label}.p7s"
+        content = f"signed-container:{kind}:{label}".encode()
+        media_type = "application/pkcs7-signature"
+    else:
+        filename = f"{label}.json"
+        content = json.dumps(
+            payload or {"kind": kind, "label": label},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+        media_type = "application/json"
+    return create_delivery_evidence_object(
+        db,
+        evidence_kind=kind,
+        filename=filename,
+        media_type=media_type,
+        content=content,
+        source_url=source_url,
+        expires_at=expires_at,
+        user=user,
+        scenario=scenario,
+    )
+
+
 def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
     delivery_db, monkeypatch
 ):
@@ -165,6 +211,36 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
                 submitted_evidence_hash="4" * 64,
             )
 
+        expert_oab_submission = _store_evidence(
+            db,
+            kind="oab_submission",
+            label="expert-oab-submission",
+            user=expert,
+            expires_at=now + timedelta(days=90),
+        )
+        with monkeypatch.context() as quota_patch:
+            quota_patch.setattr(
+                delivery_service, "MAX_DELIVERY_EVIDENCE_OBJECTS_PER_USER", 1
+            )
+            with pytest.raises(DeliveryAssuranceError, match="配额已用尽"):
+                _store_evidence(
+                    db,
+                    kind="oab_submission",
+                    label="expert-oab-over-quota",
+                    user=expert,
+                    expires_at=now + timedelta(days=90),
+                )
+        with pytest.raises(DeliveryAssuranceError, match="oab_submission"):
+            submit_credential(
+                db,
+                user=expert,
+                holder_name="Brazil Expert",
+                jurisdiction="BR",
+                authority="OAB/SP",
+                registration_number="123456",
+                official_register_url="https://consulta.oab.org.br/",
+                submitted_evidence_hash=hashlib.sha256(b"not-retained").hexdigest(),
+            )
         credential = submit_credential(
             db,
             user=expert,
@@ -173,7 +249,34 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
             authority="OAB/SP",
             registration_number="123456",
             official_register_url="https://consulta.oab.org.br/",
-            submitted_evidence_hash="4" * 64,
+            submitted_evidence_hash=expert_oab_submission.content_sha256,
+        )
+        with pytest.raises(DeliveryAssuranceError, match="重新绑定"):
+            submit_credential(
+                db,
+                user=expert,
+                holder_name="Brazil Expert",
+                jurisdiction="BR",
+                authority="OAB/SP",
+                registration_number="123457",
+                official_register_url="https://consulta.oab.org.br/",
+                submitted_evidence_hash=expert_oab_submission.content_sha256,
+            )
+        with pytest.raises(DeliveryAssuranceError, match="官方 HTTPS"):
+            _store_evidence(
+                db,
+                kind="oab_verification_report",
+                label="missing-official-source",
+                user=admin,
+                expires_at=now + timedelta(days=90),
+            )
+        expert_oab_verification = _store_evidence(
+            db,
+            kind="oab_verification_report",
+            label="expert-oab-verification",
+            user=admin,
+            expires_at=now + timedelta(days=90),
+            source_url="https://confirmadv.oab.org.br/",
         )
         with pytest.raises(DeliveryAssurancePermissionError):
             decide_credential(
@@ -184,7 +287,7 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
                 note="Self verification must be rejected.",
                 user=expert,
                 verification_reference="https://consulta.oab.org.br/",
-                verification_evidence_hash="5" * 64,
+                verification_evidence_hash=expert_oab_verification.content_sha256,
                 registration_status="regular",
                 valid_until=now + timedelta(days=60),
             )
@@ -196,9 +299,16 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
             note="Independent OAB CNA and ConfirmADV evidence reviewed.",
             user=admin,
             verification_reference="https://confirmadv.oab.org.br/",
-            verification_evidence_hash="5" * 64,
+            verification_evidence_hash=expert_oab_verification.content_sha256,
             registration_status="regular",
             valid_until=now + timedelta(days=60),
+        )
+        second_oab_submission = _store_evidence(
+            db,
+            kind="oab_submission",
+            label="second-oab-submission",
+            user=second_expert,
+            expires_at=now + timedelta(days=90),
         )
         second_credential = submit_credential(
             db,
@@ -208,8 +318,29 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
             authority="OAB/RJ",
             registration_number="654321",
             official_register_url="https://consulta.oab.org.br/",
-            submitted_evidence_hash="a" * 64,
+            submitted_evidence_hash=second_oab_submission.content_sha256,
         )
+        second_oab_verification = _store_evidence(
+            db,
+            kind="oab_verification_report",
+            label="second-oab-verification",
+            user=admin,
+            expires_at=now + timedelta(days=90),
+            source_url="https://confirmadv.oab.org.br/",
+        )
+        with pytest.raises(DeliveryAssuranceError, match="不得复用"):
+            decide_credential(
+                db,
+                credential=second_credential,
+                decision="verified",
+                expected_revision=0,
+                note="A report for another registration must not be reused.",
+                user=admin,
+                verification_reference="https://confirmadv.oab.org.br/",
+                verification_evidence_hash=expert_oab_verification.content_sha256,
+                registration_status="regular",
+                valid_until=now + timedelta(days=60),
+            )
         second_credential = decide_credential(
             db,
             credential=second_credential,
@@ -218,7 +349,7 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
             note="Independent second OAB CNA and ConfirmADV evidence reviewed.",
             user=admin,
             verification_reference="https://confirmadv.oab.org.br/",
-            verification_evidence_hash="b" * 64,
+            verification_evidence_hash=second_oab_verification.content_sha256,
             registration_status="regular",
             valid_until=now + timedelta(days=60),
         )
@@ -262,6 +393,23 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
         assert current_snapshot_hash == snapshot_hash
         assert current_manifest == manifest
         assert current_manifest_hash == stable_hash(manifest)
+        scenario_signature = _store_evidence(
+            db,
+            kind="iti_signature_artifact",
+            label="scenario-signature",
+            user=expert,
+            scenario=scenario,
+            expires_at=now + timedelta(days=40),
+        )
+        scenario_validation = _store_evidence(
+            db,
+            kind="iti_validation_report",
+            label="scenario-validation",
+            user=expert,
+            scenario=scenario,
+            expires_at=now + timedelta(days=40),
+            source_url="https://validar.iti.gov.br/",
+        )
         attestation_kwargs = {
             "scenario": scenario,
             "generation_config": _config(),
@@ -269,9 +417,9 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
             "artifact_ids": [item.id for item in artifacts],
             "signed_artifact_manifest_hash": stable_hash(manifest),
             "signature_format": "PAdES",
-            "signature_artifact_hash": "6" * 64,
+            "signature_artifact_hash": scenario_signature.content_sha256,
             "signature_validation_url": "https://validar.iti.gov.br/",
-            "signature_validation_report_hash": "7" * 64,
+            "signature_validation_report_hash": scenario_validation.content_sha256,
             "certificate_serial": "ICP-BRASIL-123",
             "certificate_valid_until": now + timedelta(days=45),
             "statement": "I reviewed the frozen facts, legal sources, claims and exact artifact hashes.",
@@ -342,13 +490,67 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
         )
         assert attestation.status == "active"
 
+        original_artifact_hash = tamper_target.content_sha256
+        original_artifact_length = tamper_target.content_length
+        rebound_content = b"different-candidate-for-signature-replay"
+        db.execute(
+            update(ScenarioDeliveryArtifact)
+            .where(ScenarioDeliveryArtifact.id == tamper_target.id)
+            .values(
+                content=rebound_content,
+                content_sha256=hashlib.sha256(rebound_content).hexdigest(),
+                content_length=len(rebound_content),
+            )
+        )
+        db.flush()
+        _snapshot, _manifest, rebound_manifest_hash = current_delivery_artifact_manifest(
+            db, scenario_id=scenario.id
+        )
+        with pytest.raises(DeliveryAssuranceError, match="其他 artifact manifest"):
+            create_expert_attestation(
+                db,
+                certificate_subject="CN=Brazil Expert",
+                **{
+                    **attestation_kwargs,
+                    "signed_artifact_manifest_hash": rebound_manifest_hash,
+                },
+            )
+        db.execute(
+            update(ScenarioDeliveryArtifact)
+            .where(ScenarioDeliveryArtifact.id == tamper_target.id)
+            .values(
+                content=original_content,
+                content_sha256=original_artifact_hash,
+                content_length=original_artifact_length,
+            )
+        )
+        db.flush()
+        db.expire_all()
+        attestation = db.get(ScenarioExpertAttestation, attestation.id)
+
+        uat_plan = _store_evidence(
+            db,
+            kind="uat_test_plan",
+            label="uat-plan",
+            user=customer,
+            scenario=scenario,
+            expires_at=now + timedelta(days=25),
+        )
+        uat_result = _store_evidence(
+            db,
+            kind="uat_test_evidence",
+            label="uat-result",
+            user=customer,
+            scenario=scenario,
+            expires_at=now + timedelta(days=25),
+        )
         acceptance = create_uat_acceptance(
             db,
             scenario=scenario,
             attestation=attestation,
             customer_organization="Acme",
-            test_plan_hash="8" * 64,
-            test_evidence_hash="9" * 64,
+            test_plan_hash=uat_plan.content_sha256,
+            test_evidence_hash=uat_result.content_sha256,
             evidence_reference="https://evidence.example.com/uat/1",
             environment="customer_acceptance",
             target_environment_id="acme-prod-br-01",
@@ -356,8 +558,75 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
             expires_at=now + timedelta(days=20),
             user=customer,
         )
+        with pytest.raises(DeliveryAssuranceError, match="其他快照/环境"):
+            create_uat_acceptance(
+                db,
+                scenario=scenario,
+                attestation=attestation,
+                customer_organization="Acme",
+                test_plan_hash=uat_plan.content_sha256,
+                test_evidence_hash=uat_result.content_sha256,
+                evidence_reference="https://evidence.example.com/uat/rebound",
+                environment="customer_acceptance",
+                target_environment_id="acme-other-environment",
+                acceptance_statement="The same UAT evidence must not be rebound to another environment.",
+                expires_at=now + timedelta(days=20),
+                user=customer,
+            )
         content_limitations = (
             "Certification is limited to the frozen release and declared legal date."
+        )
+        gold_dataset = _store_evidence(
+            db,
+            kind="gold_dataset",
+            label="gold-dataset",
+            user=admin,
+            expires_at=now + timedelta(days=30),
+        )
+        evaluation_policy = _store_evidence(
+            db,
+            kind="evaluation_policy",
+            label="evaluation-policy",
+            user=admin,
+            expires_at=now + timedelta(days=30),
+        )
+        evaluation_run = _store_evidence(
+            db,
+            kind="evaluation_run",
+            label="evaluation-run",
+            user=admin,
+            expires_at=now + timedelta(days=30),
+            payload={"status": "passed", "suite": "frozen-gold-v1"},
+        )
+        primary_content_signature = _store_evidence(
+            db,
+            kind="content_primary_signature",
+            label="primary-content-signature",
+            user=expert,
+            expires_at=now + timedelta(days=30),
+        )
+        primary_content_validation = _store_evidence(
+            db,
+            kind="content_primary_validation_report",
+            label="primary-content-validation",
+            user=expert,
+            expires_at=now + timedelta(days=30),
+            source_url="https://validar.iti.gov.br/",
+        )
+        secondary_content_signature = _store_evidence(
+            db,
+            kind="content_secondary_signature",
+            label="secondary-content-signature",
+            user=second_expert,
+            expires_at=now + timedelta(days=30),
+        )
+        secondary_content_validation = _store_evidence(
+            db,
+            kind="content_secondary_validation_report",
+            label="secondary-content-validation",
+            user=second_expert,
+            expires_at=now + timedelta(days=30),
+            source_url="https://validar.iti.gov.br/",
         )
         content_manifest = build_legal_content_manifest(
             capability_pack_id="brazil_new_energy_greenfield",
@@ -365,9 +634,9 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
             capability_pack_hash="1" * 64,
             rules_artifact_hash="2" * 64,
             corpus_artifact_hash="3" * 64,
-            gold_dataset_sha256="4" * 64,
-            evaluation_policy_sha256="5" * 64,
-            evaluation_run_sha256="6" * 64,
+            gold_dataset_sha256=gold_dataset.content_sha256,
+            evaluation_policy_sha256=evaluation_policy.content_sha256,
+            evaluation_run_sha256=evaluation_run.content_sha256,
             regression_status="passed",
             primary_credential_id=credential.id,
             secondary_credential_id=second_credential.id,
@@ -380,52 +649,175 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
             capability_pack_hash="1" * 64,
             rules_artifact_hash="2" * 64,
             corpus_artifact_hash="3" * 64,
-            gold_dataset_sha256="4" * 64,
-            evaluation_policy_sha256="5" * 64,
-            evaluation_run_sha256="6" * 64,
+            gold_dataset_sha256=gold_dataset.content_sha256,
+            evaluation_policy_sha256=evaluation_policy.content_sha256,
+            evaluation_run_sha256=evaluation_run.content_sha256,
             regression_status="passed",
             primary_credential=credential,
             secondary_credential=second_credential,
-            primary_signature_hash="7" * 64,
+            primary_signature_hash=primary_content_signature.content_sha256,
             primary_certificate_subject="CN=Brazil Expert",
             primary_certificate_serial="ICP-BRASIL-CONTENT-1",
             primary_validation_url="https://validar.iti.gov.br/",
-            primary_validation_report_hash="8" * 64,
-            secondary_signature_hash="9" * 64,
+            primary_validation_report_hash=primary_content_validation.content_sha256,
+            secondary_signature_hash=secondary_content_signature.content_sha256,
             secondary_certificate_subject="CN=Second Brazil Expert",
             secondary_certificate_serial="ICP-BRASIL-CONTENT-2",
             secondary_validation_url="https://validar.iti.gov.br/",
-            secondary_validation_report_hash="a" * 64,
+            secondary_validation_report_hash=secondary_content_validation.content_sha256,
             signed_content_manifest_hash=stable_hash(content_manifest),
             limitations=content_limitations,
             expires_at=now + timedelta(days=20),
             user=admin,
+        )
+        rebound_limitations = "Attempt to bind old signatures to a different content manifest."
+        rebound_manifest = build_legal_content_manifest(
+            capability_pack_id="brazil_new_energy_greenfield",
+            capability_pack_version="1.0",
+            capability_pack_hash="1" * 64,
+            rules_artifact_hash="2" * 64,
+            corpus_artifact_hash="3" * 64,
+            gold_dataset_sha256=gold_dataset.content_sha256,
+            evaluation_policy_sha256=evaluation_policy.content_sha256,
+            evaluation_run_sha256=evaluation_run.content_sha256,
+            regression_status="passed",
+            primary_credential_id=credential.id,
+            secondary_credential_id=second_credential.id,
+            limitations=rebound_limitations,
+        )
+        with pytest.raises(DeliveryAssuranceError, match="其他内容 manifest"):
+            create_legal_content_certification(
+                db,
+                capability_pack_id="brazil_new_energy_greenfield",
+                capability_pack_version="1.0",
+                capability_pack_hash="1" * 64,
+                rules_artifact_hash="2" * 64,
+                corpus_artifact_hash="3" * 64,
+                gold_dataset_sha256=gold_dataset.content_sha256,
+                evaluation_policy_sha256=evaluation_policy.content_sha256,
+                evaluation_run_sha256=evaluation_run.content_sha256,
+                regression_status="passed",
+                primary_credential=credential,
+                secondary_credential=second_credential,
+                primary_signature_hash=primary_content_signature.content_sha256,
+                primary_certificate_subject="CN=Brazil Expert",
+                primary_certificate_serial="ICP-BRASIL-CONTENT-1",
+                primary_validation_url="https://validar.iti.gov.br/",
+                primary_validation_report_hash=primary_content_validation.content_sha256,
+                secondary_signature_hash=secondary_content_signature.content_sha256,
+                secondary_certificate_subject="CN=Second Brazil Expert",
+                secondary_certificate_serial="ICP-BRASIL-CONTENT-2",
+                secondary_validation_url="https://validar.iti.gov.br/",
+                secondary_validation_report_hash=secondary_content_validation.content_sha256,
+                signed_content_manifest_hash=stable_hash(rebound_manifest),
+                limitations=rebound_limitations,
+                expires_at=now + timedelta(days=20),
+                user=admin,
+            )
+        commit_sha = hashlib.sha1(b"tested-release-commit").hexdigest()
+        backend_digest = "sha256:" + hashlib.sha256(b"backend-image").hexdigest()
+        frontend_digest = "sha256:" + hashlib.sha256(b"frontend-image").hexdigest()
+        database_digest = "sha256:" + hashlib.sha256(b"database-image").hexdigest()
+        build_descriptor = _store_evidence(
+            db,
+            kind="build_artifact_descriptor",
+            label="build-artifact-descriptor",
+            user=admin,
+            expires_at=now + timedelta(days=20),
+            payload={
+                "schema_version": "1.0",
+                "artifact": "vela-production-release",
+                "media_type": "application/vnd.oci.image.index.v1+json",
+                "target_environment_id": "acme-prod-br-01",
+                "commit_sha": commit_sha,
+                "migration_head": "20260718_0006",
+                "backend_image_digest": backend_digest,
+                "frontend_image_digest": frontend_digest,
+                "database_image_digest": database_digest,
+            },
+        )
+        build_receipt = _store_evidence(
+            db,
+            kind="build_artifact_receipt",
+            label="build-artifact-receipt",
+            user=admin,
+            expires_at=now + timedelta(days=20),
+            payload={
+                "schema_version": "1.0",
+                "target_environment_id": "acme-prod-br-01",
+                "commit_sha": commit_sha,
+                "migration_head": "20260718_0006",
+                "artifact_sha256": build_descriptor.content_sha256,
+                "backend_image_digest": backend_digest,
+                "frontend_image_digest": frontend_digest,
+                "database_image_digest": database_digest,
+            },
+        )
+        sbom = _store_evidence(
+            db,
+            kind="sbom",
+            label="cyclonedx-sbom",
+            user=admin,
+            expires_at=now + timedelta(days=20),
+            payload={"bomFormat": "CycloneDX", "specVersion": "1.6"},
+        )
+        security_report = _store_evidence(
+            db,
+            kind="security_report",
+            label="security-report",
+            user=admin,
+            expires_at=now + timedelta(days=20),
+            payload={"policy": "release", "result": "passed"},
+        )
+        provenance = _store_evidence(
+            db,
+            kind="provenance",
+            label="slsa-provenance",
+            user=admin,
+            expires_at=now + timedelta(days=20),
+        )
+        runtime_probe = _store_evidence(
+            db,
+            kind="runtime_probe",
+            label="runtime-probe",
+            user=admin,
+            expires_at=now + timedelta(days=20),
+            payload={"target": "acme-prod-br-01", "result": "passed"},
+        )
+        config_schema = _store_evidence(
+            db,
+            kind="config_schema",
+            label="config-schema",
+            user=admin,
+            expires_at=now + timedelta(days=20),
         )
         deployment = create_deployment_evidence(
             db,
             legal_content_certification_id=content_certification.id,
             environment="production",
             target_environment_id="acme-prod-br-01",
-            commit_sha="a" * 40,
-            migration_head="20260718_0005",
+            commit_sha=commit_sha,
+            migration_head="20260718_0006",
             ci_run_url="https://github.com/acme/vela/actions/runs/1",
-            artifact_sha256="a" * 64,
-            sbom_sha256="b" * 64,
+            artifact_sha256=build_descriptor.content_sha256,
+            artifact_receipt_hash=build_receipt.content_sha256,
+            sbom_sha256=sbom.content_sha256,
             security_evidence_url="https://evidence.example.com/security/1",
+            security_evidence_sha256=security_report.content_sha256,
             provenance_url="https://evidence.example.com/provenance/1",
-            provenance_sha256="c" * 64,
+            provenance_sha256=provenance.content_sha256,
             runtime_probe_url="https://evidence.example.com/runtime/1",
-            runtime_probe_sha256="d" * 64,
-            backend_image_digest="sha256:" + "e" * 64,
-            frontend_image_digest="sha256:" + "f" * 64,
-            database_image_digest="sha256:" + "0" * 64,
-            config_schema_sha256="1" * 64,
+            runtime_probe_sha256=runtime_probe.content_sha256,
+            backend_image_digest=backend_digest,
+            frontend_image_digest=frontend_digest,
+            database_image_digest=database_digest,
+            config_schema_sha256=config_schema.content_sha256,
             capability_pack_hash="1" * 64,
             rules_artifact_hash="2" * 64,
             corpus_artifact_hash="3" * 64,
-            gold_dataset_sha256="4" * 64,
-            evaluation_policy_sha256="5" * 64,
-            evaluation_run_sha256="6" * 64,
+            gold_dataset_sha256=gold_dataset.content_sha256,
+            evaluation_policy_sha256=evaluation_policy.content_sha256,
+            evaluation_run_sha256=evaluation_run.content_sha256,
             regression_status="passed",
             verification_note="Production probes, provenance, SBOM, CVE policy and gold run reviewed.",
             expires_at=now + timedelta(days=15),
@@ -463,6 +855,33 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
         )
         assert report["delivery_allowed"] is True
         assert report["release_hash"] == release.release_hash
+        validated_report = DeliveryGateStatusResponse.model_validate(report)
+        assert validated_report.schema_version == "1.1"
+
+        original_runtime_probe = runtime_probe.content
+        db.execute(
+            update(type(runtime_probe))
+            .where(type(runtime_probe).id == runtime_probe.id)
+            .values(content=b'{"result":"tampered"}')
+        )
+        db.commit()
+        evidence_tamper_report = evaluate_delivery_release(
+            db, scenario=scenario, generation_config=_config()
+        )
+        assert evidence_tamper_report["delivery_allowed"] is False
+        assert (
+            "delivery_evidence_objects_invalid"
+            in evidence_tamper_report["blocking_reasons"]
+        )
+        db.execute(
+            update(type(runtime_probe))
+            .where(type(runtime_probe).id == runtime_probe.id)
+            .values(content=original_runtime_probe)
+        )
+        db.commit()
+        assert evaluate_delivery_release(
+            db, scenario=scenario, generation_config=_config()
+        )["delivery_allowed"] is True
         _report, frozen_docx = require_released_delivery_artifact(
             db,
             scenario=scenario,
@@ -572,4 +991,19 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
         assert any(
             reason.startswith("delivery_artifact_invalid:docx")
             for reason in blocked.value.report["blocking_reasons"]
+        )
+
+        revoke_delivery_evidence_object(
+            db,
+            evidence=build_descriptor,
+            reason="The production build descriptor was withdrawn after incident review.",
+            user=admin,
+        )
+        db.commit()
+        revoked_evidence_report = evaluate_delivery_release(
+            db, scenario=scenario, generation_config=_config()
+        )
+        assert (
+            "delivery_evidence_objects_invalid"
+            in revoked_evidence_report["blocking_reasons"]
         )

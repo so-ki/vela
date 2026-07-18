@@ -23,8 +23,89 @@ from sqlalchemy.types import JSON
 from app.core.database import Base
 
 
+DELIVERY_EVIDENCE_KINDS = frozenset(
+    {
+        "oab_submission",
+        "oab_verification_report",
+        "iti_signature_artifact",
+        "iti_validation_report",
+        "uat_test_plan",
+        "uat_test_evidence",
+        "content_primary_signature",
+        "content_primary_validation_report",
+        "content_secondary_signature",
+        "content_secondary_validation_report",
+        "gold_dataset",
+        "evaluation_policy",
+        "evaluation_run",
+        "build_artifact_descriptor",
+        "build_artifact_receipt",
+        "sbom",
+        "security_report",
+        "provenance",
+        "runtime_probe",
+        "config_schema",
+    }
+)
+
+
 def utcnow() -> datetime:
     return datetime.now(timezone.utc)
+
+
+class DeliveryEvidenceObject(Base):
+    """Immutable, content-addressed bytes supporting a delivery assertion."""
+
+    __tablename__ = "delivery_evidence_objects"
+    __table_args__ = (
+        UniqueConstraint(
+            "evidence_kind",
+            "content_sha256",
+            name="uq_delivery_evidence_kind_content_sha256",
+        ),
+        CheckConstraint(
+            "evidence_kind IN ("
+            "'oab_submission','oab_verification_report',"
+            "'iti_signature_artifact','iti_validation_report',"
+            "'uat_test_plan','uat_test_evidence',"
+            "'content_primary_signature','content_primary_validation_report',"
+            "'content_secondary_signature','content_secondary_validation_report',"
+            "'gold_dataset','evaluation_policy','evaluation_run',"
+            "'build_artifact_descriptor','build_artifact_receipt',"
+            "'sbom','security_report','provenance',"
+            "'runtime_probe','config_schema'"
+            ")",
+            name="ck_delivery_evidence_object_kind",
+        ),
+        CheckConstraint(
+            "status IN ('available','revoked')",
+            name="ck_delivery_evidence_object_status",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    scenario_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("investigation_scenarios.id"), index=True, nullable=True
+    )
+    evidence_kind: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    filename: Mapped[str] = mapped_column(String(512), nullable=False)
+    media_type: Mapped[str] = mapped_column(String(255), nullable=False)
+    content_sha256: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    content_length: Mapped[int] = mapped_column(Integer, nullable=False)
+    content: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    source_url: Mapped[Optional[str]] = mapped_column(String(2048), nullable=True)
+    status: Mapped[str] = mapped_column(String(24), index=True, nullable=False)
+    uploaded_by: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True, nullable=False)
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), index=True, nullable=True
+    )
+    revoked_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
+    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    revocation_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
 
 
 class LegalExpertCredential(Base):
@@ -284,8 +365,10 @@ class DeploymentEvidence(Base):
     migration_head: Mapped[str] = mapped_column(String(128), nullable=False)
     ci_run_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     artifact_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
+    artifact_receipt_hash: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     sbom_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     security_evidence_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    security_evidence_sha256: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     provenance_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     provenance_sha256: Mapped[str] = mapped_column(String(64), nullable=False)
     runtime_probe_url: Mapped[str] = mapped_column(String(2048), nullable=False)
@@ -358,6 +441,7 @@ class ScenarioDeliveryRelease(Base):
 
 
 _MUTABLE_FIELDS = {
+    DeliveryEvidenceObject: {"status", "revoked_by", "revoked_at", "revocation_reason"},
     LegalExpertCredential: {
         "status",
         "verification_reference",

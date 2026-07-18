@@ -1,3 +1,44 @@
+export type DeliveryEvidenceKind =
+  | 'oab_submission'
+  | 'oab_verification_report'
+  | 'iti_signature_artifact'
+  | 'iti_validation_report'
+  | 'uat_test_plan'
+  | 'uat_test_evidence'
+  | 'content_primary_signature'
+  | 'content_primary_validation_report'
+  | 'content_secondary_signature'
+  | 'content_secondary_validation_report'
+  | 'gold_dataset'
+  | 'evaluation_policy'
+  | 'evaluation_run'
+  | 'build_artifact_descriptor'
+  | 'build_artifact_receipt'
+  | 'sbom'
+  | 'security_report'
+  | 'provenance'
+  | 'runtime_probe'
+  | 'config_schema'
+
+export interface DeliveryEvidenceObject {
+  id: string
+  scenario_id: number | null
+  evidence_kind: DeliveryEvidenceKind
+  filename: string
+  media_type: string
+  content_sha256: string
+  content_length: number
+  source_url: string | null
+  status: 'available' | 'revoked'
+  uploaded_by: number
+  uploaded_at: string
+  expires_at: string | null
+  revoked_by: number | null
+  revoked_at: string | null
+  revocation_reason: string | null
+  created_at: string
+}
+
 export interface DeliveryArtifact {
   id: string
   scenario_id: number
@@ -87,6 +128,8 @@ export interface DeploymentEvidence {
   target_environment_id: string
   commit_sha: string
   migration_head: string
+  artifact_receipt_hash: string | null
+  security_evidence_sha256: string | null
   status: 'verified' | 'revoked'
   verified_by: number
   verified_at: string

@@ -22,7 +22,7 @@
 | A-04 | 中葡简报 | `accepted`（工程） | 简报由冻结结果生成，法源组成按真实命中披露 | `test_brief_source_disclosure.py`、全量后端测试 |
 | A-05 | Word/PDF/审计包 | `accepted`（工程） | 精确 bytes 在签署前冻结；最终端点只返回 active release 绑定的原制品，携带可复核哈希 | `test_export_citation_service.py`、`test_delivery_assurance.py` |
 | A-06 | 单客户私有化部署 | `accepted`（RC） | PostgreSQL migration、三镜像、登录/业务页面和 API 黄金路径通过 | GitHub Actions production compose smoke |
-| A-07 | 法律内容达到可对客户交付质量 | `implemented / blocked_external` | 两名巴西执业律师认证 rules/corpus/gold release；场景律师签署精确制品；客户 UAT 与生产证据有效 | 代码门见 Alembic `0005`、`test_delivery_assurance.py`；真实证据仍为 0 |
+| A-07 | 法律内容达到可对客户交付质量 | `implemented / blocked_external` | 两名巴西执业律师认证 rules/corpus/gold release；场景律师签署精确制品；客户 UAT 与生产证据有效 | 代码门见 Alembic `0006`、`test_delivery_assurance.py`；真实证据仍为 0 |
 
 ## B. 冻结讨论中的机制层
 
@@ -41,11 +41,12 @@
 
 | ID | 需求 | 当前状态 | 完成判据 | 证据/下一动作 |
 |---|---|---|---|---|
-| E-01 | OAB 凭证与职责分离 | `implemented / blocked_external` | 持证人不能自核验；admin 不能代签；只有 `review.finalized_by_id` 对应主审可冻结/签场景；凭证来自 CNA/ConfirmADV 且 current/regular | 代码与非主审签署攻击测试已完成；等待真实律师 |
+| E-01 | OAB 凭证与职责分离 | `implemented / blocked_external` | 持证人不能自核验；admin 不能代签；只有 `review.finalized_by_id` 对应主审可冻结/签场景；CNA/ConfirmADV 报告 exact bytes 入库且不得跨凭证复用 | 代码与非主审/报告复用攻击测试已完成；等待真实律师 |
 | E-02 | 两律师法律内容 release | `implemented / blocked_external` | 两名不同有效律师签名覆盖精确 pack/rules/corpus/gold hashes | `LegalContentCertification`；等待真实双签和 gold set |
 | E-03 | 精确制品签名 | `implemented / blocked_external` | 冻结 DOCX/PDF/audit bytes；场景主审签 manifest；签名核验与发布前均重验 bytes/全部元数据；管理员核验 ITI 报告 | `ScenarioDeliveryArtifact/ExpertAttestation` 与签前篡改攻击；等待真实签名 |
-| E-04 | 客户 UAT/生产证据 | `implemented / blocked_external` | UAT 与 production `target_environment_id`、commit、image digest、SBOM、provenance、runtime probe 一致 | API 已实现；等待客户环境 |
-| E-05 | 最终 release 与下载 | `accepted`（工程） | 最终 admin 未参与该 release 的任一证据核验；schema 1.1 checkpoint 绑定全部关键证据；统一 evaluator 重算；最终端点只返回原冻结 bytes；撤回/过期/篡改立即阻断 | `test_delivery_assurance.py` 的同 admin 放行、签前 bytes 与 release note raw-SQL 攻击；角色化证据台 |
+| E-04 | 客户 UAT/生产证据 | `implemented / blocked_external` | UAT 与 production `target_environment_id`、commit、image digest、SBOM、provenance、runtime probe 一致；构建描述符与回执 exact bytes 入库，回执绑定上述字段 | API 与 receipt 重算已实现；等待客户环境 |
+| E-05 | 最终 release 与下载 | `accepted`（工程） | 最终 admin 未参与该 release 的任一证据核验；schema 1.1 checkpoint 绑定全部关键证据及原件 manifest；统一 evaluator 逐 bytes 重算；最终端点只返回原冻结 bytes；撤回/过期/篡改立即阻断 | `test_delivery_assurance.py` 的同 admin 放行、签前/证据 bytes、撤回原件与 release note raw-SQL 攻击；角色化证据台 |
+| E-06 | 证据原件与手填 hash 分离 | `accepted`（工程） | 凭证、签名、UAT、gold/eval 和部署提交必须引用按角色/场景绑定的受控 exact bytes；签名/报告/UAT 原件不得重绑其他 manifest、快照或环境；无原件、过期、撤回或哈希不符即阻断 | Alembic `0006`；`DeliveryEvidenceObject`；伪 hash、重绑、bytes 篡改和撤回攻击测试 |
 
 ## C. 法律研究与数据质量
 

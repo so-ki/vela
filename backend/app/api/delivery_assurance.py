@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import json
-from urllib.parse import quote
+import mimetypes
+from datetime import datetime
+from urllib.parse import quote, urlparse
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import Response
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, joinedload
@@ -13,6 +15,7 @@ from app.core.deps import get_current_user
 from app.core.roles import ROLE_ADMIN, is_legal_role
 from app.models.delivery_assurance import (
     DeploymentEvidence,
+    DeliveryEvidenceObject,
     LegalContentCertification,
     LegalExpertCredential,
     ScenarioDeliveryRelease,
@@ -29,6 +32,7 @@ from app.schemas.delivery_assurance import (
     DeliveryArtifactCreateRequest,
     DeliveryArtifactManifestResponse,
     DeliveryArtifactResponse,
+    DeliveryEvidenceObjectResponse,
     DeliveryGateStatusResponse,
     DeliveryReleaseCreateRequest,
     DeliveryReleaseResponse,
@@ -52,6 +56,7 @@ from app.services.delivery_assurance_service import (
     DeliveryAssurancePermissionError,
     create_delivery_release,
     create_delivery_artifacts,
+    create_delivery_evidence_object,
     create_deployment_evidence,
     create_expert_attestation,
     create_legal_content_certification,
@@ -64,6 +69,7 @@ from app.services.delivery_assurance_service import (
     revoke_attestation,
     revoke_delivery_release,
     revoke_deployment_evidence,
+    revoke_delivery_evidence_object,
     revoke_legal_content_certification,
     require_current_legal_content_signers,
     submit_credential,
@@ -74,6 +80,7 @@ from app.services.generation_guard import (
     require_generated_result,
     stable_hash,
 )
+from app.services.upload_security import read_evidence_upload_limited
 
 
 router = APIRouter(tags=["客户交付保证"])
@@ -122,6 +129,155 @@ def _config(db: Session, scenario: InvestigationScenario):
         return require_generated_result(db, scenario)
     except GenerationGuardError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@router.post(
+    "/delivery-assurance/evidence-objects",
+    response_model=DeliveryEvidenceObjectResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def post_delivery_evidence_object(
+    evidence_kind: str = Form(...),
+    file: UploadFile = File(...),
+    scenario_id: int | None = Form(default=None),
+    source_url: str | None = Form(default=None),
+    expires_at: datetime | None = Form(default=None),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    scenario = (
+        _load_scenario(db, scenario_id, current_user) if scenario_id is not None else None
+    )
+    normalized_source_url = source_url.strip() if source_url else None
+    if normalized_source_url:
+        parsed = urlparse(normalized_source_url)
+        if parsed.scheme != "https" or not parsed.hostname:
+            raise HTTPException(status_code=422, detail="证据来源必须是 HTTPS URL")
+    try:
+        content = await read_evidence_upload_limited(file)
+        filename = file.filename or "evidence.bin"
+        media_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        evidence = create_delivery_evidence_object(
+            db,
+            evidence_kind=evidence_kind,
+            filename=filename,
+            media_type=media_type,
+            content=content,
+            source_url=normalized_source_url,
+            expires_at=expires_at,
+            user=current_user,
+            scenario=scenario,
+        )
+        write_audit_log(
+            db,
+            user=current_user,
+            action="delivery.evidence_object_upload",
+            resource_type="delivery_evidence_object",
+            resource_id=evidence.id,
+            detail=_audit_detail(
+                scenario_id=evidence.scenario_id,
+                evidence_kind=evidence.evidence_kind,
+                content_sha256=evidence.content_sha256,
+                content_length=evidence.content_length,
+                expires_at=evidence.expires_at,
+            ),
+            commit=False,
+        )
+        db.commit()
+        db.refresh(evidence)
+        return evidence
+    except (ValueError, DeliveryAssuranceError, DeliveryAssurancePermissionError) as exc:
+        db.rollback()
+        _raise_service_error(exc)
+    except IntegrityError as exc:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="相同证据原件已存在") from exc
+
+
+@router.get(
+    "/delivery-assurance/evidence-objects",
+    response_model=list[DeliveryEvidenceObjectResponse],
+)
+def get_delivery_evidence_objects(
+    scenario_id: int | None = None,
+    evidence_kind: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    if scenario_id is not None:
+        _load_scenario(db, scenario_id, current_user)
+    query = db.query(DeliveryEvidenceObject)
+    if current_user.role != ROLE_ADMIN:
+        query = query.filter(DeliveryEvidenceObject.uploaded_by == current_user.id)
+    if scenario_id is not None:
+        query = query.filter(DeliveryEvidenceObject.scenario_id == scenario_id)
+    if evidence_kind:
+        query = query.filter(DeliveryEvidenceObject.evidence_kind == evidence_kind)
+    return query.order_by(DeliveryEvidenceObject.uploaded_at.desc()).limit(500).all()
+
+
+@router.get("/delivery-assurance/evidence-objects/{evidence_id}/download")
+def download_delivery_evidence_object(
+    evidence_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    evidence = _entity(db, DeliveryEvidenceObject, evidence_id, "证据原件")
+    if current_user.role != ROLE_ADMIN and evidence.uploaded_by != current_user.id:
+        raise HTTPException(status_code=403, detail="无权下载该证据原件")
+    write_audit_log(
+        db,
+        user=current_user,
+        action="delivery.evidence_object_download",
+        resource_type="delivery_evidence_object",
+        resource_id=evidence.id,
+        detail=_audit_detail(
+            evidence_kind=evidence.evidence_kind,
+            content_sha256=evidence.content_sha256,
+        ),
+    )
+    return Response(
+        content=evidence.content,
+        media_type=evidence.media_type,
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quote(evidence.filename)}",
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+            "X-Content-SHA256": evidence.content_sha256,
+        },
+    )
+
+
+@router.post(
+    "/delivery-assurance/evidence-objects/{evidence_id}/revoke",
+    response_model=DeliveryEvidenceObjectResponse,
+)
+def post_revoke_delivery_evidence_object(
+    evidence_id: str,
+    body: RevokeRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    evidence = _entity(db, DeliveryEvidenceObject, evidence_id, "证据原件")
+    try:
+        evidence = revoke_delivery_evidence_object(
+            db, evidence=evidence, reason=body.reason, user=current_user
+        )
+        write_audit_log(
+            db,
+            user=current_user,
+            action="delivery.evidence_object_revoke",
+            resource_type="delivery_evidence_object",
+            resource_id=evidence.id,
+            detail=_audit_detail(reason=body.reason),
+            commit=False,
+        )
+        db.commit()
+        db.refresh(evidence)
+        return evidence
+    except (DeliveryAssuranceError, DeliveryAssurancePermissionError) as exc:
+        db.rollback()
+        _raise_service_error(exc)
 
 
 def _audit_detail(**values) -> str:

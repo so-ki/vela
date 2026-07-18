@@ -2,7 +2,7 @@
 
 日期：2026-07-18（Asia/Shanghai）
 分支：`codex/vela-release-hardening`
-状态：`local-verified / remote-CI-green / draft-review-only / external-evidence-blocked`
+状态：`local-verified / remote-CI-pending / draft-review-only / external-evidence-blocked`
 
 本文件记录当前开发分支相对上一冻结 RC 的新增工程事实。它不是新的发布放行声明；远端工程 CI 已通过，但独立人工/法律审查、真实客户证据和目标环境验收仍不得由 CI 代替。
 
@@ -19,21 +19,22 @@
 9. **机制层界面：** 新增 `/scenarios/:id/mechanism` 双角色工作台，业务可维护材料/事实，法务可编译并确认 Claim、生成 CoverageProof；客户交付状态与机制通过状态明确分离。
 10. **客户交付证据台：** 新增 `/scenarios/:id/delivery-assurance` 角色化界面，支持候选件审阅、OAB 凭证、canonical manifest、场景签名/ITI 核验、客户 UAT、双律师内容认证、生产证据、限时 release 与紧急撤回；所有操作仍经过服务端门禁。
 11. **自我反驳加固：** 场景冻结/签署绑定法务定稿主审，最终 release admin 与全部证据核验 actor 分离，签名批准和发布前重验 exact bytes，release checkpoint 升级为覆盖全部关键证据的 schema 1.1；详见 `SELF_RED_TEAM_2026-07-18.md`。
+12. **证据原件库：** 新增 Alembic `0006` 与角色/场景绑定的 `DeliveryEvidenceObject`；OAB、ITI、UAT、gold/eval、构建描述符/回执、SBOM、安全、provenance、runtime/config 不再允许只靠手填 hash/URL。业务创建与 release evaluator 均从 DB 逐 bytes 重算，撤回或篡改即 fail-closed。
 
 ## 本地验收证据
 
 | 验收项 | 当前结果 |
 |---|---|
-| 后端 Python 3.12 全量 | `293 passed`；3 条第三方弃用警告 |
+| 后端全量 | `295 passed`；本地 Python 3.13 有 2 条第三方弃用警告，无失败 |
 | Python 编译 | `app` 与 `tests` compileall 通过 |
-| 前端组件 | `28 passed` |
+| 前端组件 | `29 passed` |
 | 前端 TypeScript/Vite | 生产构建通过，158 modules |
 | 锁定依赖审计 | 本地 `pip-audit: No known vulnerabilities found`、`npm audit --offline: 0 vulnerabilities`；远端在线审计通过 |
-| Alembic | base → `20260718_0005` → base → `20260718_0005` 通过；`alembic check` 无漂移 |
+| Alembic | base → `20260718_0006` → base → `20260718_0006` 通过；`alembic check` 无漂移 |
 | 法律质量门 | controlled pilot 通过；GA 按设计失败，`expert_verified=0` |
 | 发布边界 | Docker context/COPY allowlist、测试 fixture 排除、密钥边界与 GitHub Actions SHA pins 通过 |
 | 差异格式 | `git diff --check` 通过 |
-| Draft PR 远端 CI | commit `4ec6c5a` 的 [CI run 29635681320](https://github.com/so-ki/vela/actions/runs/29635681320) 5/5 jobs 通过：依赖审计、293 tests、迁移、27 tests/构建、发布边界、API golden path、三镜像 CVE/SBOM、PostgreSQL Compose 与 Playwright smoke |
+| Draft PR 远端 CI | 本批尚未推送；上一基线 commit 的 CI 绿色不代表本批已通过 |
 
 ## 尚未完成，不能对外宣称
 

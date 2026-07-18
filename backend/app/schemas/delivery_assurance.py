@@ -16,6 +16,28 @@ def _non_placeholder_sha256(value: str) -> str:
 
 
 Sha256 = Annotated[str, AfterValidator(_non_placeholder_sha256)]
+DeliveryEvidenceKind = Literal[
+    "oab_submission",
+    "oab_verification_report",
+    "iti_signature_artifact",
+    "iti_validation_report",
+    "uat_test_plan",
+    "uat_test_evidence",
+    "content_primary_signature",
+    "content_primary_validation_report",
+    "content_secondary_signature",
+    "content_secondary_validation_report",
+    "gold_dataset",
+    "evaluation_policy",
+    "evaluation_run",
+    "build_artifact_descriptor",
+    "build_artifact_receipt",
+    "sbom",
+    "security_report",
+    "provenance",
+    "runtime_probe",
+    "config_schema",
+]
 
 
 def _https(value: str) -> str:
@@ -24,6 +46,27 @@ def _https(value: str) -> str:
     if parsed.scheme != "https" or not parsed.hostname:
         raise ValueError("证据引用必须是带主机名的 HTTPS URL")
     return normalized
+
+
+class DeliveryEvidenceObjectResponse(BaseModel):
+    id: str
+    scenario_id: Optional[int]
+    evidence_kind: DeliveryEvidenceKind
+    filename: str
+    media_type: str
+    content_sha256: str
+    content_length: int
+    source_url: Optional[str]
+    status: Literal["available", "revoked"]
+    uploaded_by: int
+    uploaded_at: datetime
+    expires_at: Optional[datetime]
+    revoked_by: Optional[int]
+    revoked_at: Optional[datetime]
+    revocation_reason: Optional[str]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class CredentialCreateRequest(BaseModel):
@@ -372,8 +415,10 @@ class DeploymentEvidenceCreateRequest(BaseModel):
     migration_head: str = Field(min_length=3, max_length=128)
     ci_run_url: str = Field(min_length=1, max_length=2048)
     artifact_sha256: Sha256 = Field(pattern=r"^[0-9a-f]{64}$")
+    artifact_receipt_hash: Sha256 = Field(pattern=r"^[0-9a-f]{64}$")
     sbom_sha256: Sha256 = Field(pattern=r"^[0-9a-f]{64}$")
     security_evidence_url: str = Field(min_length=1, max_length=2048)
+    security_evidence_sha256: Sha256 = Field(pattern=r"^[0-9a-f]{64}$")
     provenance_url: str = Field(min_length=1, max_length=2048)
     provenance_sha256: Sha256 = Field(pattern=r"^[0-9a-f]{64}$")
     runtime_probe_url: str = Field(min_length=1, max_length=2048)
@@ -422,8 +467,10 @@ class DeploymentEvidenceResponse(BaseModel):
     migration_head: str
     ci_run_url: str
     artifact_sha256: str
+    artifact_receipt_hash: Optional[str]
     sbom_sha256: str
     security_evidence_url: str
+    security_evidence_sha256: Optional[str]
     provenance_url: str
     provenance_sha256: str
     runtime_probe_url: str
@@ -490,7 +537,7 @@ class RevokeRequest(BaseModel):
 
 
 class DeliveryGateStatusResponse(BaseModel):
-    schema_version: Literal["1.0"]
+    schema_version: Literal["1.1"]
     scenario_id: int
     evaluated_at: datetime
     delivery_allowed: bool

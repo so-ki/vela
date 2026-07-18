@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 import re
 import zipfile
 from pathlib import Path
@@ -18,7 +19,12 @@ MAX_ZIP_COMPRESSION_RATIO = 100
 MAX_EXTRACTED_CHARACTERS = 2_000_000
 MAX_PROJECT_DOCUMENTS = 30
 MAX_PROJECT_STORED_CHARACTERS = 5_000_000
+MAX_DELIVERY_EVIDENCE_OBJECTS_PER_USER = 500
+MAX_DELIVERY_EVIDENCE_BYTES_PER_USER = 1024 * 1024 * 1024
+MAX_DELIVERY_EVIDENCE_OBJECTS_PER_INSTANCE = 5_000
+MAX_DELIVERY_EVIDENCE_BYTES_PER_INSTANCE = 5 * 1024 * 1024 * 1024
 ALLOWED_SUFFIXES = {".txt", ".md", ".docx", ".pdf"}
+EVIDENCE_ALLOWED_SUFFIXES = {".txt", ".md", ".json", ".xml", ".pdf", ".p7s", ".sig"}
 PDF_ACTIVE_CONTENT_NAMES = frozenset(
     {
         b"javascript",
@@ -36,7 +42,7 @@ PDF_NAME_TOKEN_RE = re.compile(rb"/([^\x00\t\n\f\r ()<>\[\]{}/%]+)")
 PDF_NAME_ESCAPE_RE = re.compile(rb"#([0-9a-fA-F]{2})")
 
 
-def validate_upload_container(filename: str, content: bytes) -> None:
+def _validate_safe_filename(filename: str) -> None:
     if (
         not filename
         or len(filename.encode("utf-8")) > 512
@@ -45,6 +51,10 @@ def validate_upload_container(filename: str, content: bytes) -> None:
         or any(ord(char) < 32 or ord(char) == 127 for char in filename)
     ):
         raise ValueError("文件名不安全或过长")
+
+
+def validate_upload_container(filename: str, content: bytes) -> None:
+    _validate_safe_filename(filename)
     suffix = Path(filename).suffix.lower()
     if suffix not in ALLOWED_SUFFIXES:
         raise ValueError(f"仅支持 {', '.join(sorted(ALLOWED_SUFFIXES))} 文件")
@@ -61,6 +71,37 @@ def validate_upload_container(filename: str, content: bytes) -> None:
         _validate_docx_archive(content)
     if suffix in {".txt", ".md"} and b"\x00" in content[:4096]:
         raise ValueError("文本文件包含二进制空字节")
+
+
+def validate_evidence_container(filename: str, content: bytes) -> None:
+    """Validate inert evidence attachments without claiming AV/CDR coverage."""
+
+    _validate_safe_filename(filename)
+    suffix = Path(filename).suffix.lower()
+    if suffix not in EVIDENCE_ALLOWED_SUFFIXES:
+        raise ValueError(
+            f"证据原件仅支持 {', '.join(sorted(EVIDENCE_ALLOWED_SUFFIXES))} 文件"
+        )
+    if not content:
+        raise ValueError("证据文件为空")
+    if suffix == ".pdf":
+        if not content.startswith(b"%PDF-"):
+            raise ValueError("文件扩展名为 PDF，但内容不是有效 PDF")
+        if _pdf_has_active_content_name(content):
+            raise ValueError("PDF 证据包含主动内容，禁止进入证据库")
+    elif suffix == ".json":
+        try:
+            json.loads(content.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("JSON 证据不是有效 UTF-8 JSON") from exc
+    elif suffix == ".xml":
+        lowered = content[:1024 * 1024].lower()
+        if not content.lstrip().startswith(b"<"):
+            raise ValueError("XML 证据结构无效")
+        if b"<!doctype" in lowered or b"<!entity" in lowered or b"<xi:include" in lowered:
+            raise ValueError("XML 证据包含 DTD、实体或外部包含")
+    elif suffix in {".txt", ".md"} and b"\x00" in content[:4096]:
+        raise ValueError("文本证据包含二进制空字节")
 
 
 def _validate_docx_archive(content: bytes) -> None:
@@ -144,6 +185,33 @@ async def read_upload_limited(upload: Any, *, max_bytes: int = MAX_FILE_BYTES) -
             await close()
     content = b"".join(chunks)
     validate_upload_container(getattr(upload, "filename", None) or "upload.bin", content)
+    return content
+
+
+async def read_evidence_upload_limited(
+    upload: Any, *, max_bytes: int = MAX_FILE_BYTES
+) -> bytes:
+    chunks: list[bytes] = []
+    total = 0
+    try:
+        while True:
+            chunk = await upload.read(READ_CHUNK_BYTES)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > max_bytes:
+                raise ValueError(
+                    f"单个证据文件不能超过 {max_bytes // (1024 * 1024)}MB"
+                )
+            chunks.append(chunk)
+    finally:
+        close = getattr(upload, "close", None)
+        if close is not None:
+            await close()
+    content = b"".join(chunks)
+    validate_evidence_container(
+        getattr(upload, "filename", None) or "evidence.bin", content
+    )
     return content
 
 

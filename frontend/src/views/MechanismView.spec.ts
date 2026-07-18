@@ -177,7 +177,7 @@ describe('MechanismView', () => {
     client.fetchLatestClaimCompilation.mockResolvedValue(null)
     client.fetchLatestCoverageProof.mockResolvedValue(null)
     client.fetchDeliveryGateStatus.mockResolvedValue({
-      schema_version: '1.0',
+      schema_version: '1.1',
       scenario_id: 9,
       evaluated_at: '2026-07-18T00:00:00Z',
       delivery_allowed: false,

@@ -12,6 +12,8 @@
 | SR-04 | release hash 只绑定对象 ID；具有 DB 写权限者可改 UAT、部署、内容签名或发布说明而不改变 ID | 成立 | **accept**。release checkpoint 升级为 schema `1.1`，绑定场景签署证据、artifact manifest、UAT、内容双签、三份律师凭证、完整部署证据和 release note 的派生哈希 | raw SQL 修改 release note 后 `delivery_release_hash_invalid` |
 | SR-05 | 较长的部署/release 有效期可越过内容认证、签名证书或律师凭证的到期日 | 部分成立 | **accept**。部署不得晚于内容认证；release 不得晚于证据链任一凭证、证书、签署、UAT、内容认证或部署证据 | 创建时拒绝 + evaluator 运行时重算 |
 | SR-06 | UI 仍会诱导刚完成核验的 admin 点击最终发布，产生可预见的权限错误 | 成立 | **accept**。证据台显示四眼冲突原因并禁用最终按钮；服务端仍是权威门 | Vue 组件测试与 TypeScript 构建 |
+| SR-07 | 上述对象只保存 URL/手填 hash，调用者可用任意 64 位字符伪装 OAB、ITI、UAT、gold 或部署证据 | 成立 | **accept**。新增按角色/场景绑定的不可变内容寻址原件库；全部业务动作与发布 evaluator 从 DB 重读 bytes/长度/SHA-256/时效/状态；构建 receipt 绑定独立 descriptor、commit、迁移、环境与镜像 | 伪 hash 被拒绝，原件 raw-SQL bytes 篡改/撤回后 `delivery_evidence_objects_invalid` |
+| SR-08 | 有效原件可能被重放到另一律师凭证、artifact/content manifest 或 UAT 环境 | 成立 | **accept**。OAB 申报/核验报告禁止跨凭证复用；场景签名与报告锁定 artifact manifest；内容双签/报告锁定 content manifest；UAT 计划/结果锁定 snapshot 与 target environment | 凭证、场景签名、内容签名与 UAT 重绑攻击测试 |
 
 ## 修复后的不可绕过不变量
 
@@ -20,14 +22,16 @@
 3. 数字签名提交、签名核验、最终发布、每次正式下载均有重新验证点；任何一点失败都不能返回正式制品。
 4. release hash 是证据链检查点，不是法律正确性证明；ITI 签名有效也不证明文档内容真实或法律结论正确。
 5. ORM 不可变限制不是唯一防线；evaluator 会从数据库记录重算派生哈希，用 raw SQL 绕过 ORM 仍会 fail-closed。
+6. 字段里的 SHA-256 不再被当成证据；它必须解析到正确类型、上传人/场景、当前有效的 exact bytes。release hash 另外绑定全部原件 manifest。
 
 ## 仍不能由程序解决
 
 - 两名账号是否真的是两个独立自然人，必须由客户 IdP、用工/委聘与利益冲突流程证明；
 - OAB/ConfirmADV 和 ITI 报告是否真实，仍需外部查询证据与具名核验人；
+- 原件库能证明“当时上传的是这些 bytes”，不能自动证明报告内容真实、官方网页未被伪造或法律结论正确；
 - rules/corpus/gold 的法律正确性与覆盖充分性，必须由巴西律师和真实评测集验收；
 - 客户 UAT、生产镜像、KMS、WORM、备份恢复、LGPD/DPA 与 runtime probe 必须来自目标环境；
-- 数据库超级管理员可同时改记录与重算所有哈希。要抵抗该主体，必须把签名/checkpoint 写入客户控制的 KMS、透明日志或对象锁/WORM。
+- 数据库超级管理员可同时改记录与重算所有哈希。要抵抗该主体，必须把原件与签名/checkpoint 写入客户控制的 KMS、透明日志或对象锁/WORM。
 
 因此产品状态仍是 `engineering-implemented / external-evidence-blocked / not-production-authorized`，不能改写为“完全完美”或“已可真实客户交付”。
 
@@ -39,4 +43,4 @@ cd frontend && npm run test:components && npm run build
 git diff --check
 ```
 
-本轮本地结果：后端 `293 passed`；前端 `28 passed`；Vite `158 modules transformed`；差异检查通过。远端 CI 必须以具体 commit 的 GitHub Actions 结果为准。
+本轮本地结果：后端 `295 passed`；前端 `29 passed`；Vite `158 modules transformed`；Alembic base/head 往返与漂移检查、controlled-pilot 法律质量门、发布边界和差异检查通过。远端 CI 必须以具体 commit 的 GitHub Actions 结果为准。

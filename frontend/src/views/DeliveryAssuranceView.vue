@@ -6,8 +6,10 @@ import {
   decideExpertSignature,
   decideLegalCredential,
   downloadCandidateArtifact,
+  downloadDeliveryEvidenceObject,
   fetchDeliveryArtifactManifest,
   fetchDeliveryArtifacts,
+  fetchDeliveryEvidenceObjects,
   fetchDeliveryGateStatus,
   fetchDeliveryReleases,
   fetchDeploymentEvidence,
@@ -19,6 +21,7 @@ import {
   freezeDeliveryArtifacts,
   previewLegalContentManifest,
   revokeDeliveryRelease,
+  revokeDeliveryEvidenceObject,
   revokeDeploymentEvidence,
   revokeExpertAttestation,
   revokeLegalContentCertification,
@@ -28,12 +31,15 @@ import {
   submitLegalContentCertification,
   submitLegalCredential,
   submitUATAcceptance,
+  uploadDeliveryEvidenceObject,
   withdrawUATAcceptance,
 } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import type {
   ArtifactManifest,
   DeliveryArtifact,
+  DeliveryEvidenceKind,
+  DeliveryEvidenceObject,
   DeliveryRelease,
   DeploymentEvidence,
   ExpertAttestation,
@@ -54,6 +60,7 @@ const isBusiness = computed(() => auth.user?.role === 'business')
 const scenario = ref<Scenario | null>(null)
 const gate = ref<DeliveryGateStatus | null>(null)
 const artifacts = ref<DeliveryArtifact[]>([])
+const evidenceObjects = ref<DeliveryEvidenceObject[]>([])
 const manifest = ref<ArtifactManifest | null>(null)
 const credentials = ref<LegalCredential[]>([])
 const attestations = ref<ExpertAttestation[]>([])
@@ -66,6 +73,63 @@ const busy = ref<string | null>(null)
 const error = ref<string | null>(null)
 const notice = ref<string | null>(null)
 const contentManifestPreview = ref<{ manifest: Record<string, unknown>; manifest_hash: string } | null>(null)
+const evidenceFile = ref<File | null>(null)
+const evidenceUpload = reactive({
+  kind: '' as DeliveryEvidenceKind | '',
+  sourceUrl: '',
+  expiresAt: '',
+})
+const evidenceKinds = computed<DeliveryEvidenceKind[]>(() => {
+  if (isBusiness.value) return ['uat_test_plan', 'uat_test_evidence']
+  if (isExactLegal.value) {
+    return [
+      'oab_submission',
+      'iti_signature_artifact',
+      'iti_validation_report',
+      'content_primary_signature',
+      'content_primary_validation_report',
+      'content_secondary_signature',
+      'content_secondary_validation_report',
+    ]
+  }
+  return [
+    'oab_verification_report',
+    'iti_validation_report',
+    'content_primary_validation_report',
+    'content_secondary_validation_report',
+    'gold_dataset',
+    'evaluation_policy',
+    'evaluation_run',
+    'build_artifact_descriptor',
+    'build_artifact_receipt',
+    'sbom',
+    'security_report',
+    'provenance',
+    'runtime_probe',
+    'config_schema',
+  ]
+})
+const scenarioEvidenceKinds = new Set<DeliveryEvidenceKind>([
+  'iti_signature_artifact',
+  'iti_validation_report',
+  'uat_test_plan',
+  'uat_test_evidence',
+])
+const evidenceFormatHint = computed(() => {
+  if (evidenceUpload.kind === 'build_artifact_descriptor') {
+    return 'JSON 必须包含 schema_version=1.0、target_environment_id、commit_sha、migration_head 和三个 image digest。'
+  }
+  if (evidenceUpload.kind === 'build_artifact_receipt') {
+    return 'JSON 必须包含 descriptor 的 artifact_sha256，并重复绑定环境、commit、migration head 和三个 image digest。'
+  }
+  if (evidenceUpload.kind.endsWith('validation_report') || evidenceUpload.kind === 'oab_verification_report') {
+    return '官方核验报告必须同时填写 OAB/ConfirmADV 或 ITI VALIDAR 官方 HTTPS 来源。'
+  }
+  if (evidenceUpload.kind.includes('signature')) {
+    return '数字签名原件只接受 P7S、PDF 或 SIG；上传本身不代表签名已通过官方验证。'
+  }
+  return ''
+})
 const deliveryArtifactCount = computed(() => {
   if (manifest.value) return manifest.value.artifact_manifest.length
   const latestSnapshot = artifacts.value[0]?.snapshot_hash
@@ -228,11 +292,13 @@ function refreshTemplates() {
       environment: 'production',
       target_environment_id: '',
       commit_sha: 'REPLACE_WITH_40_OR_64_HEX_GIT_COMMIT',
-      migration_head: '20260718_0005',
+      migration_head: '20260718_0006',
       ci_run_url: 'REPLACE_WITH_GITHUB_ACTIONS_RUN_URL',
       artifact_sha256: requiredHash,
+      artifact_receipt_hash: requiredHash,
       sbom_sha256: requiredHash,
       security_evidence_url: 'REPLACE_WITH_HTTPS_SECURITY_EVIDENCE_URL',
+      security_evidence_sha256: requiredHash,
       provenance_url: 'REPLACE_WITH_HTTPS_PROVENANCE_URL',
       provenance_sha256: requiredHash,
       runtime_probe_url: 'REPLACE_WITH_HTTPS_RUNTIME_PROBE_URL',
@@ -276,7 +342,7 @@ async function loadPage() {
   loading.value = true
   error.value = null
   try {
-    const [loadedScenario, loadedGate, loadedArtifacts, loadedManifest, loadedAttestations, loadedUat, loadedReleases] =
+    const [loadedScenario, loadedGate, loadedArtifacts, loadedManifest, loadedAttestations, loadedUat, loadedReleases, loadedEvidence] =
       await Promise.all([
         fetchScenario(scenarioId.value),
         fetchDeliveryGateStatus(scenarioId.value),
@@ -285,6 +351,7 @@ async function loadPage() {
         fetchExpertAttestations(scenarioId.value),
         fetchUATAcceptances(scenarioId.value),
         fetchDeliveryReleases(scenarioId.value),
+        fetchDeliveryEvidenceObjects(),
       ])
     scenario.value = loadedScenario
     gate.value = loadedGate
@@ -293,6 +360,7 @@ async function loadPage() {
     attestations.value = loadedAttestations
     acceptances.value = loadedUat
     releases.value = loadedReleases
+    evidenceObjects.value = loadedEvidence
 
     if (isExactLegal.value || isAdmin.value) {
       credentials.value = await fetchLegalCredentials()
@@ -357,6 +425,56 @@ async function downloadCandidate(artifact: DeliveryArtifact) {
     URL.revokeObjectURL(url)
   } catch (cause: unknown) {
     error.value = extractError(cause, '候选件下载失败')
+  } finally {
+    busy.value = null
+  }
+}
+
+function selectEvidenceFile(event: Event) {
+  evidenceFile.value = (event.target as HTMLInputElement).files?.[0] || null
+}
+
+async function uploadEvidence() {
+  if (!evidenceUpload.kind || !evidenceFile.value) {
+    error.value = '请选择证据类型和真实证据文件。'
+    return
+  }
+  busy.value = 'evidence-upload'
+  error.value = null
+  try {
+    const evidence = await uploadDeliveryEvidenceObject({
+      evidenceKind: evidenceUpload.kind,
+      file: evidenceFile.value,
+      scenarioId: scenarioEvidenceKinds.has(evidenceUpload.kind) ? scenarioId.value : undefined,
+      sourceUrl: evidenceUpload.sourceUrl.trim() || undefined,
+      expiresAt: evidenceUpload.expiresAt
+        ? new Date(evidenceUpload.expiresAt).toISOString()
+        : undefined,
+    })
+    notice.value = `证据原件已冻结：${evidence.content_sha256}`
+    evidenceFile.value = null
+    evidenceUpload.sourceUrl = ''
+    evidenceUpload.expiresAt = ''
+    await loadPage()
+  } catch (cause: unknown) {
+    error.value = extractError(cause, '证据原件上传失败')
+  } finally {
+    busy.value = null
+  }
+}
+
+async function downloadEvidence(evidence: DeliveryEvidenceObject) {
+  busy.value = `evidence-download-${evidence.id}`
+  try {
+    const { blob, filename } = await downloadDeliveryEvidenceObject(evidence.id)
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = filename
+    anchor.click()
+    URL.revokeObjectURL(url)
+  } catch (cause: unknown) {
+    error.value = extractError(cause, '证据原件下载失败')
   } finally {
     busy.value = null
   }
@@ -431,6 +549,8 @@ async function submitRevocation() {
       await revokeDeploymentEvidence(forms.revokeId.trim(), reason)
     } else if (forms.revokeKind === 'release') {
       await revokeDeliveryRelease(scenarioId.value, forms.revokeId.trim(), reason)
+    } else if (forms.revokeKind === 'evidence-object') {
+      await revokeDeliveryEvidenceObject(forms.revokeId.trim(), reason)
     } else {
       throw new Error('unsupported revocation kind')
     }
@@ -494,12 +614,42 @@ function extractError(cause: unknown, fallback: string) {
 
     <template v-else>
       <section class="evidence-grid" aria-label="交付证据链进度">
+        <article><b>{{ evidenceObjects.filter((v) => v.status === 'available').length }}</b><span>受控证据原件</span></article>
         <article><b>{{ isBusiness ? '—' : credentials.filter((v) => v.status === 'verified').length }}</b><span>有效 OAB 凭证{{ isBusiness ? '（受限）' : '' }}</span></article>
         <article><b>{{ isBusiness ? '—' : certifications.filter((v) => v.status === 'certified').length }}</b><span>双律师内容认证{{ isBusiness ? '（受限）' : '' }}</span></article>
         <article><b>{{ deliveryArtifactCount }}/3</b><span>精确冻结制品</span></article>
         <article><b>{{ attestations.filter((v) => v.status === 'active').length }}</b><span>已核验场景签名</span></article>
         <article><b>{{ acceptances.filter((v) => v.status === 'accepted').length }}</b><span>客户 UAT</span></article>
         <article><b>{{ releases.filter((v) => v.status === 'active').length }}</b><span>有效 release</span></article>
+      </section>
+
+      <section class="panel evidence-section">
+        <div class="section-heading"><div><span class="step">00</span><h2>上传并冻结证据原件</h2></div></div>
+        <p class="warning-note">后续 JSON 中的证据 SHA-256 必须来自这里保存的 exact bytes。系统不再接受只有 URL/手填 hash、却没有原件的交付证据。</p>
+        <div class="evidence-upload-form">
+          <label>证据类型
+            <select v-model="evidenceUpload.kind">
+              <option value="">请选择</option>
+              <option v-for="kind in evidenceKinds" :key="kind" :value="kind">{{ kind }}</option>
+            </select>
+          </label>
+          <label>原件文件（PDF/P7S/XML/JSON/TXT/MD/SIG）
+            <input type="file" accept=".pdf,.p7s,.xml,.json,.txt,.md,.sig" @change="selectEvidenceFile" />
+          </label>
+          <label>官方或受控来源 URL（适用时）<input v-model="evidenceUpload.sourceUrl" type="url" placeholder="https://…" /></label>
+          <label>证据到期时间（可选）<input v-model="evidenceUpload.expiresAt" type="datetime-local" /></label>
+          <button type="button" class="btn-primary" :disabled="!!busy || !evidenceUpload.kind || !evidenceFile" @click="uploadEvidence">计算 SHA-256 并冻结原件</button>
+        </div>
+        <p v-if="evidenceFormatHint" class="muted">{{ evidenceFormatHint }}</p>
+        <div class="record-list">
+          <div v-for="item in evidenceObjects" :key="item.id" class="record-row">
+            <div><b>{{ item.evidence_kind }}</b><small>{{ item.filename }} · {{ item.content_length.toLocaleString() }} bytes</small></div>
+            <span class="status" :data-status="item.status">{{ item.status }}</span>
+            <code>{{ item.content_sha256 }}</code>
+            <button type="button" class="btn-secondary sm" :disabled="!!busy" @click="downloadEvidence(item)">下载核对</button>
+          </div>
+        </div>
+        <p v-if="!evidenceObjects.length" class="muted">尚无受控证据原件。凭证、签名、UAT、内容认证和部署证据提交都会 fail-closed。</p>
       </section>
 
       <section class="panel evidence-section">
@@ -640,6 +790,7 @@ function extractError(cause: unknown, fallback: string) {
               <option v-if="isAdmin" value="content-certification">双律师内容认证</option>
               <option v-if="isAdmin" value="deployment">部署证据</option>
               <option v-if="isAdmin" value="release">客户交付 release</option>
+              <option value="evidence-object">证据原件</option>
             </select>
           </label>
           <label>对象 ID<input v-model="forms.revokeId" /></label>
@@ -666,7 +817,7 @@ function extractError(cause: unknown, fallback: string) {
 .gate-meta { display: flex; flex-wrap: wrap; gap: 1rem; color: #475569; font-family: ui-monospace, monospace; font-size: .82rem; }
 .reason-list { margin: 0; padding-left: 1.25rem; columns: 2; color: #9a3412; }
 .boundary { margin: 0; font-size: .82rem; color: #64748b; }
-.evidence-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: .75rem; }
+.evidence-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .75rem; }
 .evidence-grid article { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 1rem; display: grid; gap: .25rem; }
 .evidence-grid b { font-size: 1.45rem; color: #0f172a; }
 .evidence-grid span { color: #64748b; font-size: .8rem; }
@@ -693,6 +844,9 @@ function extractError(cause: unknown, fallback: string) {
 .action-panel input { padding: .65rem; border: 1px solid #94a3b8; border-radius: 8px; }
 .inline-actions { justify-content: flex-end; }
 .warning-note { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; padding: .8rem; border-radius: 10px; }
+.evidence-upload-form { display: grid; grid-template-columns: 1fr 1.5fr 1.5fr 1fr auto; gap: .7rem; align-items: end; }
+.evidence-upload-form label { display: grid; gap: .35rem; font-size: .78rem; color: #475569; }
+.evidence-upload-form input, .evidence-upload-form select { min-width: 0; padding: .65rem; border: 1px solid #94a3b8; border-radius: 8px; background: #fff; }
 .admin-zone { border-color: #c4b5fd; }
 .release-zone { border-color: #5eead4; }
 .revoke-zone { border-color: #fca5a5; }
@@ -705,6 +859,6 @@ function extractError(cause: unknown, fallback: string) {
   .artifact-row, .record-row { grid-template-columns: 1fr; }
   .reason-list { columns: 1; }
   .delivery-header, .section-heading { align-items: stretch; flex-direction: column; }
-  .revoke-form { grid-template-columns: 1fr; }
+  .revoke-form, .evidence-upload-form { grid-template-columns: 1fr; }
 }
 </style>

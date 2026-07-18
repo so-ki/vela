@@ -21,6 +21,7 @@ Vela 当前代码实现的是：**由巴西执业律师控制、签署并承担�
   → 业务确认事实
   → Claim Compiler + 法务逐项决定
   → 可重算 CoverageProof / Answerability Gate
+  → 各责任人上传证据 exact bytes，系统计算 SHA-256 并冻结
   → 两名独立巴西律师认证 rules + corpus + gold release
   → API 生成唯一 canonical content manifest/hash 供双签
   → 冻结 exact DOCX/PDF/audit bytes
@@ -28,7 +29,7 @@ Vela 当前代码实现的是：**由巴西执业律师控制、签署并承担�
   → 场景律师外部数字签名 artifact manifest
   → 独立管理员核验 ITI VALIDAR 报告
   → 客户 UAT 绑定 target_environment_id
-  → production provenance / image digests / SBOM / runtime probe
+  → production build descriptor + receipt / provenance / image digests / SBOM / runtime probe
   → 未参与上述核验的另一名独立管理员批准限时 ScenarioDeliveryRelease
   → 只下载原冻结 bytes
 ```
@@ -55,7 +56,7 @@ Vela 当前代码实现的是：**由巴西执业律师控制、签署并承担�
 - [OAB Cadastro Nacional](https://consulta.oab.org.br/)
 - [OAB ConfirmADV](https://confirmadv.oab.org.br/)
 
-代码因此保存签名 artifact hash、VALIDAR 报告 hash、证书主体/序列/有效期，并要求独立管理员决定；它从不把普通数据库按钮称为数字签名。
+代码因此保存签名 artifact 与 VALIDAR 报告的 exact bytes/SHA-256、证书主体/序列/有效期，并要求独立管理员决定；它从不把普通数据库按钮称为数字签名。OAB/VALIDAR 现有公开网页流程由人工操作并上传结果；代码不抓取或猜测未公开稳定 API。
 
 签名前必须先调用内容 manifest 或场景 artifact manifest 接口取得 canonical JSON/hash；内容认证与专家签署提交时会重算并拒绝任何不一致的签名 hash。候选文件只向该场景提交人、legal 和 admin 开放，响应带 `Cache-Control: no-store` 与 `X-Customer-Delivery-Authorized: false`；正式导出仍必须通过 active release 门。
 
@@ -66,6 +67,7 @@ Vela 当前代码实现的是：**由巴西执业律师控制、签署并承担�
 - Git commit 与 migration head；
 - backend/frontend/database 三镜像 digest；
 - CI run、构建 artifact、SBOM 和安全证据；
+- 受控构建描述符 bytes 及回执 JSON；两者均绑定 commit、migration head、target environment 和三镜像 digest，回执另外绑定 descriptor hash；
 - provenance 和客户环境 runtime probe；
 - config schema hash；
 - 精确 Capability Pack、rules、corpus 哈希；
@@ -76,6 +78,7 @@ Vela 当前代码实现的是：**由巴西执业律师控制、签署并承担�
 
 ## 已由代码实现
 
+- 按角色限制的 `DeliveryEvidenceObject` 原件库：单件 25MB、每上传人 500 件/1GB、每实例 5,000 件/5GB 配额（撤回对象仍计入）；文件名/扩展名/容器安全检查、exact bytes 哈希、不可变核心、到期、撤回与审计；
 - CAS/状态机、时效、撤回、职责分离；
 - 当前 checklist/facts/evidence/brief Claim 快照重算；
 - CoverageProof 与 affirmative Claim 的 fail-closed 门；
@@ -85,7 +88,7 @@ Vela 当前代码实现的是：**由巴西执业律师控制、签署并承担�
 - canonical manifest 预览、受控候选件审阅下载及各证据对象列表接口；
 - 业务、legal、admin 分权的客户交付证据台，以及凭证/签名/UAT/内容认证/部署/release 撤回入口；
 - UAT 与 production 环境、pack、gold、部署证据绑定；
-- schema `1.1` release checkpoint 绑定场景签署、exact artifact manifest、UAT、内容双签、三份律师凭证、完整部署证据和发布说明，并由最终端点重算；
+- schema `1.1` release checkpoint 绑定场景签署、exact artifact manifest、UAT、内容双签、三份律师凭证、完整部署证据、全部原件 manifest 和发布说明，并由最终端点逐 bytes 重算；
 - 应用 ORM 不可变核心、数据库 check/partial unique、审计记录；
 - 过期、撤回、bytes 篡改、release hash 篡改时即时阻断。
 
@@ -103,6 +106,8 @@ Vela 当前代码实现的是：**由巴西执业律师控制、签署并承担�
 
 这些证据真实进入 API 前，任何 AI、开发者或管理员都不能把状态改写为“可对真实客户交付”。
 
+证据上传的 PDF/XML/JSON 检查是轻量主动内容和结构筛查，**不是杀毒或 CDR**。生产部署仍应在隔离上传区接入客户批准的恶意代码扫描/内容无害化服务。
+
 ## 审核方法
 
 审核者应从 [`REQUIREMENTS_TRACEABILITY.md`](./REQUIREMENTS_TRACEABILITY.md) 和 [`ai-review/CLAUDE_CODE_ARGUE_PROMPT.md`](./ai-review/CLAUDE_CODE_ARGUE_PROMPT.md) 开始，重点攻击：
@@ -117,5 +122,6 @@ Vela 当前代码实现的是：**由巴西执业律师控制、签署并承担�
 - 并发产生两个 active release；
 - 修改 release hash 或 certification manifest；
 - 保持对象 ID 不变但修改 UAT、部署证据、签名证据或 release note；
+- 只提交 URL/手填 hash 而不上传原件，复用另一律师的 OAB 报告，或篡改/撤回已引用原件；
 - 法源变化后继续下载旧 release；
 - 将签名有效错误宣传成法律内容正确。
