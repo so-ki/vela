@@ -29,7 +29,7 @@ Vela 当前代码实现的是：**由巴西执业律师控制、签署并承担�
   → 独立管理员核验 ITI VALIDAR 报告
   → 客户 UAT 绑定 target_environment_id
   → production provenance / image digests / SBOM / runtime probe
-  → 限时 ScenarioDeliveryRelease
+  → 未参与上述核验的另一名独立管理员批准限时 ScenarioDeliveryRelease
   → 只下载原冻结 bytes
 ```
 
@@ -40,8 +40,9 @@ Vela 当前代码实现的是：**由巴西执业律师控制、签署并承担�
 | 主体 | 可以做 | 不能做 |
 |---|---|---|
 | `business` 项目提交人 | 确认事实、签客户 UAT | 决定法律适用、核验律师或发布 |
-| 精确 `legal` 角色 | 确认 Claim、冻结候选制品、用本人已核验凭证签署 | 自核验 OAB 凭证、核验本人签名、创建发布授权 |
-| `admin` | 独立核验凭证/签名/部署证据，创建或撤回 release | 被当作 legal 专家代签；放行本人签署的法律结论 |
+| 场景定稿的精确 `legal` 角色 | 确认 Claim、冻结候选制品、用本人已核验凭证签署 | 签署其他律师定稿的场景、自核验 OAB 凭证、核验本人签名、创建发布授权 |
+| `admin` 证据核验人 | 独立核验凭证/签名/内容认证/部署证据，撤回权限范围内对象 | 被当作 legal 专家代签；批准自己参与核验的最终 release |
+| 独立 release admin | 重算证据链并批准/撤回限时 release | 同时充当该 release 的凭证、签名、内容认证或部署核验人 |
 
 生产法律内容另要求两个不同、当前有效、OAB 状态为 `regular` 的巴西律师覆盖精确 rules/corpus/gold 哈希。该双人政策是 Vela 的高风险控制，不宣称为巴西法律强制规定。
 
@@ -84,7 +85,7 @@ Vela 当前代码实现的是：**由巴西执业律师控制、签署并承担�
 - canonical manifest 预览、受控候选件审阅下载及各证据对象列表接口；
 - 业务、legal、admin 分权的客户交付证据台，以及凭证/签名/UAT/内容认证/部署/release 撤回入口；
 - UAT 与 production 环境、pack、gold、部署证据绑定；
-- release hash 重算与最终端点统一门禁；
+- schema `1.1` release checkpoint 绑定场景签署、exact artifact manifest、UAT、内容双签、三份律师凭证、完整部署证据和发布说明，并由最终端点重算；
 - 应用 ORM 不可变核心、数据库 check/partial unique、审计记录；
 - 过期、撤回、bytes 篡改、release hash 篡改时即时阻断。
 
@@ -96,7 +97,7 @@ Vela 当前代码实现的是：**由巴西执业律师控制、签署并承担�
 2. 生产 rules/corpus 的逐项专业认证；当前语料 `expert_verified=0`；
 3. 经双人独立标注、分歧仲裁并冻结的巴西 gold acceptance set；
 4. 客户在其真实环境完成的 UAT；
-5. 新分支远端 CI、三镜像 digest/CVE/SBOM/provenance 和 runtime probe；
+5. 客户目标环境的三镜像 digest/CVE/SBOM/provenance 和 runtime probe（仓库 CI 不能代替客户环境证据）；
 6. 客户 IdP/KMS、TLS、备份恢复、DPA/LGPD 和事故流程；
 7. 客户控制的 WORM/object lock。应用数据库无法抵抗拥有数据库超级权限的恶意管理员。
 
@@ -107,11 +108,14 @@ Vela 当前代码实现的是：**由巴西执业律师控制、签署并承担�
 审核者应从 [`REQUIREMENTS_TRACEABILITY.md`](./REQUIREMENTS_TRACEABILITY.md) 和 [`ai-review/CLAUDE_CODE_ARGUE_PROMPT.md`](./ai-review/CLAUDE_CODE_ARGUE_PROMPT.md) 开始，重点攻击：
 
 - admin 冒充律师或同一人自核验/自签/自发布；
+- 非场景主审律师冻结或签署制品；证据核验 admin 再批准自己的最终 release；
+- 在签名提交与管理员批准之间替换 bytes 或 manifest 元数据；
 - 过期或撤销凭证重放；
 - 签署后修改事实、法源、规则、模板或 bytes；
 - UAT 与 production 环境错绑；
 - 伪造合法 CI URL但替换镜像 digest；
 - 并发产生两个 active release；
 - 修改 release hash 或 certification manifest；
+- 保持对象 ID 不变但修改 UAT、部署证据、签名证据或 release note；
 - 法源变化后继续下载旧 release；
 - 将签名有效错误宣传成法律内容正确。

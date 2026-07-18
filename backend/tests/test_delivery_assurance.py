@@ -8,7 +8,11 @@ from sqlalchemy import create_engine, update
 from sqlalchemy.orm import sessionmaker
 
 from app.core.database import Base
-from app.models.delivery_assurance import ScenarioDeliveryArtifact
+from app.models.delivery_assurance import (
+    ScenarioDeliveryArtifact,
+    ScenarioDeliveryRelease,
+    ScenarioExpertAttestation,
+)
 from app.models.scenario import ComplianceChecklist, InvestigationScenario
 from app.models.user import User
 from app.services.delivery_assurance_service import (
@@ -75,6 +79,14 @@ def delivery_db(tmp_path):
                     role="legal",
                     disclaimer_accepted=True,
                 ),
+                User(
+                    id=5,
+                    email="independent-release-admin@example.com",
+                    full_name="Independent Release Admin",
+                    organization="Acme",
+                    role="admin",
+                    disclaimer_accepted=True,
+                ),
             ]
         )
         scenario = InvestigationScenario(
@@ -95,7 +107,13 @@ def delivery_db(tmp_path):
         scenario.checklist = ComplianceChecklist(
             title="Frozen checklist",
             version="v1",
-            payload={"review": {"status": "approved", "finalized_at": "2026-07-18T00:00:00Z"}},
+            payload={
+                "review": {
+                    "status": "approved",
+                    "finalized_at": "2026-07-18T00:00:00Z",
+                    "finalized_by_id": 2,
+                }
+            },
             total_items=1,
         )
         db.add(scenario)
@@ -132,6 +150,7 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
         expert = db.get(User, 2)
         admin = db.get(User, 3)
         second_expert = db.get(User, 4)
+        release_admin = db.get(User, 5)
         scenario = db.get(InvestigationScenario, 1)
 
         with pytest.raises(DeliveryAssurancePermissionError, match="管理员不得代签"):
@@ -266,12 +285,54 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
                 certificate_subject="CN=Unrelated Signer",
                 **attestation_kwargs,
             )
+        with pytest.raises(DeliveryAssurancePermissionError, match="主审律师"):
+            create_expert_attestation(
+                db,
+                scenario=scenario,
+                generation_config=_config(),
+                credential=second_credential,
+                artifact_ids=[item.id for item in artifacts],
+                signed_artifact_manifest_hash=stable_hash(manifest),
+                signature_format="PAdES",
+                signature_artifact_hash="c" * 64,
+                signature_validation_url="https://validar.iti.gov.br/",
+                signature_validation_report_hash="d" * 64,
+                certificate_subject="CN=Second Brazil Expert",
+                certificate_serial="ICP-BRASIL-OTHER",
+                certificate_valid_until=now + timedelta(days=45),
+                statement="A non-finalizing lawyer must not be allowed to sign this scenario.",
+                limitations="Not applicable.",
+                expires_at=now + timedelta(days=30),
+                user=second_expert,
+            )
         attestation = create_expert_attestation(
             db,
             certificate_subject="CN=Brazil Expert",
             **attestation_kwargs,
         )
         assert attestation.status == "pending_validation"
+        tamper_target = artifacts[0]
+        original_content = tamper_target.content
+        db.execute(
+            update(ScenarioDeliveryArtifact)
+            .where(ScenarioDeliveryArtifact.id == tamper_target.id)
+            .values(content=b"tampered-before-signature-approval")
+        )
+        db.flush()
+        with pytest.raises(DeliveryAssuranceError, match="bytes、元数据或状态"):
+            decide_attestation_signature(
+                db,
+                attestation=attestation,
+                decision="approved",
+                note="This must fail because the frozen bytes changed.",
+                user=admin,
+            )
+        db.execute(
+            update(ScenarioDeliveryArtifact)
+            .where(ScenarioDeliveryArtifact.id == tamper_target.id)
+            .values(content=original_content)
+        )
+        db.flush()
         attestation = decide_attestation_signature(
             db,
             attestation=attestation,
@@ -295,7 +356,9 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
             expires_at=now + timedelta(days=20),
             user=customer,
         )
-        content_limitations = "Certification is limited to the frozen release and declared legal date."
+        content_limitations = (
+            "Certification is limited to the frozen release and declared legal date."
+        )
         content_manifest = build_legal_content_manifest(
             capability_pack_id="brazil_new_energy_greenfield",
             capability_pack_version="1.0",
@@ -368,6 +431,21 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
             expires_at=now + timedelta(days=15),
             user=admin,
         )
+        with pytest.raises(
+            DeliveryAssurancePermissionError, match="最终发布管理员必须独立"
+        ):
+            create_delivery_release(
+                db,
+                scenario=scenario,
+                generation_config=_config(),
+                attestation=attestation,
+                acceptance=acceptance,
+                deployment=deployment,
+                release_note="The evidence verifier must not approve the final release.",
+                expires_at=now + timedelta(days=10),
+                user=admin,
+            )
+        release_note = "All independently supplied release prerequisites are present and hash-bound."
         release = create_delivery_release(
             db,
             scenario=scenario,
@@ -375,9 +453,9 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
             attestation=attestation,
             acceptance=acceptance,
             deployment=deployment,
-            release_note="All independently supplied release prerequisites are present and hash-bound.",
+            release_note=release_note,
             expires_at=now + timedelta(days=10),
-            user=admin,
+            user=release_admin,
         )
         db.commit()
         report = evaluate_delivery_release(
@@ -392,6 +470,56 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
             artifact_type="docx",
         )
         assert frozen_docx.content == b"frozen-docx"
+
+        db.execute(
+            update(ScenarioDeliveryRelease)
+            .where(ScenarioDeliveryRelease.id == release.id)
+            .values(release_note="tampered release decision")
+        )
+        db.commit()
+        release_tamper_report = evaluate_delivery_release(
+            db, scenario=scenario, generation_config=_config()
+        )
+        assert release_tamper_report["delivery_allowed"] is False
+        assert (
+            "delivery_release_hash_invalid" in release_tamper_report["blocking_reasons"]
+        )
+        db.execute(
+            update(ScenarioDeliveryRelease)
+            .where(ScenarioDeliveryRelease.id == release.id)
+            .values(release_note=release_note)
+        )
+        db.commit()
+
+        original_manifest = attestation.artifact_manifest
+        original_manifest_hash = attestation.artifact_manifest_hash
+        malformed_manifest = {"unexpected": "object-instead-of-list"}
+        db.execute(
+            update(ScenarioExpertAttestation)
+            .where(ScenarioExpertAttestation.id == attestation.id)
+            .values(
+                artifact_manifest=malformed_manifest,
+                artifact_manifest_hash=stable_hash(malformed_manifest),
+            )
+        )
+        db.commit()
+        malformed_manifest_report = evaluate_delivery_release(
+            db, scenario=scenario, generation_config=_config()
+        )
+        assert malformed_manifest_report["delivery_allowed"] is False
+        assert (
+            "delivery_artifact_set_invalid"
+            in malformed_manifest_report["blocking_reasons"]
+        )
+        db.execute(
+            update(ScenarioExpertAttestation)
+            .where(ScenarioExpertAttestation.id == attestation.id)
+            .values(
+                artifact_manifest=original_manifest,
+                artifact_manifest_hash=original_manifest_hash,
+            )
+        )
+        db.commit()
 
         original_change_lookup = delivery_service._active_legal_changes_after
         monkeypatch.setattr(

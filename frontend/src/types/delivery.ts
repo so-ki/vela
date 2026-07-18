@@ -30,6 +30,7 @@ export interface LegalCredential {
   official_register_url: string
   status: 'pending' | 'verified' | 'rejected' | 'revoked'
   registration_status: string | null
+  verified_by: number | null
   valid_until: string | null
   revision: number
   created_at: string
@@ -44,6 +45,7 @@ export interface ExpertAttestation {
   artifact_manifest_hash: string
   signature_format: string
   signature_validation_status: 'submitted' | 'approved' | 'rejected'
+  signature_verified_by: number | null
   status: 'pending_validation' | 'active' | 'superseded' | 'rejected' | 'revoked'
   signed_at: string
   expires_at: string
@@ -70,7 +72,10 @@ export interface LegalContentCertification {
   rules_artifact_hash: string
   corpus_artifact_hash: string
   certification_manifest_hash: string
+  primary_credential_id: string
+  secondary_credential_id: string
   status: 'certified' | 'revoked'
+  certified_by: number
   certified_at: string
   expires_at: string
 }
@@ -83,6 +88,7 @@ export interface DeploymentEvidence {
   commit_sha: string
   migration_head: string
   status: 'verified' | 'revoked'
+  verified_by: number
   verified_at: string
   expires_at: string
 }
@@ -96,6 +102,7 @@ export interface DeliveryRelease {
   snapshot_hash: string
   release_hash: string
   status: 'active' | 'superseded' | 'revoked'
+  released_by: number
   released_at: string
   expires_at: string
 }

@@ -41,11 +41,11 @@
 
 | ID | 需求 | 当前状态 | 完成判据 | 证据/下一动作 |
 |---|---|---|---|---|
-| E-01 | OAB 凭证与职责分离 | `implemented / blocked_external` | 持证人不能自核验；admin 不能代签；凭证来自 CNA/ConfirmADV 且 current/regular | 代码与攻击测试已完成；等待真实律师 |
+| E-01 | OAB 凭证与职责分离 | `implemented / blocked_external` | 持证人不能自核验；admin 不能代签；只有 `review.finalized_by_id` 对应主审可冻结/签场景；凭证来自 CNA/ConfirmADV 且 current/regular | 代码与非主审签署攻击测试已完成；等待真实律师 |
 | E-02 | 两律师法律内容 release | `implemented / blocked_external` | 两名不同有效律师签名覆盖精确 pack/rules/corpus/gold hashes | `LegalContentCertification`；等待真实双签和 gold set |
-| E-03 | 精确制品签名 | `implemented / blocked_external` | 冻结 DOCX/PDF/audit bytes；场景律师签 manifest；管理员核验 ITI 报告 | `ScenarioDeliveryArtifact/ExpertAttestation`；等待真实签名 |
+| E-03 | 精确制品签名 | `implemented / blocked_external` | 冻结 DOCX/PDF/audit bytes；场景主审签 manifest；签名核验与发布前均重验 bytes/全部元数据；管理员核验 ITI 报告 | `ScenarioDeliveryArtifact/ExpertAttestation` 与签前篡改攻击；等待真实签名 |
 | E-04 | 客户 UAT/生产证据 | `implemented / blocked_external` | UAT 与 production `target_environment_id`、commit、image digest、SBOM、provenance、runtime probe 一致 | API 已实现；等待客户环境 |
-| E-05 | 最终 release 与下载 | `accepted`（工程） | 统一 evaluator 重算全部依赖；最终端点只返回原冻结 bytes；撤回/过期/篡改立即阻断 | `test_delivery_assurance.py`、最终导出门、角色化客户交付证据台 |
+| E-05 | 最终 release 与下载 | `accepted`（工程） | 最终 admin 未参与该 release 的任一证据核验；schema 1.1 checkpoint 绑定全部关键证据；统一 evaluator 重算；最终端点只返回原冻结 bytes；撤回/过期/篡改立即阻断 | `test_delivery_assurance.py` 的同 admin 放行、签前 bytes 与 release note raw-SQL 攻击；角色化证据台 |
 
 ## C. 法律研究与数据质量
 

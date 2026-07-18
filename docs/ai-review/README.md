@@ -17,6 +17,7 @@ Vela 是“薄平台机制层 + 场景化 Capability Pack”的跨境法律协�
 5. [`../decisions/2026-07-17-evidence-retrieval-ocr-roadmap.md`](../decisions/2026-07-17-evidence-retrieval-ocr-roadmap.md)：GitHub/论文技术候选、采用门槛与排除项。
 6. [`../CUSTOMER_DELIVERY_ASSURANCE.md`](../CUSTOMER_DELIVERY_ASSURANCE.md)：真实客户发布门、签名边界与外部证据清单。
 7. [`CLAUDE_CODE_ARGUE_PROMPT.md`](./CLAUDE_CODE_ARGUE_PROMPT.md)：可直接复制给 Claude Code 的独立质询任务。
+8. [`../SELF_RED_TEAM_2026-07-18.md`](../SELF_RED_TEAM_2026-07-18.md)：本轮内部最强反对意见、复现、裁决和仍不可由代码解决的边界。
 
 ## 当前新分支已经实现的工程增量
 
@@ -28,13 +29,14 @@ Vela 是“薄平台机制层 + 场景化 Capability Pack”的跨境法律协�
 - GitHub/论文技术路线已形成 ADR，但 BGE-M3、Qwen3-Embedding、pgvector、Docling、Tesseract、RAGChecker 和 RefChecker **尚未被宣称为生产实现**。
 - Answerability Gate 已在所有最终下载前重算 Claim/Coverage；`/brief` 保持草稿预览。
 - OAB 凭证、两律师 rules/corpus/gold 认证、精确 bytes 冻结、ITI 签名核验、客户 UAT、production provenance 与限时 release 已形成统一代码门；没有真实外部证据时始终不可交付。
+- 场景签署已绑定 `review.finalized_by_id`；最终 release admin 与全部证据核验 actor 强制四眼分离；签名批准/发布前重验 exact bytes；schema 1.1 checkpoint 覆盖全部关键证据。
 - 机制层业务/法务 Vue 工作台已实现，真实角色 UAT 尚未执行。
 
 以上内容以当前分支代码和测试为准。远端 Draft PR 的 CI 未绿色前，不得写成“新 RC 已放行”。
 
 ## 当前必须被攻击的缺口
 
-1. 新交付门尚未经过第二个模型对职责分离、并发 partial unique、签署后 bytes 替换、release/hash 篡改和撤回传播的独立攻击。
+1. 内部红队已修复非主审签署、同 admin 自核验后放行、签名批准前 bytes 替换和弱 release hash；仍需第二个独立模型从零复现，并继续攻击并发 partial unique 与撤回传播。
 2. 机制层界面工程测试已通过，业务/法务/律师/管理员/客户的真实 UAT 仍未验收。
 3. 法规版本模块没有官方源调度器、唯一 current 指针、自动 corpus 发布或回滚；这是一条有意隔离的候选登记链。
 4. 巴西法律内容仍是 `provisional`，`expert_verified=0`；工程测试不能替代巴西执业律师核验。

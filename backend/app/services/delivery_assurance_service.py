@@ -76,7 +76,27 @@ def _require_admin(user: User) -> None:
 
 def _require_legal(user: User) -> None:
     if user.role != ROLE_LEGAL:
-        raise DeliveryAssurancePermissionError("只有独立 legal 角色可作为法律专家，管理员不得代签")
+        raise DeliveryAssurancePermissionError(
+            "只有独立 legal 角色可作为法律专家，管理员不得代签"
+        )
+
+
+def _scenario_counsel_id(scenario: InvestigationScenario) -> int:
+    review = (
+        (scenario.checklist.payload or {}).get("review") if scenario.checklist else None
+    )
+    finalized_by_id = (review or {}).get("finalized_by_id")
+    if isinstance(finalized_by_id, bool) or not isinstance(finalized_by_id, int):
+        raise DeliveryAssuranceError("法务定稿缺少可审计的 finalized_by_id")
+    return finalized_by_id
+
+
+def _require_scenario_counsel(scenario: InvestigationScenario, user: User) -> None:
+    _require_legal(user)
+    if user.id != _scenario_counsel_id(scenario):
+        raise DeliveryAssurancePermissionError(
+            "只有该场景法务定稿的主审律师可冻结或签署交付制品"
+        )
 
 
 def _jurisdiction_matches(scenario_country: str, jurisdiction: str) -> bool:
@@ -86,7 +106,9 @@ def _jurisdiction_matches(scenario_country: str, jurisdiction: str) -> bool:
         "brasil": "brazil",
         "brazil": "brazil",
     }
-    country = aliases.get(scenario_country.strip().lower(), scenario_country.strip().lower())
+    country = aliases.get(
+        scenario_country.strip().lower(), scenario_country.strip().lower()
+    )
     expert = aliases.get(jurisdiction.strip().lower(), jurisdiction.strip().lower())
     return country == expert
 
@@ -94,10 +116,14 @@ def _jurisdiction_matches(scenario_country: str, jurisdiction: str) -> bool:
 def _require_brazil_official_registry_url(value: str) -> None:
     host = (urlparse(value).hostname or "").lower().rstrip(".")
     if host not in {"consulta.oab.org.br", "confirmadv.oab.org.br"}:
-        raise DeliveryAssuranceError("巴西律师凭证必须引用 OAB CNA 或 ConfirmADV 官方域名")
+        raise DeliveryAssuranceError(
+            "巴西律师凭证必须引用 OAB CNA 或 ConfirmADV 官方域名"
+        )
 
 
-def _content_certification_manifest(certification: LegalContentCertification) -> dict[str, Any]:
+def _content_certification_manifest(
+    certification: LegalContentCertification,
+) -> dict[str, Any]:
     return build_legal_content_manifest(
         capability_pack_id=certification.capability_pack_id,
         capability_pack_version=certification.capability_pack_version,
@@ -142,6 +168,225 @@ def _content_certification_signers_are_current(
         ):
             return False
     return True
+
+
+def require_current_legal_content_signers(
+    db: Session,
+    *,
+    primary_credential: LegalExpertCredential,
+    secondary_credential: LegalExpertCredential,
+    now: datetime | None = None,
+) -> None:
+    checked_at = now or _now()
+    if (
+        primary_credential.id == secondary_credential.id
+        or primary_credential.user_id == secondary_credential.user_id
+    ):
+        raise DeliveryAssuranceError("生产法律内容必须由两名不同律师独立认证")
+    for credential in (primary_credential, secondary_credential):
+        holder = db.get(User, credential.user_id)
+        if (
+            holder is None
+            or holder.role != ROLE_LEGAL
+            or credential.registration_status != "regular"
+            or credential.valid_until is None
+            or not _is_live(credential.status, credential.valid_until, now=checked_at)
+        ):
+            raise DeliveryAssuranceError(
+                "双专家认证引用了无效、过期、非 regular 或非 legal 凭证"
+            )
+        if not _jurisdiction_matches("brazil", credential.jurisdiction):
+            raise DeliveryAssuranceError("巴西法律内容认证必须由巴西法域律师完成")
+
+
+def _iso(value: datetime | None) -> str | None:
+    return _as_utc(value).isoformat() if value is not None else None
+
+
+def _credential_evidence(credential: LegalExpertCredential) -> dict[str, Any]:
+    return {
+        "id": credential.id,
+        "user_id": credential.user_id,
+        "holder_name": credential.holder_name,
+        "jurisdiction": credential.jurisdiction,
+        "authority": credential.authority,
+        "registration_number": credential.registration_number,
+        "official_register_url": credential.official_register_url,
+        "submitted_evidence_hash": credential.submitted_evidence_hash,
+        "verification_reference": credential.verification_reference,
+        "verification_evidence_hash": credential.verification_evidence_hash,
+        "registration_status": credential.registration_status,
+        "decision_note": credential.decision_note,
+        "status": credential.status,
+        "revision": credential.revision,
+        "verified_by": credential.verified_by,
+        "verified_at": _iso(credential.verified_at),
+        "valid_until": _iso(credential.valid_until),
+    }
+
+
+def _attestation_evidence(attestation: ScenarioExpertAttestation) -> dict[str, Any]:
+    return {
+        "id": attestation.id,
+        "scenario_id": attestation.scenario_id,
+        "credential_id": attestation.credential_id,
+        "signed_by": attestation.signed_by,
+        "snapshot_hash": attestation.snapshot_hash,
+        "artifact_manifest_hash": attestation.artifact_manifest_hash,
+        "signature_format": attestation.signature_format,
+        "signature_artifact_hash": attestation.signature_artifact_hash,
+        "signature_validation_url": attestation.signature_validation_url,
+        "signature_validation_report_hash": attestation.signature_validation_report_hash,
+        "signature_validation_status": attestation.signature_validation_status,
+        "signature_verified_by": attestation.signature_verified_by,
+        "signature_verified_at": _iso(attestation.signature_verified_at),
+        "signature_verification_note": attestation.signature_verification_note,
+        "certificate_subject": attestation.certificate_subject,
+        "certificate_serial": attestation.certificate_serial,
+        "certificate_valid_until": _iso(attestation.certificate_valid_until),
+        "statement": attestation.statement,
+        "limitations": attestation.limitations,
+        "status": attestation.status,
+        "signed_at": _iso(attestation.signed_at),
+        "expires_at": _iso(attestation.expires_at),
+    }
+
+
+def _uat_evidence(acceptance: ScenarioUATAcceptance) -> dict[str, Any]:
+    return {
+        "id": acceptance.id,
+        "scenario_id": acceptance.scenario_id,
+        "expert_attestation_id": acceptance.expert_attestation_id,
+        "accepted_by": acceptance.accepted_by,
+        "customer_organization": acceptance.customer_organization,
+        "snapshot_hash": acceptance.snapshot_hash,
+        "test_plan_hash": acceptance.test_plan_hash,
+        "test_evidence_hash": acceptance.test_evidence_hash,
+        "evidence_reference": acceptance.evidence_reference,
+        "environment": acceptance.environment,
+        "target_environment_id": acceptance.target_environment_id,
+        "acceptance_statement": acceptance.acceptance_statement,
+        "status": acceptance.status,
+        "accepted_at": _iso(acceptance.accepted_at),
+        "expires_at": _iso(acceptance.expires_at),
+    }
+
+
+def _content_certification_evidence(
+    certification: LegalContentCertification,
+) -> dict[str, Any]:
+    return {
+        "id": certification.id,
+        "manifest_hash": certification.certification_manifest_hash,
+        "primary_credential_id": certification.primary_credential_id,
+        "secondary_credential_id": certification.secondary_credential_id,
+        "primary_signature_hash": certification.primary_signature_hash,
+        "primary_certificate_subject": certification.primary_certificate_subject,
+        "primary_certificate_serial": certification.primary_certificate_serial,
+        "primary_validation_url": certification.primary_validation_url,
+        "primary_validation_report_hash": certification.primary_validation_report_hash,
+        "secondary_signature_hash": certification.secondary_signature_hash,
+        "secondary_certificate_subject": certification.secondary_certificate_subject,
+        "secondary_certificate_serial": certification.secondary_certificate_serial,
+        "secondary_validation_url": certification.secondary_validation_url,
+        "secondary_validation_report_hash": certification.secondary_validation_report_hash,
+        "status": certification.status,
+        "certified_by": certification.certified_by,
+        "certified_at": _iso(certification.certified_at),
+        "expires_at": _iso(certification.expires_at),
+    }
+
+
+def _deployment_evidence_manifest(deployment: DeploymentEvidence) -> dict[str, Any]:
+    fields = (
+        "id",
+        "legal_content_certification_id",
+        "environment",
+        "target_environment_id",
+        "commit_sha",
+        "migration_head",
+        "ci_run_url",
+        "artifact_sha256",
+        "sbom_sha256",
+        "security_evidence_url",
+        "provenance_url",
+        "provenance_sha256",
+        "runtime_probe_url",
+        "runtime_probe_sha256",
+        "backend_image_digest",
+        "frontend_image_digest",
+        "database_image_digest",
+        "config_schema_sha256",
+        "capability_pack_hash",
+        "rules_artifact_hash",
+        "corpus_artifact_hash",
+        "gold_dataset_sha256",
+        "evaluation_policy_sha256",
+        "evaluation_run_sha256",
+        "regression_status",
+        "verification_note",
+        "status",
+        "verified_by",
+    )
+    result = {field: getattr(deployment, field) for field in fields}
+    result.update(
+        {
+            "verified_at": _iso(deployment.verified_at),
+            "expires_at": _iso(deployment.expires_at),
+        }
+    )
+    return result
+
+
+def _release_body(
+    *,
+    scenario_id: int,
+    snapshot_hash: str,
+    attestation: ScenarioExpertAttestation,
+    acceptance: ScenarioUATAcceptance,
+    deployment: DeploymentEvidence,
+    content_certification: LegalContentCertification,
+    scenario_credential: LegalExpertCredential,
+    primary_credential: LegalExpertCredential,
+    secondary_credential: LegalExpertCredential,
+    release_note: str,
+    released_by: int,
+    released_at: datetime,
+    expires_at: datetime,
+) -> dict[str, Any]:
+    return {
+        "schema_version": "1.1",
+        "scenario_id": scenario_id,
+        "snapshot_hash": snapshot_hash,
+        "expert_attestation_id": attestation.id,
+        "expert_attestation_evidence_hash": stable_hash(
+            _attestation_evidence(attestation)
+        ),
+        "artifact_manifest_hash": attestation.artifact_manifest_hash,
+        "uat_acceptance_id": acceptance.id,
+        "uat_evidence_hash": stable_hash(_uat_evidence(acceptance)),
+        "deployment_evidence_id": deployment.id,
+        "deployment_evidence_hash": stable_hash(
+            _deployment_evidence_manifest(deployment)
+        ),
+        "legal_content_certification_id": content_certification.id,
+        "legal_content_certification_evidence_hash": stable_hash(
+            _content_certification_evidence(content_certification)
+        ),
+        "scenario_credential_evidence_hash": stable_hash(
+            _credential_evidence(scenario_credential)
+        ),
+        "primary_content_credential_evidence_hash": stable_hash(
+            _credential_evidence(primary_credential)
+        ),
+        "secondary_content_credential_evidence_hash": stable_hash(
+            _credential_evidence(secondary_credential)
+        ),
+        "release_note_hash": stable_hash({"release_note": release_note.strip()}),
+        "released_by": released_by,
+        "released_at": _as_utc(released_at).isoformat(),
+        "expires_at": _as_utc(expires_at).isoformat(),
+    }
 
 
 def build_legal_content_manifest(
@@ -222,7 +467,9 @@ def _current_mechanism_snapshot(
             "fact_refs": list(claim.fact_refs or []),
             "evidence_refs": list(claim.evidence_refs or []),
             "confirmed_by": claim.confirmed_by,
-            "confirmed_at": _as_utc(claim.confirmed_at).isoformat() if claim.confirmed_at else None,
+            "confirmed_at": _as_utc(claim.confirmed_at).isoformat()
+            if claim.confirmed_at
+            else None,
             "confirmation_note": claim.confirmation_note,
         }
         for claim in sorted(claims, key=lambda item: item.checklist_code)
@@ -237,7 +484,9 @@ def _current_mechanism_snapshot(
         .first()
     )
     if proof is None or proof.id != gate["coverage_proof_id"]:
-        raise DeliveryAssuranceError("Answerability Gate 与 CoverageProof 读取结果不一致")
+        raise DeliveryAssuranceError(
+            "Answerability Gate 与 CoverageProof 读取结果不一致"
+        )
 
     mechanism = {
         "compilation_id": compilation.id,
@@ -265,11 +514,17 @@ def build_delivery_snapshot(
     review = (scenario.checklist.payload or {}).get("review") or {}
     if review.get("status") != "approved" or not review.get("finalized_at"):
         raise DeliveryAssuranceError("只有法务复核结论为 approved 的定稿可进入客户交付")
+    finalized_by_id = _scenario_counsel_id(scenario)
+    finalizer = db.get(User, finalized_by_id)
+    if finalizer is None or finalizer.role != ROLE_LEGAL:
+        raise DeliveryAssuranceError("法务定稿主审必须保持独立 legal 角色")
     if any(
         bool(item.get("external_counsel_required"))
         for item in (review.get("items") or [])
     ):
-        raise DeliveryAssuranceError("仍存在 external_counsel_required 条目，禁止客户交付")
+        raise DeliveryAssuranceError(
+            "仍存在 external_counsel_required 条目，禁止客户交付"
+        )
     if generation_config.scenario_id != scenario.id:
         raise DeliveryAssuranceError("冻结生成配置与场景错绑")
 
@@ -361,7 +616,9 @@ def decide_credential(
     if expected_revision != credential.revision:
         raise DeliveryAssuranceConflict("执业凭证已被其他会话更新，请刷新后重试")
     if decision not in transitions.get(credential.status, set()):
-        raise DeliveryAssuranceError(f"执业凭证不得从 {credential.status} 变更为 {decision}")
+        raise DeliveryAssuranceError(
+            f"执业凭证不得从 {credential.status} 变更为 {decision}"
+        )
     now = _now()
     values: dict[str, Any] = {
         "status": decision,
@@ -370,8 +627,14 @@ def decide_credential(
         "updated_at": now,
     }
     if decision == "verified":
-        if not verification_reference or not verification_evidence_hash or valid_until is None:
-            raise DeliveryAssuranceError("核验通过必须提交官方核验引用、证据哈希和有效期")
+        if (
+            not verification_reference
+            or not verification_evidence_hash
+            or valid_until is None
+        ):
+            raise DeliveryAssuranceError(
+                "核验通过必须提交官方核验引用、证据哈希和有效期"
+            )
         if credential.jurisdiction.strip().lower() in {"br", "bra", "brasil", "brazil"}:
             _require_brazil_official_registry_url(verification_reference)
         if registration_status != "regular":
@@ -415,8 +678,10 @@ def create_delivery_artifacts(
 ) -> list[ScenarioDeliveryArtifact]:
     """Freeze exact bytes. The endpoint returns metadata only until a release is active."""
 
-    _require_legal(user)
-    snapshot = build_delivery_snapshot(db, scenario=scenario, generation_config=generation_config)
+    _require_scenario_counsel(scenario, user)
+    snapshot = build_delivery_snapshot(
+        db, scenario=scenario, generation_config=generation_config
+    )
     snapshot_hash = stable_hash(snapshot)
     answerability = snapshot["mechanism"]["answerability_gate"]
     bundle = build_audit_bundle(scenario, generation_config=generation_config)
@@ -426,8 +691,12 @@ def create_delivery_artifacts(
     audit_bytes = json.dumps(
         bundle, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
     ).encode("utf-8")
-    docx_bytes, docx_name = build_sample_docx(scenario, generation_config=generation_config)
-    pdf_bytes, pdf_name = build_sample_pdf(scenario, generation_config=generation_config)
+    docx_bytes, docx_name = build_sample_docx(
+        scenario, generation_config=generation_config
+    )
+    pdf_bytes, pdf_name = build_sample_pdf(
+        scenario, generation_config=generation_config
+    )
     candidates = [
         (
             "docx",
@@ -436,7 +705,12 @@ def create_delivery_artifacts(
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         ),
         ("pdf", pdf_bytes, pdf_name, "application/pdf"),
-        ("audit_bundle", audit_bytes, f"vela-{scenario.id}-audit-bundle.json", "application/json"),
+        (
+            "audit_bundle",
+            audit_bytes,
+            f"vela-{scenario.id}-audit-bundle.json",
+            "application/json",
+        ),
     ]
     db.execute(
         update(ScenarioDeliveryArtifact)
@@ -489,7 +763,9 @@ def _artifact_manifest(
         "pdf",
         "audit_bundle",
     }:
-        raise DeliveryAssuranceError("专家签署必须覆盖同一冻结批次的 DOCX、PDF 和 audit bundle")
+        raise DeliveryAssuranceError(
+            "专家签署必须覆盖同一冻结批次的 DOCX、PDF 和 audit bundle"
+        )
     if any(
         item.scenario_id != scenario_id
         or item.snapshot_hash != snapshot_hash
@@ -511,6 +787,63 @@ def _artifact_manifest(
         }
         for item in sorted(artifacts, key=lambda value: value.artifact_type)
     ]
+
+
+def _validate_attestation_artifacts(
+    db: Session,
+    *,
+    attestation: ScenarioExpertAttestation,
+    expected_status: str,
+) -> list[ScenarioDeliveryArtifact]:
+    manifest = attestation.artifact_manifest
+    if not isinstance(manifest, list) or len(manifest) != 3:
+        raise DeliveryAssuranceError("签署制品 manifest 必须恰好包含三个制品")
+    artifact_ids = [
+        item.get("artifact_id") for item in manifest if isinstance(item, dict)
+    ]
+    artifact_types = [
+        item.get("artifact_type") for item in manifest if isinstance(item, dict)
+    ]
+    if (
+        len(artifact_ids) != 3
+        or len(set(artifact_ids)) != 3
+        or len(set(artifact_types)) != 3
+        or set(artifact_types) != {"docx", "pdf", "audit_bundle"}
+        or stable_hash(manifest) != attestation.artifact_manifest_hash
+        or stable_hash(attestation.snapshot or {}) != attestation.snapshot_hash
+    ):
+        raise DeliveryAssuranceError("签署快照或制品 manifest 结构/哈希校验失败")
+    artifacts = (
+        db.query(ScenarioDeliveryArtifact)
+        .filter(ScenarioDeliveryArtifact.id.in_(artifact_ids))
+        .all()
+    )
+    if len(artifacts) != 3:
+        raise DeliveryAssuranceError("签署引用的冻结制品不存在")
+    by_id = {item.id: item for item in artifacts}
+    metadata_fields = (
+        "artifact_type",
+        "content_sha256",
+        "content_length",
+        "media_type",
+        "filename",
+        "renderer_version",
+    )
+    for item in manifest:
+        artifact = by_id.get(item["artifact_id"])
+        if (
+            artifact is None
+            or artifact.scenario_id != attestation.scenario_id
+            or artifact.snapshot_hash != attestation.snapshot_hash
+            or artifact.status != expected_status
+            or any(
+                getattr(artifact, field) != item.get(field) for field in metadata_fields
+            )
+            or hashlib.sha256(artifact.content).hexdigest() != artifact.content_sha256
+            or len(artifact.content) != artifact.content_length
+        ):
+            raise DeliveryAssuranceError("签署引用的冻结制品 bytes、元数据或状态已变化")
+    return artifacts
 
 
 def current_delivery_artifact_manifest(
@@ -559,7 +892,7 @@ def create_expert_attestation(
     expires_at: datetime,
     user: User,
 ) -> ScenarioExpertAttestation:
-    _require_legal(user)
+    _require_scenario_counsel(scenario, user)
     now = _now()
     if credential.user_id != user.id:
         raise DeliveryAssurancePermissionError("只能使用本人的已核验执业凭证签署")
@@ -569,17 +902,23 @@ def create_expert_attestation(
         raise DeliveryAssuranceError("执业凭证已过期或失效")
     if not _jurisdiction_matches(scenario.country, credential.jurisdiction):
         raise DeliveryAssuranceError("执业凭证法域与场景国家不匹配")
-    if _as_utc(expires_at) <= now or _as_utc(expires_at) > _as_utc(credential.valid_until):
+    if _as_utc(expires_at) <= now or _as_utc(expires_at) > _as_utc(
+        credential.valid_until
+    ):
         raise DeliveryAssuranceError("签署有效期必须晚于当前时间且不超过执业凭证有效期")
     if _as_utc(certificate_valid_until) <= now or _as_utc(expires_at) > _as_utc(
         certificate_valid_until
     ):
         raise DeliveryAssuranceError("签名证书必须当前有效且覆盖整个签署有效期")
-    if (urlparse(signature_validation_url).hostname or "").lower() != "validar.iti.gov.br":
+    if (
+        urlparse(signature_validation_url).hostname or ""
+    ).lower() != "validar.iti.gov.br":
         raise DeliveryAssuranceError("数字签名验证必须来自 ITI VALIDAR 官方域名")
     if credential.holder_name.casefold() not in certificate_subject.casefold():
         raise DeliveryAssuranceError("签名证书主体与执业凭证持有人不匹配")
-    snapshot = build_delivery_snapshot(db, scenario=scenario, generation_config=generation_config)
+    snapshot = build_delivery_snapshot(
+        db, scenario=scenario, generation_config=generation_config
+    )
     snapshot_hash = stable_hash(snapshot)
     manifest = _artifact_manifest(
         db,
@@ -589,7 +928,9 @@ def create_expert_attestation(
     )
     manifest_hash = stable_hash(manifest)
     if signed_artifact_manifest_hash != manifest_hash:
-        raise DeliveryAssuranceError("外部签名覆盖的 artifact manifest hash 与当前冻结制品不一致")
+        raise DeliveryAssuranceError(
+            "外部签名覆盖的 artifact manifest hash 与当前冻结制品不一致"
+        )
     attestation = ScenarioExpertAttestation(
         id=str(uuid4()),
         scenario_id=scenario.id,
@@ -629,11 +970,27 @@ def decide_attestation_signature(
     _require_admin(user)
     if attestation.signed_by == user.id:
         raise DeliveryAssurancePermissionError("签署人不得核验自己的数字签名")
-    if attestation.status != "pending_validation" or attestation.signature_validation_status != "submitted":
+    if (
+        attestation.status != "pending_validation"
+        or attestation.signature_validation_status != "submitted"
+    ):
         raise DeliveryAssuranceError("只有待核验的数字签名可作决定")
     if decision not in {"approved", "rejected"}:
         raise DeliveryAssuranceError("无效的数字签名核验决定")
     now = _now()
+    if decision == "approved":
+        credential = db.get(LegalExpertCredential, attestation.credential_id)
+        if (
+            credential is None
+            or credential.valid_until is None
+            or not _is_live(credential.status, credential.valid_until, now=now)
+            or _as_utc(attestation.expires_at) <= now
+            or _as_utc(attestation.certificate_valid_until) <= now
+        ):
+            raise DeliveryAssuranceError("核验时签署、签名证书或执业凭证已失效")
+        _validate_attestation_artifacts(
+            db, attestation=attestation, expected_status="candidate"
+        )
     result = db.execute(
         update(ScenarioExpertAttestation)
         .where(
@@ -716,13 +1073,18 @@ def create_uat_acceptance(
     now = _now()
     if scenario.user_id != user.id:
         raise DeliveryAssurancePermissionError("只有项目提交人可签署客户 UAT")
-    if not user.organization or user.organization.strip() != customer_organization.strip():
+    if (
+        not user.organization
+        or user.organization.strip() != customer_organization.strip()
+    ):
         raise DeliveryAssuranceError("UAT 客户组织必须与项目提交人所属组织一致")
     if attestation.scenario_id != scenario.id or not _is_live(
         attestation.status, attestation.expires_at, now=now
     ):
         raise DeliveryAssuranceError("专家签署不存在、已过期或已撤回")
-    if _as_utc(expires_at) <= now or _as_utc(expires_at) > _as_utc(attestation.expires_at):
+    if _as_utc(expires_at) <= now or _as_utc(expires_at) > _as_utc(
+        attestation.expires_at
+    ):
         raise DeliveryAssuranceError("UAT 有效期必须晚于当前时间且不超过专家签署有效期")
     db.execute(
         update(ScenarioUATAcceptance)
@@ -812,28 +1174,27 @@ def create_legal_content_certification(
 ) -> LegalContentCertification:
     _require_admin(user)
     now = _now()
-    if primary_credential.id == secondary_credential.id or primary_credential.user_id == secondary_credential.user_id:
-        raise DeliveryAssuranceError("生产法律内容必须由两名不同律师独立认证")
-    for credential in (primary_credential, secondary_credential):
-        if (
-            credential.status != "verified"
-            or credential.registration_status != "regular"
-            or credential.valid_until is None
-            or not _is_live(credential.status, credential.valid_until, now=now)
-        ):
-            raise DeliveryAssuranceError("双专家认证引用了无效、过期或非 regular 的执业凭证")
-        if not _jurisdiction_matches("brazil", credential.jurisdiction):
-            raise DeliveryAssuranceError("巴西法律内容认证必须由巴西法域律师完成")
-        holder = db.get(User, credential.user_id)
-        if holder is None or holder.role != ROLE_LEGAL:
-            raise DeliveryAssuranceError("内容认证签署人必须保持独立 legal 角色")
-    if (urlparse(primary_validation_url).hostname or "").lower() != "validar.iti.gov.br" or (
+    require_current_legal_content_signers(
+        db,
+        primary_credential=primary_credential,
+        secondary_credential=secondary_credential,
+        now=now,
+    )
+    if (
+        urlparse(primary_validation_url).hostname or ""
+    ).lower() != "validar.iti.gov.br" or (
         urlparse(secondary_validation_url).hostname or ""
     ).lower() != "validar.iti.gov.br":
         raise DeliveryAssuranceError("双专家数字签名必须引用 ITI VALIDAR 官方域名")
-    if primary_credential.holder_name.casefold() not in primary_certificate_subject.casefold():
+    if (
+        primary_credential.holder_name.casefold()
+        not in primary_certificate_subject.casefold()
+    ):
         raise DeliveryAssuranceError("第一签名证书主体与第一执业凭证持有人不匹配")
-    if secondary_credential.holder_name.casefold() not in secondary_certificate_subject.casefold():
+    if (
+        secondary_credential.holder_name.casefold()
+        not in secondary_certificate_subject.casefold()
+    ):
         raise DeliveryAssuranceError("第二签名证书主体与第二执业凭证持有人不匹配")
     max_expiry = min(
         _as_utc(primary_credential.valid_until),
@@ -859,7 +1220,9 @@ def create_legal_content_certification(
     )
     manifest_hash = stable_hash(manifest)
     if signed_content_manifest_hash != manifest_hash:
-        raise DeliveryAssuranceError("双专家签名未覆盖当前 rules/corpus/gold manifest hash")
+        raise DeliveryAssuranceError(
+            "双专家签名未覆盖当前 rules/corpus/gold manifest hash"
+        )
     certification = LegalContentCertification(
         id=str(uuid4()),
         capability_pack_id=capability_pack_id.strip(),
@@ -966,6 +1329,8 @@ def create_deployment_evidence(
         certification.status, certification.expires_at, now=now
     ):
         raise DeliveryAssuranceError("法律内容双专家认证不存在、已过期或已撤回")
+    if _as_utc(expires_at) > _as_utc(certification.expires_at):
+        raise DeliveryAssuranceError("部署证据有效期不得超过法律内容认证有效期")
     if (
         certification.capability_pack_hash != capability_pack_hash
         or certification.rules_artifact_hash != rules_artifact_hash
@@ -1025,7 +1390,10 @@ def revoke_deployment_evidence(
     now = _now()
     result = db.execute(
         update(DeploymentEvidence)
-        .where(DeploymentEvidence.id == evidence.id, DeploymentEvidence.status == "verified")
+        .where(
+            DeploymentEvidence.id == evidence.id,
+            DeploymentEvidence.status == "verified",
+        )
         .values(
             status="revoked",
             revoked_by=user.id,
@@ -1060,6 +1428,17 @@ def create_delivery_release(
         raise DeliveryAssuranceError("签署、UAT 与场景错绑")
     if acceptance.expert_attestation_id != attestation.id:
         raise DeliveryAssuranceError("UAT 未绑定所选专家签署")
+    customer = db.get(User, scenario.user_id)
+    if (
+        acceptance.accepted_by != scenario.user_id
+        or customer is None
+        or not customer.organization
+        or customer.organization.strip() != acceptance.customer_organization.strip()
+        or acceptance.environment != "customer_acceptance"
+    ):
+        raise DeliveryAssuranceError("客户 UAT 的签署人、组织或验收环境无效")
+    if user.id == acceptance.accepted_by:
+        raise DeliveryAssurancePermissionError("最终发布管理员不得同时作为客户 UAT 签署人")
     if not _is_live(attestation.status, attestation.expires_at, now=now):
         raise DeliveryAssuranceError("专家签署已过期、撤回或被替代")
     if not _is_live(acceptance.status, acceptance.expires_at, now=now):
@@ -1083,6 +1462,14 @@ def create_delivery_release(
         db, content_certification, now=now
     ):
         raise DeliveryAssuranceError("法律内容认证签署人凭证已过期、撤回或身份不匹配")
+    primary_credential = db.get(
+        LegalExpertCredential, content_certification.primary_credential_id
+    )
+    secondary_credential = db.get(
+        LegalExpertCredential, content_certification.secondary_credential_id
+    )
+    if primary_credential is None or secondary_credential is None:
+        raise DeliveryAssuranceError("法律内容认证签署人凭证不存在")
     if stable_hash(_content_certification_manifest(content_certification)) != (
         content_certification.certification_manifest_hash
     ):
@@ -1094,19 +1481,30 @@ def create_delivery_release(
         or deployment.rules_artifact_hash != generation_config.rules_artifact_hash
         or deployment.corpus_artifact_hash != generation_config.corpus_artifact_hash
     ):
-        raise DeliveryAssuranceError("部署证据的 Capability Pack/规则/语料哈希与场景不一致")
+        raise DeliveryAssuranceError(
+            "部署证据的 Capability Pack/规则/语料哈希与场景不一致"
+        )
     if (
-        content_certification.capability_pack_hash != generation_config.capability_pack_hash
-        or content_certification.rules_artifact_hash != generation_config.rules_artifact_hash
-        or content_certification.corpus_artifact_hash != generation_config.corpus_artifact_hash
+        content_certification.capability_pack_hash
+        != generation_config.capability_pack_hash
+        or content_certification.rules_artifact_hash
+        != generation_config.rules_artifact_hash
+        or content_certification.corpus_artifact_hash
+        != generation_config.corpus_artifact_hash
         or content_certification.gold_dataset_sha256 != deployment.gold_dataset_sha256
-        or content_certification.evaluation_policy_sha256 != deployment.evaluation_policy_sha256
-        or content_certification.evaluation_run_sha256 != deployment.evaluation_run_sha256
+        or content_certification.evaluation_policy_sha256
+        != deployment.evaluation_policy_sha256
+        or content_certification.evaluation_run_sha256
+        != deployment.evaluation_run_sha256
     ):
-        raise DeliveryAssuranceError("法律内容双专家认证未覆盖当前规则、语料或 gold run")
+        raise DeliveryAssuranceError(
+            "法律内容双专家认证未覆盖当前规则、语料或 gold run"
+        )
     credential = db.get(LegalExpertCredential, attestation.credential_id)
-    if credential is None or credential.valid_until is None or not _is_live(
-        credential.status, credential.valid_until, now=now
+    if (
+        credential is None
+        or credential.valid_until is None
+        or not _is_live(credential.status, credential.valid_until, now=now)
     ):
         raise DeliveryAssuranceError("专家执业凭证已失效")
     if (
@@ -1115,28 +1513,67 @@ def create_delivery_release(
         or attestation.signature_verified_at is None
     ):
         raise DeliveryAssuranceError("专家数字签名尚未经独立核验")
-    snapshot = build_delivery_snapshot(db, scenario=scenario, generation_config=generation_config)
+    if attestation.signed_by != _scenario_counsel_id(scenario):
+        raise DeliveryAssuranceError("专家签署人不是当前场景法务定稿主审")
+    verification_actors = {
+        attestation.signature_verified_by,
+        deployment.verified_by,
+        content_certification.certified_by,
+        credential.verified_by,
+        primary_credential.verified_by,
+        secondary_credential.verified_by,
+    }
+    verification_actors.discard(None)
+    if user.id in verification_actors:
+        raise DeliveryAssurancePermissionError(
+            "最终发布管理员必须独立于凭证、签名、内容认证和部署证据核验人"
+        )
+    for actor_id in verification_actors:
+        actor = db.get(User, actor_id)
+        if actor is None or actor.role != ROLE_ADMIN:
+            raise DeliveryAssuranceError("证据核验人必须保持 admin 角色")
+    _validate_attestation_artifacts(
+        db, attestation=attestation, expected_status="candidate"
+    )
+    snapshot = build_delivery_snapshot(
+        db, scenario=scenario, generation_config=generation_config
+    )
     snapshot_hash = stable_hash(snapshot)
-    if attestation.snapshot_hash != snapshot_hash or acceptance.snapshot_hash != snapshot_hash:
+    if (
+        attestation.snapshot_hash != snapshot_hash
+        or acceptance.snapshot_hash != snapshot_hash
+    ):
         raise DeliveryAssuranceError("签署或 UAT 已因项目快照变化而失效")
     max_expiry = min(
         _as_utc(attestation.expires_at),
+        _as_utc(attestation.certificate_valid_until),
         _as_utc(acceptance.expires_at),
         _as_utc(deployment.expires_at),
+        _as_utc(content_certification.expires_at),
+        _as_utc(credential.valid_until),
+        _as_utc(primary_credential.valid_until),
+        _as_utc(secondary_credential.valid_until),
     )
     if _as_utc(expires_at) <= now or _as_utc(expires_at) > max_expiry:
-        raise DeliveryAssuranceError("发布有效期不得超过签署、UAT 或部署证据的最早有效期")
-    release_body = {
-        "schema_version": "1.0",
-        "scenario_id": scenario.id,
-        "snapshot_hash": snapshot_hash,
-        "expert_attestation_id": attestation.id,
-        "uat_acceptance_id": acceptance.id,
-        "deployment_evidence_id": deployment.id,
-        "released_by": user.id,
-        "released_at": now.isoformat(),
-        "expires_at": _as_utc(expires_at).isoformat(),
-    }
+        raise DeliveryAssuranceError(
+            "发布有效期不得超过证据链任一凭证、签名或验收的最早有效期"
+        )
+    normalized_release_note = release_note.strip()
+    release_body = _release_body(
+        scenario_id=scenario.id,
+        snapshot_hash=snapshot_hash,
+        attestation=attestation,
+        acceptance=acceptance,
+        deployment=deployment,
+        content_certification=content_certification,
+        scenario_credential=credential,
+        primary_credential=primary_credential,
+        secondary_credential=secondary_credential,
+        release_note=normalized_release_note,
+        released_by=user.id,
+        released_at=now,
+        expires_at=expires_at,
+    )
     db.execute(
         update(ScenarioDeliveryRelease)
         .where(
@@ -1153,14 +1590,16 @@ def create_delivery_release(
         deployment_evidence_id=deployment.id,
         snapshot_hash=snapshot_hash,
         release_hash=stable_hash(release_body),
-        release_note=release_note.strip(),
+        release_note=normalized_release_note,
         status="active",
         released_by=user.id,
         released_at=now,
         expires_at=expires_at,
     )
     db.add(release)
-    artifact_ids = [item.get("artifact_id") for item in attestation.artifact_manifest or []]
+    artifact_ids = [
+        item.get("artifact_id") for item in attestation.artifact_manifest or []
+    ]
     artifact_update = db.execute(
         update(ScenarioDeliveryArtifact)
         .where(
@@ -1214,7 +1653,9 @@ def evaluate_delivery_release(
 ) -> dict[str, Any]:
     reasons: list[str] = []
     try:
-        snapshot = build_delivery_snapshot(db, scenario=scenario, generation_config=generation_config)
+        snapshot = build_delivery_snapshot(
+            db, scenario=scenario, generation_config=generation_config
+        )
         snapshot_hash = stable_hash(snapshot)
     except DeliveryAssuranceError as exc:
         snapshot = None
@@ -1231,7 +1672,8 @@ def evaluate_delivery_release(
         .first()
     )
     now = _now()
-    attestation = acceptance = deployment = None
+    attestation = acceptance = deployment = content_certification = None
+    credential = primary_credential = secondary_credential = None
     if release is None:
         reasons.append("active_delivery_release_missing")
     else:
@@ -1239,56 +1681,79 @@ def evaluate_delivery_release(
             reasons.append("delivery_release_expired")
         if snapshot_hash is None or release.snapshot_hash != snapshot_hash:
             reasons.append("delivery_release_snapshot_stale")
-        release_body = {
-            "schema_version": "1.0",
-            "scenario_id": release.scenario_id,
-            "snapshot_hash": release.snapshot_hash,
-            "expert_attestation_id": release.expert_attestation_id,
-            "uat_acceptance_id": release.uat_acceptance_id,
-            "deployment_evidence_id": release.deployment_evidence_id,
-            "released_by": release.released_by,
-            "released_at": _as_utc(release.released_at).isoformat(),
-            "expires_at": _as_utc(release.expires_at).isoformat(),
-        }
-        if stable_hash(release_body) != release.release_hash:
-            reasons.append("delivery_release_hash_invalid")
         attestation = db.get(ScenarioExpertAttestation, release.expert_attestation_id)
         acceptance = db.get(ScenarioUATAcceptance, release.uat_acceptance_id)
         deployment = db.get(DeploymentEvidence, release.deployment_evidence_id)
-        if attestation is None or not _is_live(attestation.status, attestation.expires_at, now=now):
+        if deployment is not None:
+            content_certification = db.get(
+                LegalContentCertification, deployment.legal_content_certification_id
+            )
+        if attestation is not None:
+            credential = db.get(LegalExpertCredential, attestation.credential_id)
+        if content_certification is not None:
+            primary_credential = db.get(
+                LegalExpertCredential, content_certification.primary_credential_id
+            )
+            secondary_credential = db.get(
+                LegalExpertCredential, content_certification.secondary_credential_id
+            )
+
+        if attestation is None or not _is_live(
+            attestation.status, attestation.expires_at, now=now
+        ):
             reasons.append("expert_attestation_inactive")
         elif (
             attestation.signature_validation_status != "approved"
             or not attestation.signature_verified_by
             or not attestation.signature_verified_at
+            or _as_utc(attestation.certificate_valid_until) <= now
             or stable_hash(attestation.snapshot or {}) != attestation.snapshot_hash
-            or stable_hash(attestation.artifact_manifest or {}) != attestation.artifact_manifest_hash
+            or stable_hash(attestation.artifact_manifest or {})
+            != attestation.artifact_manifest_hash
             or attestation.scenario_id != scenario.id
             or attestation.snapshot_hash != release.snapshot_hash
         ):
             reasons.append("expert_signature_or_manifest_invalid")
         else:
-            manifest = list(attestation.artifact_manifest or [])
-            if {item.get("artifact_type") for item in manifest} != {
-                "docx",
-                "pdf",
-                "audit_bundle",
-            }:
+            manifest = attestation.artifact_manifest
+            if not isinstance(manifest, list) or not all(
+                isinstance(item, dict) for item in manifest
+            ):
                 reasons.append("delivery_artifact_set_invalid")
-            for item in manifest:
-                artifact = db.get(ScenarioDeliveryArtifact, item.get("artifact_id"))
+                manifest = []
+            manifest_ids = [item.get("artifact_id") for item in manifest]
+            if (
+                len(manifest) != 3
+                or len(set(manifest_ids)) != 3
+                or {item.get("artifact_type") for item in manifest}
+                != {"docx", "pdf", "audit_bundle"}
+            ):
+                reasons.append("delivery_artifact_set_invalid")
+            for manifest_item in manifest:
+                artifact = db.get(
+                    ScenarioDeliveryArtifact, manifest_item.get("artifact_id")
+                )
                 if (
                     artifact is None
                     or artifact.scenario_id != scenario.id
                     or artifact.snapshot_hash != release.snapshot_hash
                     or artifact.status != "released"
-                    or artifact.content_sha256 != item.get("content_sha256")
-                    or artifact.content_length != item.get("content_length")
-                    or hashlib.sha256(artifact.content).hexdigest() != artifact.content_sha256
+                    or artifact.content_sha256 != manifest_item.get("content_sha256")
+                    or artifact.content_length != manifest_item.get("content_length")
+                    or artifact.media_type != manifest_item.get("media_type")
+                    or artifact.filename != manifest_item.get("filename")
+                    or artifact.renderer_version
+                    != manifest_item.get("renderer_version")
+                    or hashlib.sha256(artifact.content).hexdigest()
+                    != artifact.content_sha256
                     or len(artifact.content) != artifact.content_length
                 ):
-                    reasons.append(f"delivery_artifact_invalid:{item.get('artifact_type')}")
-        if acceptance is None or not _is_live(acceptance.status, acceptance.expires_at, now=now):
+                    reasons.append(
+                        f"delivery_artifact_invalid:{manifest_item.get('artifact_type')}"
+                    )
+        if acceptance is None or not _is_live(
+            acceptance.status, acceptance.expires_at, now=now
+        ):
             reasons.append("customer_uat_inactive")
         elif (
             acceptance.scenario_id != scenario.id
@@ -1297,7 +1762,24 @@ def evaluate_delivery_release(
             or acceptance.snapshot_hash != release.snapshot_hash
         ):
             reasons.append("customer_uat_binding_invalid")
-        if deployment is None or not _is_live(deployment.status, deployment.expires_at, now=now):
+        elif (
+            acceptance.accepted_by != scenario.user_id
+            or acceptance.environment != "customer_acceptance"
+        ):
+            reasons.append("customer_uat_identity_invalid")
+        else:
+            customer = db.get(User, acceptance.accepted_by)
+            if (
+                customer is None
+                or not customer.organization
+                or customer.organization.strip()
+                != acceptance.customer_organization.strip()
+            ):
+                reasons.append("customer_uat_identity_invalid")
+
+        if deployment is None or not _is_live(
+            deployment.status, deployment.expires_at, now=now
+        ):
             reasons.append("deployment_evidence_inactive")
         elif deployment.environment != "production":
             reasons.append("deployment_not_production")
@@ -1315,9 +1797,6 @@ def evaluate_delivery_release(
         ):
             reasons.append("deployment_legal_artifact_binding_stale")
         else:
-            content_certification = db.get(
-                LegalContentCertification, deployment.legal_content_certification_id
-            )
             if content_certification is None or not _is_live(
                 content_certification.status,
                 content_certification.expires_at,
@@ -1328,9 +1807,9 @@ def evaluate_delivery_release(
                 db, content_certification, now=now
             ):
                 reasons.append("legal_content_signer_credentials_invalid")
-            elif stable_hash(_content_certification_manifest(content_certification)) != (
-                content_certification.certification_manifest_hash
-            ):
+            elif stable_hash(
+                _content_certification_manifest(content_certification)
+            ) != (content_certification.certification_manifest_hash):
                 reasons.append("legal_content_certification_hash_invalid")
             elif _active_legal_changes_after(db, content_certification.certified_at):
                 reasons.append("legal_change_revalidation_required")
@@ -1349,10 +1828,12 @@ def evaluate_delivery_release(
                 != deployment.evaluation_run_sha256
             ):
                 reasons.append("legal_content_certification_binding_stale")
+
         if attestation is not None:
-            credential = db.get(LegalExpertCredential, attestation.credential_id)
-            if credential is None or credential.valid_until is None or not _is_live(
-                credential.status, credential.valid_until, now=now
+            if (
+                credential is None
+                or credential.valid_until is None
+                or not _is_live(credential.status, credential.valid_until, now=now)
             ):
                 reasons.append("expert_credential_inactive")
             elif credential.user_id != attestation.signed_by:
@@ -1368,10 +1849,80 @@ def evaluate_delivery_release(
                 signer = db.get(User, attestation.signed_by)
                 if signer is None or signer.role != ROLE_LEGAL:
                     reasons.append("expert_signer_role_invalid")
+                else:
+                    try:
+                        if signer.id != _scenario_counsel_id(scenario):
+                            reasons.append("expert_signer_not_scenario_counsel")
+                    except DeliveryAssuranceError:
+                        reasons.append("expert_signer_not_scenario_counsel")
+
+        release_admin = db.get(User, release.released_by)
+        if release_admin is None or release_admin.role != ROLE_ADMIN:
+            reasons.append("release_approver_role_invalid")
+        verification_actors = {
+            attestation.signature_verified_by if attestation else None,
+            deployment.verified_by if deployment else None,
+            content_certification.certified_by if content_certification else None,
+            credential.verified_by if credential else None,
+            primary_credential.verified_by if primary_credential else None,
+            secondary_credential.verified_by if secondary_credential else None,
+        }
+        verification_actors.discard(None)
+        if release.released_by in verification_actors:
+            reasons.append("release_approver_separation_invalid")
+        if acceptance is not None and release.released_by == acceptance.accepted_by:
+            reasons.append("release_approver_separation_invalid")
+        for actor_id in verification_actors:
+            actor = db.get(User, actor_id)
+            if actor is None or actor.role != ROLE_ADMIN:
+                reasons.append("evidence_verifier_role_invalid")
+
+        evidence_records = (
+            attestation,
+            acceptance,
+            deployment,
+            content_certification,
+            credential,
+            primary_credential,
+            secondary_credential,
+        )
+        if all(item is not None for item in evidence_records):
+            release_body = _release_body(
+                scenario_id=release.scenario_id,
+                snapshot_hash=release.snapshot_hash,
+                attestation=attestation,
+                acceptance=acceptance,
+                deployment=deployment,
+                content_certification=content_certification,
+                scenario_credential=credential,
+                primary_credential=primary_credential,
+                secondary_credential=secondary_credential,
+                release_note=release.release_note,
+                released_by=release.released_by,
+                released_at=release.released_at,
+                expires_at=release.expires_at,
+            )
+            if stable_hash(release_body) != release.release_hash:
+                reasons.append("delivery_release_hash_invalid")
+            evidence_expiries = (
+                attestation.expires_at,
+                attestation.certificate_valid_until,
+                acceptance.expires_at,
+                deployment.expires_at,
+                content_certification.expires_at,
+                credential.valid_until,
+                primary_credential.valid_until,
+                secondary_credential.valid_until,
+            )
+            if any(
+                expiry is None or _as_utc(release.expires_at) > _as_utc(expiry)
+                for expiry in evidence_expiries
+            ):
+                reasons.append("delivery_release_expiry_exceeds_evidence")
 
     unique_reasons = sorted(set(reasons))
     return {
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "scenario_id": scenario.id,
         "evaluated_at": now.isoformat(),
         "delivery_allowed": not unique_reasons,
@@ -1425,11 +1976,19 @@ def require_released_delivery_artifact(
     )
     if manifest_item is None:
         raise DeliveryGateBlocked(
-            {**report, "delivery_allowed": False, "blocking_reasons": ["artifact_not_released"]}
+            {
+                **report,
+                "delivery_allowed": False,
+                "blocking_reasons": ["artifact_not_released"],
+            }
         )
     artifact = db.get(ScenarioDeliveryArtifact, manifest_item.get("artifact_id"))
     if artifact is None or artifact.status != "released":
         raise DeliveryGateBlocked(
-            {**report, "delivery_allowed": False, "blocking_reasons": ["artifact_not_released"]}
+            {
+                **report,
+                "delivery_allowed": False,
+                "blocking_reasons": ["artifact_not_released"],
+            }
         )
     return report, artifact

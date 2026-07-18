@@ -76,6 +76,7 @@ const pendingAttestation = {
   artifact_manifest_hash: 'm'.repeat(64),
   signature_format: 'PAdES',
   signature_validation_status: 'submitted',
+  signature_verified_by: null,
   status: 'pending_validation',
   signed_at: '2026-07-18T00:00:00Z',
   expires_at: '2026-08-18T00:00:00Z',
@@ -161,5 +162,30 @@ describe('DeliveryAssuranceView', () => {
       note: expect.stringContaining('ITI VALIDAR'),
     })
     expect(client.fetchDeploymentEvidence).toHaveBeenCalled()
+  })
+
+  it('blocks a signature verifier from approving the same final release', async () => {
+    auth.user = {
+      id: 3,
+      full_name: 'Release Admin',
+      organization: 'Acme',
+      role: 'admin',
+    }
+    client.fetchExpertAttestations.mockResolvedValue([
+      {
+        ...pendingAttestation,
+        status: 'active',
+        signature_validation_status: 'approved',
+        signature_verified_by: 3,
+      },
+    ])
+    const wrapper = mount(DeliveryAssuranceView, { global: { stubs: { RouterLink: true } } })
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('当前账号参与了 场景签名核验')
+    const releaseButton = wrapper
+      .findAll('button')
+      .find((button) => button.text().includes('重算并创建 release'))
+    expect(releaseButton?.attributes('disabled')).toBeDefined()
   })
 })

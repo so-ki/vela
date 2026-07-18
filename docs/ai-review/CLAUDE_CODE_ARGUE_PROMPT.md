@@ -25,11 +25,12 @@ F. API 权限和单客户边界是否被误写成多租户安全；
 G. Alembic base→head、downgrade/re-upgrade、alembic check、后端全量、前端测试/构建和发布边界是否可复现；
 H. 文档里的每个“已完成/accepted/RC”是否都有当前提交证据，旧 RC 证据是否被错误套用到新分支；
 I. GitHub/论文技术是否只是有退出条件的实验候选，是否有人把路线图误写成已上线能力。
-J. admin 是否能冒充 legal，或同一人自核验 OAB、核验本人签名、签客户 UAT并发布；
-K. 最终下载是否只返回签署前冻结的 exact bytes；能否在签署后重渲染、替换 bytes、manifest 或 release hash；
+J. admin 是否能冒充 legal；非 `review.finalized_by_id` 主审是否能冻结/签署；同一人是否能自核验 OAB、核验本人签名，或参与凭证/签名/内容/部署核验后再批准最终 release；
+K. 最终下载是否只返回签署前冻结的 exact bytes；能否在签名提交与批准之间、批准与发布之间、发布之后重渲染或替换 bytes/manifest 元数据；
 L. 两律师法律内容认证是否确实使用不同、current、regular 凭证并绑定精确 rules/corpus/gold hashes；
 M. UAT target environment、production runtime probe、三镜像 digest、provenance 与当前 Capability Pack 是否可错绑；
-N. 任一 credential/content certification/signature/UAT/deployment/release 过期或撤回后，旧 release 是否立即失效。
+N. 任一 credential/content certification/signature/UAT/deployment/release 过期或撤回后，旧 release 是否立即失效；release 有效期能否越过任一证据有效期。
+O. 保持对象 ID 不变，用 ORM 绕过或 raw SQL 修改 UAT、签名报告、内容双签、部署证据或 release note，schema 1.1 release checkpoint 是否仍 fail-closed。
 
 输出必须包含：
 1. 执行摘要：可接受范围、不可接受范围；

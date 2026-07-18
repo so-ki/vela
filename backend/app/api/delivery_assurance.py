@@ -65,6 +65,7 @@ from app.services.delivery_assurance_service import (
     revoke_delivery_release,
     revoke_deployment_evidence,
     revoke_legal_content_certification,
+    require_current_legal_content_signers,
     submit_credential,
     withdraw_uat,
 )
@@ -224,7 +225,9 @@ def download_candidate_artifact(
     if artifact.scenario_id != scenario_id or artifact.status != "candidate":
         raise HTTPException(status_code=404, detail="当前候选制品不存在")
     encoded_name = quote(artifact.filename)
-    candidate_extension = "json" if artifact.artifact_type == "audit_bundle" else artifact.artifact_type
+    candidate_extension = (
+        "json" if artifact.artifact_type == "audit_bundle" else artifact.artifact_type
+    )
     write_audit_log(
         db,
         user=current_user,
@@ -258,7 +261,9 @@ def get_credentials(
     current_user: User = Depends(get_current_user),
 ):
     if current_user.role not in {"legal", ROLE_ADMIN}:
-        raise HTTPException(status_code=403, detail="只有法务或发布管理员可读取执业凭证")
+        raise HTTPException(
+            status_code=403, detail="只有法务或发布管理员可读取执业凭证"
+        )
     query = db.query(LegalExpertCredential)
     if current_user.role != ROLE_ADMIN:
         query = query.filter(LegalExpertCredential.user_id == current_user.id)
@@ -614,15 +619,23 @@ def post_legal_content_manifest(
     current_user: User = Depends(get_current_user),
 ):
     if current_user.role not in {"legal", ROLE_ADMIN}:
-        raise HTTPException(status_code=403, detail="只有法务或发布管理员可生成签名清单")
+        raise HTTPException(
+            status_code=403, detail="只有法务或发布管理员可生成签名清单"
+        )
     primary = _entity(
         db, LegalExpertCredential, body.primary_credential_id, "第一专家执业凭证"
     )
     secondary = _entity(
         db, LegalExpertCredential, body.secondary_credential_id, "第二专家执业凭证"
     )
-    if primary.user_id == secondary.user_id:
-        raise HTTPException(status_code=422, detail="签名清单必须绑定两名不同专家")
+    try:
+        require_current_legal_content_signers(
+            db,
+            primary_credential=primary,
+            secondary_credential=secondary,
+        )
+    except DeliveryAssuranceError as exc:
+        _raise_service_error(exc)
     manifest = build_legal_content_manifest(**body.model_dump())
     return {"manifest": manifest, "manifest_hash": stable_hash(manifest)}
 
@@ -636,7 +649,9 @@ def get_legal_content_certifications(
     current_user: User = Depends(get_current_user),
 ):
     if current_user.role not in {"legal", ROLE_ADMIN}:
-        raise HTTPException(status_code=403, detail="只有法务或发布管理员可读取内容认证")
+        raise HTTPException(
+            status_code=403, detail="只有法务或发布管理员可读取内容认证"
+        )
     return (
         db.query(LegalContentCertification)
         .order_by(LegalContentCertification.certified_at.desc())
@@ -836,9 +851,7 @@ def post_delivery_release(
     attestation = _entity(
         db, ScenarioExpertAttestation, body.expert_attestation_id, "专家签署"
     )
-    acceptance = _entity(
-        db, ScenarioUATAcceptance, body.uat_acceptance_id, "客户 UAT"
-    )
+    acceptance = _entity(db, ScenarioUATAcceptance, body.uat_acceptance_id, "客户 UAT")
     deployment = _entity(
         db, DeploymentEvidence, body.deployment_evidence_id, "部署证据"
     )

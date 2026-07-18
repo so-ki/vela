@@ -18,6 +18,7 @@
 8. **真实交付门：** Answerability Gate 已接入所有最终下载；OAB 凭证、两律师法律内容认证、精确 bytes 冻结、ITI 签名核验、客户 UAT、production provenance/gold evidence 和限时 release 已形成统一 fail-closed 链。
 9. **机制层界面：** 新增 `/scenarios/:id/mechanism` 双角色工作台，业务可维护材料/事实，法务可编译并确认 Claim、生成 CoverageProof；客户交付状态与机制通过状态明确分离。
 10. **客户交付证据台：** 新增 `/scenarios/:id/delivery-assurance` 角色化界面，支持候选件审阅、OAB 凭证、canonical manifest、场景签名/ITI 核验、客户 UAT、双律师内容认证、生产证据、限时 release 与紧急撤回；所有操作仍经过服务端门禁。
+11. **自我反驳加固：** 场景冻结/签署绑定法务定稿主审，最终 release admin 与全部证据核验 actor 分离，签名批准和发布前重验 exact bytes，release checkpoint 升级为覆盖全部关键证据的 schema 1.1；详见 `SELF_RED_TEAM_2026-07-18.md`。
 
 ## 本地验收证据
 
@@ -25,7 +26,7 @@
 |---|---|
 | 后端 Python 3.12 全量 | `293 passed`；3 条第三方弃用警告 |
 | Python 编译 | `app` 与 `tests` compileall 通过 |
-| 前端组件 | `27 passed` |
+| 前端组件 | `28 passed` |
 | 前端 TypeScript/Vite | 生产构建通过，158 modules |
 | 锁定依赖审计 | 本地 `pip-audit: No known vulnerabilities found`、`npm audit --offline: 0 vulnerabilities`；远端在线审计通过 |
 | Alembic | base → `20260718_0005` → base → `20260718_0005` 通过；`alembic check` 无漂移 |

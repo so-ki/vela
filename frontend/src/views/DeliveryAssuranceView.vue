@@ -75,6 +75,40 @@ const deliveryArtifactCount = computed(() => {
       ).length
     : 0
 })
+const releaseSeparationConflicts = computed(() => {
+  const userId = auth.user?.id
+  if (!userId) return []
+  const attestation = active(attestations.value, 'active')
+  const deployment = active(deployments.value, 'verified')
+  const acceptance = active(acceptances.value, 'accepted')
+  const certification = deployment
+    ? certifications.value.find(
+        (item) =>
+          item.id === deployment.legal_content_certification_id && item.status === 'certified',
+      )
+    : undefined
+  const scenarioCredential = attestation
+    ? credentials.value.find((item) => item.id === attestation.credential_id)
+    : undefined
+  const primaryCredential = certification
+    ? credentials.value.find((item) => item.id === certification.primary_credential_id)
+    : undefined
+  const secondaryCredential = certification
+    ? credentials.value.find((item) => item.id === certification.secondary_credential_id)
+    : undefined
+  return [
+    [attestation?.signature_verified_by, '场景签名核验'],
+    [deployment?.verified_by, '部署证据核验'],
+    [certification?.certified_by, '双律师内容认证记录'],
+    [scenarioCredential?.verified_by, '场景律师凭证核验'],
+    [primaryCredential?.verified_by, '第一内容律师凭证核验'],
+    [secondaryCredential?.verified_by, '第二内容律师凭证核验'],
+    [acceptance?.accepted_by, '客户 UAT 签署'],
+  ]
+    .filter(([actorId]) => actorId === userId)
+    .map(([, label]) => label as string)
+})
+const releaseAdminEligible = computed(() => releaseSeparationConflicts.value.length === 0)
 
 const forms = reactive({
   credential: '',
@@ -578,8 +612,12 @@ function extractError(cause: unknown, fallback: string) {
 
       <section v-if="isAdmin" class="panel evidence-section release-zone">
         <div class="section-heading"><div><span class="step">06</span><h2>创建限时客户交付 release</h2></div></div>
+        <p v-if="!releaseAdminEligible" class="warning-note">
+          当前账号参与了 {{ releaseSeparationConflicts.join('、') }}，不能再批准最终 release。请切换到未参与上述核验的独立 admin。
+        </p>
+        <p v-else class="muted">最终批准会重新校验冻结 bytes、全部证据哈希、有效期和四眼分离。</p>
         <textarea v-model="forms.release" rows="9" spellcheck="false" />
-        <button type="button" class="btn-primary" :disabled="!!busy" @click="runJsonAction('release', forms.release, (payload) => submitDeliveryRelease(scenarioId, payload), 'release 已创建；系统将立即重算全部依赖。')">重算并创建 release</button>
+        <button type="button" class="btn-primary" :disabled="!!busy || !releaseAdminEligible" @click="runJsonAction('release', forms.release, (payload) => submitDeliveryRelease(scenarioId, payload), 'release 已创建；系统将立即重算全部依赖。')">重算并创建 release</button>
       </section>
 
       <section class="panel evidence-section">
