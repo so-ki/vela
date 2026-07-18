@@ -47,6 +47,10 @@ class UnsupportedCombinationError(VersionedRegistryError):
         )
 
 
+class VersionedRegistryConfigurationError(VersionedRegistryError):
+    """The registry itself is misconfigured; refuse to operate, never repair."""
+
+
 CURRENT_COMPILER_WRITE_VERSION = "0.2"
 CURRENT_COVERAGE_PROOF_WRITE_VERSION = "0.1"
 
@@ -177,6 +181,66 @@ def require_supported_combination(
 
 def current_coverage_proof_writer() -> CoverageProofReader:
     return get_coverage_reader(CURRENT_COVERAGE_PROOF_WRITE_VERSION)
+
+
+def validate_registry_configuration(
+    *,
+    compiler_readers: Mapping[str, Any],
+    proof_readers: Mapping[str, Any],
+    combinations: frozenset[tuple[str, str]],
+    current_compiler_write_version: str,
+    current_proof_write_version: str,
+    required_compiler_versions: tuple[str, ...] = ("0.2",),
+    required_proof_versions: tuple[str, ...] = ("0.1",),
+    required_combinations: tuple[tuple[str, str], ...] = (("0.2", "0.1"),),
+) -> None:
+    """Pure self-consistency check. Raises on any mismatch; never repairs,
+    ignores or falls back. The production registry runs this once at module
+    load; tests may pass isolated mappings to exercise every failure mode."""
+
+    for unit, readers in (("claim_compiler", compiler_readers), ("coverage_proof", proof_readers)):
+        for key, reader in readers.items():
+            if getattr(reader, "version", None) != key:
+                raise VersionedRegistryConfigurationError(
+                    f"{unit} registry key {key!r} 与 reader.version {getattr(reader, 'version', None)!r} 不一致"
+                )
+    if current_compiler_write_version not in compiler_readers:
+        raise VersionedRegistryConfigurationError(
+            f"CURRENT_COMPILER_WRITE_VERSION {current_compiler_write_version!r} 未注册"
+        )
+    if current_proof_write_version not in proof_readers:
+        raise VersionedRegistryConfigurationError(
+            f"CURRENT_COVERAGE_PROOF_WRITE_VERSION {current_proof_write_version!r} 未注册"
+        )
+    for compiler_version, proof_version in combinations:
+        if compiler_version not in compiler_readers:
+            raise VersionedRegistryConfigurationError(
+                f"兼容矩阵引用了未注册的 compiler 版本：{compiler_version!r}"
+            )
+        if proof_version not in proof_readers:
+            raise VersionedRegistryConfigurationError(
+                f"兼容矩阵引用了未注册的 proof 版本：{proof_version!r}"
+            )
+    for version in required_compiler_versions:
+        if version not in compiler_readers:
+            raise VersionedRegistryConfigurationError(f"必需的历史 compiler 版本缺失：{version!r}")
+    for version in required_proof_versions:
+        if version not in proof_readers:
+            raise VersionedRegistryConfigurationError(f"必需的历史 proof 版本缺失：{version!r}")
+    for pair in required_combinations:
+        if pair not in combinations:
+            raise VersionedRegistryConfigurationError(f"必需的历史版本组合缺失：{pair!r}")
+
+
+# One-time production self-check at module load (D-0008: append-only,
+# fail-closed configuration; no automatic repair).
+validate_registry_configuration(
+    compiler_readers=SUPPORTED_COMPILER_READERS,
+    proof_readers=SUPPORTED_COVERAGE_PROOF_READERS,
+    combinations=SUPPORTED_COMPILER_PROOF_COMBINATIONS,
+    current_compiler_write_version=CURRENT_COMPILER_WRITE_VERSION,
+    current_proof_write_version=CURRENT_COVERAGE_PROOF_WRITE_VERSION,
+)
 
 
 def current_compiler_writer() -> CompilerReader:

@@ -36,7 +36,9 @@ MATERIAL_STATES = {
     "not_applicable",
 }
 HUMAN_CONFIRMED_MATERIAL_STATES = {"verified", "not_applicable"}
-# Write default; readers dispatch on the persisted version, never on this.
+# Compat read-only alias for legacy callers. It must NOT be used to persist
+# a database identity: compile_claims() writes writer.version, the single
+# source of truth from the versioned registry (C3-A.1).
 COMPILER_VERSION = versioned_registry.CURRENT_COMPILER_WRITE_VERSION
 
 
@@ -323,25 +325,25 @@ def compile_claims(
         )
 
     drafts = [draft.model_dump(mode="json") for draft in request.drafts]
-    input_snapshot = build_compiler_input_snapshot(
+    writer = versioned_registry.current_compiler_writer()
+    input_snapshot = writer.build_input_snapshot(
         db,
         scenario=scenario,
         drafts=drafts,
     )
-    claim_values = build_compiler_claim_values(
+    claim_values = writer.build_claim_values(
         items,
         drafts=drafts,
         facts=input_snapshot["facts"],
         evidence=input_snapshot["evidence"],
     )
 
-    writer = versioned_registry.current_compiler_writer()
     input_hash = writer.hash_payload(input_snapshot)
     output_hash = writer.hash_payload(claim_values)
     compilation = ClaimCompilation(
         id=str(uuid4()),
         scenario_id=scenario.id,
-        compiler_version=COMPILER_VERSION,
+        compiler_version=writer.version,
         input_hash=input_hash,
         output_hash=output_hash,
         input_snapshot=input_snapshot,

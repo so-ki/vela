@@ -82,6 +82,96 @@ def _conflict_error(
     )
 
 
+def _drafts_structure_ok(drafts: list[Any]) -> bool:
+    """Every persisted draft must be interpretable by the frozen 0.2 reader."""
+
+    for draft in drafts:
+        if not isinstance(draft, dict):
+            return False
+        if not isinstance(draft.get("checklist_code"), str):
+            return False
+        if not isinstance(draft.get("statement"), str):
+            return False
+        for key in ("fact_refs", "evidence_refs"):
+            value = draft.get(key)
+            # Historical semantics treat a missing/None value as empty.
+            if value is not None and not isinstance(value, list):
+                return False
+    return True
+
+
+def _items_structure_ok(items: Any) -> bool:
+    if not isinstance(items, list):
+        return False
+    for item in items:
+        if not isinstance(item, dict):
+            return False
+        hits = item.get("legal_hits")
+        if hits is not None and not isinstance(hits, list):
+            return False
+        if isinstance(hits, list) and any(not isinstance(hit, dict) for hit in hits):
+            return False
+    return True
+
+
+def _sections_structure_ok(sections: Any) -> bool:
+    if sections is None:
+        return True
+    if not isinstance(sections, list):
+        return False
+    for section in sections:
+        if not isinstance(section, dict):
+            return False
+        items = section.get("items")
+        if items is not None and not _items_structure_ok(items):
+            return False
+    return True
+
+
+def _checklist_payload_structure_ok(payload: Any) -> bool:
+    """The live payload feeds the frozen reader recompute: reject unsupported
+    JSON shapes explicitly instead of letting them raise inside the reader."""
+
+    if not isinstance(payload, dict):
+        return False
+    if not _sections_structure_ok(payload.get("sections_with_legal")):
+        return False
+    if not _sections_structure_ok(payload.get("sections")):
+        return False
+    brief = payload.get("brief")
+    if brief is not None:
+        if not isinstance(brief, dict):
+            return False
+        if not _sections_structure_ok(brief.get("sections")):
+            return False
+    return True
+
+
+def _coverage_proof_body_structure_ok(body: dict[str, Any]) -> bool:
+    """Schema-0.1 bodies must be structurally interpretable even when the
+    stored proof_hash was recomputed over the malformed body."""
+
+    denominator = body.get("denominator")
+    covered = body.get("covered_checklist_codes")
+    uncovered = body.get("uncovered")
+    if not isinstance(denominator, list) or not isinstance(covered, list):
+        return False
+    if not isinstance(uncovered, list):
+        return False
+    if any(not isinstance(entry, dict) for entry in denominator):
+        return False
+    for item in uncovered:
+        if not isinstance(item, dict):
+            return False
+        if not isinstance(item.get("checklist_code"), str):
+            return False
+        if not isinstance(item.get("status"), str):
+            return False
+        if not isinstance(item.get("unanswerable_reasons"), list):
+            return False
+    return True
+
+
 def _included_conclusions(payload: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """Affirmative brief conclusions; explicit refusals remain deliverable."""
 
@@ -109,7 +199,17 @@ def _assert_compiler_integrity(
     claims: list[ClaimRecord],
 ) -> None:
     reasons: list[str] = []
-    stored_snapshot = compilation.input_snapshot or {}
+    stored_snapshot = compilation.input_snapshot
+    # Persisted JSON is attacker-writable via raw SQL: validate its structure
+    # explicitly BEFORE any attribute access or reader call so malformed
+    # shapes fail closed with 422 instead of raising an uncaught 500 — even
+    # when the stored hash was recomputed over the malformed body.
+    if not isinstance(stored_snapshot, dict):
+        raise _integrity_error(
+            "Claim compilation 输入快照不是对象，禁止交付。",
+            ["compiler_input_snapshot_invalid"],
+            compilation=compilation,
+        )
     # Dispatch on the persisted compiler version — never on the current write
     # default (D-0008/D-0014). Unknown persisted versions are unexplainable
     # stored identities, not "stale" state: fail closed with 422.
@@ -128,10 +228,20 @@ def _assert_compiler_integrity(
     if not isinstance(drafts, list):
         reasons.append("compiler_drafts_missing")
         drafts = []
+    elif not _drafts_structure_ok(drafts):
+        reasons.append("compiler_input_snapshot_invalid")
+        drafts = []
     if reasons:
         raise _integrity_error(
             "Claim compilation 输入快照完整性校验失败，禁止交付。",
             reasons,
+            compilation=compilation,
+        )
+    current_payload = scenario.checklist.payload if scenario.checklist else {}
+    if not _checklist_payload_structure_ok(current_payload):
+        raise _integrity_error(
+            "当前 checklist payload 结构损坏，禁止交付。",
+            ["compiler_current_payload_invalid"],
             compilation=compilation,
         )
     current_snapshot = reader.build_input_snapshot(
@@ -212,7 +322,17 @@ def _assert_coverage_integrity(
             proof=proof,
         )
 
-    stored_body = proof.proof or {}
+    stored_body = proof.proof
+    # A proof body that is not a JSON object has no readable schema identity:
+    # fail closed with 422 before any attribute access, even when proof_hash
+    # was recomputed over the malformed value (would otherwise raise a 500).
+    if not isinstance(stored_body, dict):
+        raise _integrity_error(
+            "CoverageProof 存储体不是对象，无法解释其 schema 版本，禁止交付。",
+            ["coverage_proof_schema_unsupported"],
+            compilation=compilation,
+            proof=proof,
+        )
     # Dispatch on the persisted proof schema version (D-0014). A missing,
     # non-string or unregistered version is an unexplainable stored identity:
     # fail closed with 422, never fall back to the current reader and never
@@ -239,6 +359,14 @@ def _assert_coverage_integrity(
             compilation=compilation,
             proof=proof,
         ) from None
+
+    if not _coverage_proof_body_structure_ok(stored_body):
+        raise _integrity_error(
+            "CoverageProof 存储体结构非法，禁止交付。",
+            ["coverage_proof_body_invalid"],
+            compilation=compilation,
+            proof=proof,
+        )
 
     stored_denominator = list(stored_body.get("denominator") or [])
     stored_uncovered = list(stored_body.get("uncovered") or [])
