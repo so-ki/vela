@@ -164,3 +164,13 @@
 - **提交 SHA**: 65f0b398
 - **是否已复现**: 静态确认。
 - **限制和不确定性**: 前端如何呈现 refused 占位与真实拒答的区别未复核(属 WS-2/WS-10)。
+
+## EV-0017
+
+- **claim**: 外部证据核验完成:21 项候选技术/产品/模型能力全部于 2026-07-18 经实际网络访问原始来源核验(原始论文 arXiv 摘要页、官方 GitHub/LICENSE 原文、OASIS 官方标准页、lexml.gov.br 官方 URN 规范 PDF、各厂商官方文档);采用结论:生产采用 4 项(LexML URN、citator 数据模型思想、LegalRuleML 概念核对表、Tesseract),实验→生产候选 4 项(in-toto+cosign、Promptfoo、Docling、strict 结构化输出),受控实验 7 项(BGE-M3、Qwen3-Embedding、pgvector、LegalBench、LegalBench-RAG、lexml-linker、br-eli-mcp、RAGChecker 仅诊断),拒绝采用 6 项(LangGraph、GraphRAG 自动图构建、RefChecker 已归档、STARA 闭源、CoCounsel/Lexis/Vincent 产品与数据)。
+- **文件与精确行号**: N/A(外部来源);关键来源:arxiv.org/abs/2402.03216、2308.11462、2408.10343、2408.08067、2405.14486;github.com 的 FlagOpen/FlagEmbedding、pgvector/pgvector(LICENSE 原文)、docling-project/docling、tesseract-ocr/tesseract、langchain-ai/langgraph、promptfoo/promptfoo、microsoft/graphrag(RAI_TRANSPARENCY.md 原文)、in-toto/in-toto、sigstore/cosign、HazyResearch/legalbench、zeroentropy-ai/legalbenchrag、amazon-science/RAGChecker、amazon-science/RefChecker(已归档)、lexml/lexml-linker、matematicsolutions/br-eli-mcp;docs.oasis-open.org LegalRuleML v1.0 OS;projeto.lexml.gov.br/documentacao/Parte-2-LexML-URN.pdf;reglab.github.io/stara;legal.thomsonreuters.com/en/products/cocounsel-legal;lexisnexis.com Shepard's 与 Lexis+ AI 页;vlex.com/vincent-ai;platform.claude.com、developers.openai.com、ai.google.dev、api-docs.deepseek.com、alibabacloud.com 官方文档
+- **命令**: 三个子代理 WebFetch/WebSearch(访问日期均 2026-07-18)
+- **原始结果摘要**: 要点:RefChecker 2026-04-08 归档;LangGraph 官方文档不承诺确定性重放;GraphRAG RAI 文档自证输出需领域专家逐条人工验证;lexml-linker 为 GPL-2.0(须进程隔离);br-eli-mcp 存在(v0.7.1,2026-07-18 发布,0 star 单人维护);Vincent 官方列明覆盖巴西(州/市级深度未披露);Claude/GPT/Gemini/DeepSeek 官方文档均已 GA schema 保证型结构化输出;DeepSeek 旧模型名 2026-07-24 弃用。
+- **提交 SHA**: 65f0b398(仓库状态);外部来源以访问日期为准
+- **是否已复现**: 单轮访问,未二次复现;完整逐项字段(已核验事实/可借鉴/不能解决/采用状态/gold set/进入退出条件/URL)见本轮 Phase 0.5 会话报告。
+- **限制和不确定性**: 未核验残留:Qwen3.7-Max 1M 上下文与 strict schema 官方文档、BGE-M3 葡语逐项列名、in-toto↔SLSA 官方关系表述、CoCounsel 巴西覆盖、Vincent 州/市级深度、LegalBench 与 lexml-linker 最后提交日期、projeto.lexml.gov.br 根页(503)、各厂商营销数字(登记为主张)。这些不得当作事实使用。
