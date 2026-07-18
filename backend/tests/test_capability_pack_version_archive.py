@@ -67,18 +67,24 @@ def _build_pack(
     corpus_version: str,
     rules_marker: str = "baseline",
     status: str = "active",
+    pack_id: str = PACK_ID,
+    route_country: str = "ZZ-ARCH",
+    jurisdiction_id: str = "zz-arch",
 ) -> tuple[dict, bytes, bytes]:
-    rules_bytes = _dump(_rules_doc(rules_version, marker=rules_marker))
+    rules_doc = _rules_doc(rules_version, marker=rules_marker)
+    rules_doc["jurisdiction"]["id"] = jurisdiction_id
+    rules_bytes = _dump(rules_doc)
     corpus_bytes = _dump(_corpus_doc(corpus_version))
+    file_stem = "zz_archive" if pack_id == PACK_ID else pack_id.replace("-", "_")
     manifest = {
         "manifest_schema_version": "1.1",
-        "pack_id": PACK_ID,
+        "pack_id": pack_id,
         "version": pack_version,
         "status": status,
         "content_status": "provisional",
         "display_name": "合成归档测试包",
         "description": "WS-1C/C1 synthetic archive bundle",
-        "country": "ZZ-ARCH",
+        "country": route_country,
         "state": "zz-state",
         "industry": "arch_industry",
         "action_type": "arch_action",
@@ -88,25 +94,25 @@ def _build_pack(
             "artifact_id": "zz-archive-rules",
             "version": rules_version,
             "content_hash": _sha256(rules_bytes),
-            "resource": "rules://zz_archive_rules.json",
+            "resource": f"rules://{file_stem}_rules.json",
         },
         "corpus_artifact": {
             "artifact_id": "zz-archive-corpus",
             "version": corpus_version,
             "content_hash": _sha256(corpus_bytes),
-            "resource": "corpus://zz_archive_corpus.json",
+            "resource": f"corpus://{file_stem}_corpus.json",
         },
         "artifact_binding": {
-            "country": "zz-arch",
+            "country": jurisdiction_id,
             "state": "zz-state",
             "industry": "arch_industry",
             "action_type": "arch_action",
         },
         "routing_hints": {
-            "country": ["zz-arch-country-token"],
-            "state": ["zz-arch-state-token"],
-            "industry": ["zz-arch-industry-token"],
-            "action_type": ["zz-arch-action-token"],
+            "country": [f"{jurisdiction_id}-country-token"],
+            "state": [f"{jurisdiction_id}-state-token"],
+            "industry": [f"{jurisdiction_id}-industry-token"],
+            "action_type": [f"{jurisdiction_id}-action-token"],
             "excluded_states": [],
             "excluded_action_types": [],
         },
@@ -142,10 +148,18 @@ def _write(path: Path, content: bytes) -> None:
     path.write_bytes(content)
 
 
+def _artifact_filenames(manifest: dict) -> tuple[str, str]:
+    return (
+        manifest["rules_artifact"]["resource"].split("://", 1)[1],
+        manifest["corpus_artifact"]["resource"].split("://", 1)[1],
+    )
+
+
 def _install_active(root: Path, manifest: dict, rules_bytes: bytes, corpus_bytes: bytes) -> None:
+    rules_name, corpus_name = _artifact_filenames(manifest)
     _write(root / manifest["pack_id"] / "manifest.json", _dump(manifest))
-    _write(root.parent / "rules" / "zz_archive_rules.json", rules_bytes)
-    _write(root.parent / "data" / "zz_archive_corpus.json", corpus_bytes)
+    _write(root.parent / "rules" / rules_name, rules_bytes)
+    _write(root.parent / "data" / corpus_name, corpus_bytes)
 
 
 def _install_archive(
@@ -165,12 +179,13 @@ def _install_archive(
         / (dir_version or manifest["version"])
         / "bundle"
     )
+    rules_name, corpus_name = _artifact_filenames(manifest)
     _write(
         bundle / "capability_packs" / (inner_dir or manifest["pack_id"]) / "manifest.json",
         _dump(manifest),
     )
-    _write(bundle / "rules" / "zz_archive_rules.json", rules_bytes)
-    _write(bundle / "data" / "zz_archive_corpus.json", corpus_bytes)
+    _write(bundle / "rules" / rules_name, rules_bytes)
+    _write(bundle / "data" / corpus_name, corpus_bytes)
     return bundle
 
 
@@ -449,6 +464,46 @@ def test_load_frozen_capability_pack_loads_archived_identity(synthetic_root: Pat
     stale["rules_artifact_hash"] = "f" * 64
     with pytest.raises(CapabilityPackRegistryError, match="不一致"):
         load_frozen_capability_pack(stale, registry=registry)
+
+
+def test_future_active_upgrade_keeps_archived_version_readable(synthetic_root: Path) -> None:
+    """模拟未来:archive=合成 1.3.1,active=同 pack 1.4.0,另有第二个 active Pack。"""
+    old_manifest, old_rules, old_corpus = _build_pack(
+        pack_version="1.3.1", rules_version="2.9", corpus_version="1.13"
+    )
+    new_manifest, new_rules, new_corpus = _build_pack(
+        pack_version="1.4.0", rules_version="3.0", corpus_version="2.0", rules_marker="next"
+    )
+    other_manifest, other_rules, other_corpus = _build_pack(
+        pack_version="0.2.0",
+        rules_version="1.0",
+        corpus_version="1.0",
+        pack_id="zz-second-pack",
+        route_country="ZZ-OTHER",
+        jurisdiction_id="zz-other",
+    )
+    _install_active(synthetic_root, new_manifest, new_rules, new_corpus)
+    _install_active(synthetic_root, other_manifest, other_rules, other_corpus)
+    bundle = _install_archive(synthetic_root, old_manifest, old_rules, old_corpus)
+    registry = _registry(synthetic_root)
+
+    versions = [item["version"] for item in registry.list_versions(PACK_ID)]
+    assert versions.count("1.3.1") == 1
+    assert versions.count("1.4.0") == 1
+
+    archived = registry.get_exact(PACK_ID, "1.3.1", old_manifest["semantic_hash"])
+    assert archived.manifest.version == "1.3.1"
+    assert bundle in archived.rules_path.parents
+
+    matched = registry.match(
+        country="ZZ-ARCH", state="zz-state", industry="arch_industry", action_type="arch_action"
+    )
+    assert matched.manifest.version == "1.4.0"
+
+    active_identities = {(p.pack_id, p.manifest.version) for p in registry.list_active()}
+    assert (PACK_ID, "1.3.1") not in active_identities
+    assert (PACK_ID, "1.4.0") in active_identities
+    assert ("zz-second-pack", "0.2.0") in active_identities
 
 
 def test_get_exact_reads_inactive_live_root_by_exact_identity(synthetic_root: Path) -> None:

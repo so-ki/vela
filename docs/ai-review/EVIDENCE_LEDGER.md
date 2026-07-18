@@ -260,3 +260,12 @@
 - **提交 SHA**: 见 C2 提交
 - **是否已复现**: 失败模式两次复现(代理与直连)。
 - **限制和不确定性**: **镜像包含 archive、容器内 registry 发现/加载、archive 不参与 routing 四项容器级断言均为未验证**;当前包含性证据仅为静态双重验证:(1) release_safety check-docker 按真实 dockerignore+COPY 语义计算的传输/候选集合含 version_index.py 与 3 个归档文件(EV-0023);(2) 等效加载逻辑在宿主机测试中通过(EV-0022)。待具备可信出网或 CI 环境时,应由远端 GitHub Actions production-compose-smoke(真实构建+烟测)闭环,其结果以具体 commit 的 Actions run 为准。
+
+## EV-0025
+
+- **claim**: C2.1 完成:(1) 修复长期回归测试对当前 active 版本/数量的错误依赖——原 `test_registry_index_and_exact_lookup_with_real_archive` 严格断言 `list_versions(PACK_ID)` 仅含 1.3.1 一条、原 `test_real_archive_not_in_public_active_or_routing` 严格断言 active/public 总数为 1,active 升级到 1.4.0 或新增第二个真实 Pack 时会错误失败;修改后:list_versions 只锚定 1.3.1 条目(哈希与冻结常量一致、同 (pack_id,version) 恰出现一次、允许未来更多版本)、active/public/routing 断言改为"active 清单任何 Pack 的 manifest_path 不在 archive root 下、公开清单不因归档产生重复 PACK_ID@1.3.1、当前 active Brazil route 的 match() 返回非归档制品",不固定未来版本号。(2) 新增未来升级模拟测试 `test_future_active_upgrade_keeps_archived_version_readable`(合成:archive 1.3.1 + 同 pack active 1.4.0 + 第二个不同 pack_id active):list_versions 同含 1.3.1/1.4.0 各一次、1.3.1 仍可 get_exact 且路径在 bundle 内、routing 只返回 1.4.0、归档不增加 routing candidate、第二个 active Pack 不影响。(3) **无网络 Docker context 实探针通过**:临时 Dockerfile(FROM scratch,仅 2 条 COPY,不入仓库)+ 真实 daemon `docker build --no-cache --progress=plain -f <scratch>/vela-c2-context-probe.Dockerfile -t vela-c2-context-probe backend`,`docker create`+`docker export`+`tar -tf` 确认四个目标路径全部存在:probe/app/capability_packs/version_index.py 与 archive bundle 的 manifest/rules/corpus 三文件。该探针只验证真实 .dockerignore 与 Docker context/COPY 语义,不宣称完成正式生产镜像运行验证(该项仍按 EV-0024 未验证)。探针容器/镜像/Dockerfile/tar 已全部删除。
+- **文件与精确行号**: backend/tests/test_capability_pack_real_archive.py(两测试重写);backend/tests/test_capability_pack_version_archive.py(_build_pack/_install_* 参数化 + 新增模拟测试;既有断言未删未降)
+- **命令与结果**(Python 3.12.3):专项 2 文件 → **28 passed**(19+9,含新增模拟测试);compileall 通过;ruff 2 文件 All checks passed;全量 `pytest tests -q` → **324 passed**;check_release_boundaries.sh 全 OK;git diff --check 干净;探针四路径断言全 PRESENT。
+- **提交 SHA**: 见 C2.1 提交(test(capability-packs): future-proof archive regression coverage)
+- **是否已复现**: 单轮通过;探针输出已原样记录。
+- **限制和不确定性**: 探针不含 pip 安装与运行时导入;完整生产镜像构建仍由远端 CI production-compose-smoke 闭环(EV-0024)。

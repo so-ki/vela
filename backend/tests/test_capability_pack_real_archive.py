@@ -97,34 +97,46 @@ def test_registry_index_and_exact_lookup_with_real_archive() -> None:
     identity = index.lookup(PACK_ID, PACK_VERSION)
     assert identity is not None
     assert identity.semantic_hash == PACK_SEMANTIC_HASH
+    # 未来 active 升级(1.4.0、1.5.0…)后列表允许包含更多版本;只锚定 1.3.1 条目。
     versions = registry.list_versions(PACK_ID)
-    assert versions == [
-        {
-            "pack_id": PACK_ID,
-            "version": PACK_VERSION,
-            "semantic_hash": PACK_SEMANTIC_HASH,
-            "rules_content_hash": RULES_SHA256,
-            "corpus_content_hash": CORPUS_SHA256,
-        }
-    ]
+    frozen_entries = [item for item in versions if item["version"] == PACK_VERSION]
+    assert len(frozen_entries) == 1
+    assert frozen_entries[0] == {
+        "pack_id": PACK_ID,
+        "version": PACK_VERSION,
+        "semantic_hash": PACK_SEMANTIC_HASH,
+        "rules_content_hash": RULES_SHA256,
+        "corpus_content_hash": CORPUS_SHA256,
+    }
     pack = registry.get_exact(PACK_ID, PACK_VERSION, PACK_SEMANTIC_HASH)
     assert pack.manifest.semantic_hash == PACK_SEMANTIC_HASH
 
 
 def test_real_archive_not_in_public_active_or_routing() -> None:
+    """未来存在多个 active Pack 或 active 升级后本测试必须仍然有效。"""
     registry = _production_registry()
     active = registry.list_active()
-    assert len(active) == 1
-    assert all(pack.manifest.status == "active" for pack in active)
-    summaries = registry.list_public_active()
-    assert len(summaries) == 1
-    # routing 只经 active 清单;归档目录不注入额外路由候选(多候选会抛错)。
+    assert active
+    # active 清单中任何 Pack 都不得来自 archive root。
+    for pack in active:
+        assert ARCHIVE_ROOT not in pack.manifest_path.parents
+        assert pack.manifest.status == "active"
+    # 公开清单不因归档产生重复的 PACK_ID@1.3.1。
+    frozen_public = [
+        item
+        for item in registry.list_public_active()
+        if item["pack_id"] == PACK_ID and item["version"] == PACK_VERSION
+    ]
+    assert len(frozen_public) <= 1
+    # 当前 active Brazil Pack 的 route 经 match() 返回的必须不是归档制品。
+    brazil = registry.get(PACK_ID)
     matched = registry.match(
-        country=active[0].manifest.country,
-        state=active[0].manifest.state,
-        industry=active[0].manifest.industry,
-        action_type=active[0].manifest.action_type,
+        country=brazil.manifest.country,
+        state=brazil.manifest.state,
+        industry=brazil.manifest.industry,
+        action_type=brazil.manifest.action_type,
     )
+    assert ARCHIVE_ROOT not in matched.manifest_path.parents
     assert matched.manifest.status == "active"
 
 
