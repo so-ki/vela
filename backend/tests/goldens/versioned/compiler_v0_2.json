@@ -1,0 +1,329 @@
+{
+  "_meta": {
+    "generated_from_commit": "efc76e0052077b6d92f9e6bf3b6c0b1067ef18c4",
+    "unit": "claim_compiler",
+    "uuid_patch": "sequential 00000000-0000-4000-8000-%012d starting at 1",
+    "version": "0.2"
+  },
+  "expected": {
+    "claim_values": [
+      {
+        "checklist_code": "ENV-001",
+        "evidence_refs": [
+          "ENV-001:L-1",
+          "ENV-001:L-2"
+        ],
+        "fact_refs": [
+          "fact-confirmed-0001"
+        ],
+        "reason_codes": [],
+        "statement": "该项目的环境许可路径已按冻结法源确认，需在施工前完成 LP 阶段许可。",
+        "status": "awaiting_human_confirmation"
+      },
+      {
+        "checklist_code": "LAND-001",
+        "evidence_refs": [],
+        "fact_refs": [],
+        "reason_codes": [
+          "evidence_reference_required",
+          "fact_reference_required"
+        ],
+        "statement": "待核验事项：土地权属核验",
+        "status": "refused"
+      },
+      {
+        "checklist_code": "TAX-001",
+        "evidence_refs": [
+          "TAX-001:L-3"
+        ],
+        "fact_refs": [
+          "fact-unconfirmed-0002"
+        ],
+        "reason_codes": [
+          "evidence_not_grounded:TAX-001:L-3",
+          "fact_not_verified:fact-unconfirmed-0002"
+        ],
+        "statement": "税务登记义务已初步梳理。",
+        "status": "refused"
+      }
+    ],
+    "compiler_version": "0.2",
+    "denominator_count": 3,
+    "input_hash": "5e566256d9fa6e4fa56d06984684974b8a7be0b96997e0d8438ddd7d4c8ded0b",
+    "input_snapshot": {
+      "brief_conclusions": [
+        {
+          "code": "ENV-001",
+          "conclusion_hash": "d90fc6540356348e02918011103557d0a386986c1daf5b3d723996f56d7b69ae",
+          "gate_status": "passed",
+          "risk_pt": "A rota de licenciamento foi confirmada nas fontes congeladas.",
+          "risk_zh": "该项目的环境许可路径已按冻结法源确认，需在施工前完成 LP 阶段许可。",
+          "title": "环境许可路径"
+        },
+        {
+          "code": "LAND-001",
+          "conclusion_hash": "ac9c522878c336dbdb10f74c27d1639938ba977a92dd24b9e8a24a4f5bcaadf7",
+          "gate_status": "blocked",
+          "risk_pt": null,
+          "risk_zh": null,
+          "title": "土地权属核验"
+        }
+      ],
+      "checklist": [
+        {
+          "code": "ENV-001",
+          "item_hash": "51883d05397c508430d98c79e4489b5e354d6ef8ab68d63a54d6e7d0d7720943",
+          "priority": "high",
+          "title": "环境许可路径"
+        },
+        {
+          "code": "LAND-001",
+          "item_hash": "b2c51d926227d2aa909088fe90a78b23fbbf504c8f42009a04299dbc4ccf49f7",
+          "priority": "high",
+          "title": "土地权属核验"
+        },
+        {
+          "code": "TAX-001",
+          "item_hash": "43e3a46e2bbb1ffa576e903923fd86b2b03d40b38d1e0486964cc3fb6e714aad",
+          "priority": "medium",
+          "title": "税务登记义务"
+        }
+      ],
+      "drafts": [
+        {
+          "checklist_code": "ENV-001",
+          "evidence_refs": [
+            "ENV-001:L-1",
+            "ENV-001:L-2"
+          ],
+          "fact_refs": [
+            "fact-confirmed-0001"
+          ],
+          "statement": "该项目的环境许可路径已按冻结法源确认，需在施工前完成 LP 阶段许可。"
+        },
+        {
+          "checklist_code": "TAX-001",
+          "evidence_refs": [
+            "TAX-001:L-3"
+          ],
+          "fact_refs": [
+            "fact-unconfirmed-0002"
+          ],
+          "statement": "税务登记义务已初步梳理。"
+        }
+      ],
+      "evidence": {
+        "ENV-001:L-1": {
+          "checklist_code": "ENV-001",
+          "eligible": true,
+          "grounded": true,
+          "hit_id": "L-1",
+          "pinpoint": "art. 1",
+          "ref": "ENV-001:L-1",
+          "requires_review": false,
+          "review_status": "expert_verified",
+          "source_hash": "6b62503e263424c77f0aff11196eccefb98f581c3534ad556082411b85f7a215",
+          "url": "https://example.invalid/l1",
+          "urn": "urn:lex:zz:golden:l1"
+        },
+        "ENV-001:L-2": {
+          "checklist_code": "ENV-001",
+          "eligible": true,
+          "grounded": true,
+          "hit_id": "L-2",
+          "pinpoint": "art. 2",
+          "ref": "ENV-001:L-2",
+          "requires_review": true,
+          "review_status": "pending",
+          "source_hash": "6dfb62b350d6a5bee91344841465af9b11a9da290d0755ccf1a139a0091fee1e",
+          "url": "https://example.invalid/l2",
+          "urn": "urn:lex:zz:golden:l2"
+        },
+        "TAX-001:L-3": {
+          "checklist_code": "TAX-001",
+          "eligible": false,
+          "grounded": false,
+          "hit_id": "L-3",
+          "pinpoint": null,
+          "ref": "TAX-001:L-3",
+          "requires_review": true,
+          "review_status": "pending",
+          "source_hash": "321f12a8568d74fc6e8740bee8f8b9f798fb6387c6ca1a99ba88fc6dd46e6c09",
+          "url": "https://example.invalid/l3",
+          "urn": "urn:lex:zz:golden:l3"
+        }
+      },
+      "facts": {
+        "fact-confirmed-0001": {
+          "attribute": "site_area",
+          "block_id": "block-001",
+          "fact_pack_version": "fp-1",
+          "fact_time": "2026-06-01",
+          "ref": "fact-confirmed-0001",
+          "source_document": "proposal.pdf",
+          "subject": "project",
+          "value": "320000 m2",
+          "verification_status": "business_confirmed",
+          "verified": true
+        },
+        "fact-unconfirmed-0002": {
+          "attribute": "headcount",
+          "block_id": "block-002",
+          "fact_pack_version": "fp-1",
+          "fact_time": "2026-06-01",
+          "ref": "fact-unconfirmed-0002",
+          "source_document": "proposal.pdf",
+          "subject": "project",
+          "value": "300",
+          "verification_status": "submitted",
+          "verified": false
+        }
+      },
+      "scenario_id": 1
+    },
+    "output_hash": "e731487bab93dd4b370037749f68eb1b7521ecd146c21d9e671ca59fc7a458ab",
+    "ready_count": 1,
+    "refused_count": 2
+  },
+  "inputs": {
+    "drafts": [
+      {
+        "checklist_code": "ENV-001",
+        "evidence_refs": [
+          "ENV-001:L-1",
+          "ENV-001:L-2"
+        ],
+        "fact_refs": [
+          "fact-confirmed-0001"
+        ],
+        "statement": "该项目的环境许可路径已按冻结法源确认，需在施工前完成 LP 阶段许可。"
+      },
+      {
+        "checklist_code": "TAX-001",
+        "evidence_refs": [
+          "TAX-001:L-3"
+        ],
+        "fact_refs": [
+          "fact-unconfirmed-0002"
+        ],
+        "statement": "税务登记义务已初步梳理。"
+      }
+    ],
+    "facts": [
+      {
+        "attribute": "site_area",
+        "block_id": "block-001",
+        "business_confirmed_by": 1,
+        "confirmation_note": "confirmed by business",
+        "fact_pack_version": "fp-1",
+        "fact_time": "2026-06-01",
+        "id": "fact-confirmed-0001",
+        "source_document": "proposal.pdf",
+        "status": "business_confirmed",
+        "subject": "project",
+        "value": "320000 m2"
+      },
+      {
+        "attribute": "headcount",
+        "block_id": "block-002",
+        "business_confirmed_by": null,
+        "confirmation_note": null,
+        "fact_pack_version": "fp-1",
+        "fact_time": "2026-06-01",
+        "id": "fact-unconfirmed-0002",
+        "source_document": "proposal.pdf",
+        "status": "submitted",
+        "subject": "project",
+        "value": "300"
+      }
+    ],
+    "payload": {
+      "brief": {
+        "sections": [
+          {
+            "items": [
+              {
+                "code": "ENV-001",
+                "gate_status": "passed",
+                "risk_pt": "A rota de licenciamento foi confirmada nas fontes congeladas.",
+                "risk_zh": "该项目的环境许可路径已按冻结法源确认，需在施工前完成 LP 阶段许可。",
+                "title": "环境许可路径"
+              },
+              {
+                "code": "LAND-001",
+                "gate_status": "blocked",
+                "risk_pt": null,
+                "risk_zh": null,
+                "title": "土地权属核验"
+              }
+            ]
+          }
+        ]
+      },
+      "review": {
+        "finalized_at": "2026-07-01T10:00:00+00:00",
+        "finalized_by_id": 2,
+        "items": [],
+        "revision": 3,
+        "status": "approved"
+      },
+      "sections_with_legal": [
+        {
+          "dimension_id": "environment",
+          "items": [
+            {
+              "code": "ENV-001",
+              "legal_hits": [
+                {
+                  "citation_status": "grounded",
+                  "grounded": true,
+                  "id": "L-1",
+                  "pinpoint": "art. 1",
+                  "requires_review": false,
+                  "review_status": "expert_verified",
+                  "url": "https://example.invalid/l1",
+                  "urn": "urn:lex:zz:golden:l1"
+                },
+                {
+                  "citation_status": "grounded",
+                  "grounded": true,
+                  "id": "L-2",
+                  "pinpoint": "art. 2",
+                  "requires_review": true,
+                  "review_status": "pending",
+                  "url": "https://example.invalid/l2",
+                  "urn": "urn:lex:zz:golden:l2"
+                }
+              ],
+              "priority": "high",
+              "title": "环境许可路径"
+            },
+            {
+              "code": "LAND-001",
+              "legal_hits": [],
+              "priority": "high",
+              "title": "土地权属核验"
+            },
+            {
+              "code": "TAX-001",
+              "legal_hits": [
+                {
+                  "citation_status": "candidate",
+                  "grounded": false,
+                  "id": "L-3",
+                  "pinpoint": null,
+                  "requires_review": true,
+                  "review_status": "pending",
+                  "url": "https://example.invalid/l3",
+                  "urn": "urn:lex:zz:golden:l3"
+                }
+              ],
+              "priority": "medium",
+              "title": "税务登记义务"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

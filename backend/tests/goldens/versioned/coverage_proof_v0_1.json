@@ -1,0 +1,61 @@
+{
+  "_meta": {
+    "generated_from_commit": "efc76e0052077b6d92f9e6bf3b6c0b1067ef18c4",
+    "note": "post-confirmation state: ENV-001 supported, TAX-001/LAND-001 refused",
+    "unit": "coverage_proof",
+    "version": "0.1"
+  },
+  "expected": {
+    "covered_count": 1,
+    "denominator_count": 3,
+    "denominator_hash": "9a1dbe05f1196fe77214ac7fac4004d3c70d1e99979354ebe65d03ff04c8c6ac",
+    "denominator_ref": "manual:golden-denominator",
+    "proof_body": {
+      "answerability_rule": "covered 仅计入经法务人工确认的 supported Claim；awaiting/refused 均不得作为已覆盖结论。",
+      "compilation_id": "00000000-0000-4000-8000-000000000001",
+      "compiler_input_hash": "5e566256d9fa6e4fa56d06984684974b8a7be0b96997e0d8438ddd7d4c8ded0b",
+      "compiler_output_hash": "e731487bab93dd4b370037749f68eb1b7521ecd146c21d9e671ca59fc7a458ab",
+      "covered_checklist_codes": [
+        "ENV-001"
+      ],
+      "denominator": [
+        {
+          "checklist_code": "ENV-001",
+          "statement": "该项目的环境许可路径已按冻结法源确认，需在施工前完成 LP 阶段许可。"
+        },
+        {
+          "checklist_code": "LAND-001",
+          "statement": "待核验事项：土地权属核验"
+        },
+        {
+          "checklist_code": "TAX-001",
+          "statement": "税务登记义务已初步梳理。"
+        }
+      ],
+      "denominator_ref": "manual:golden-denominator",
+      "scenario_id": 1,
+      "schema_version": "0.1",
+      "uncovered": [
+        {
+          "checklist_code": "LAND-001",
+          "status": "refused",
+          "unanswerable_reasons": [
+            "evidence_reference_required",
+            "fact_reference_required"
+          ]
+        },
+        {
+          "checklist_code": "TAX-001",
+          "status": "refused",
+          "unanswerable_reasons": [
+            "evidence_not_grounded:TAX-001:L-3",
+            "fact_not_verified:fact-unconfirmed-0002"
+          ]
+        }
+      ]
+    },
+    "proof_hash": "08536aca612ec799a86ff46715d27844c4af0eb1a328e892853bf9da6e129184",
+    "unanswerable_count": 2,
+    "uncovered_count": 2
+  }
+}

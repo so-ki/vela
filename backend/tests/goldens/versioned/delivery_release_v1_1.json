@@ -1,0 +1,422 @@
+{
+  "_meta": {
+    "generated_from_commit": "efc76e0052077b6d92f9e6bf3b6c0b1067ef18c4",
+    "note": "characterization only in C3-A; snapshot/release refactor is C3-B",
+    "unit": "delivery_release+delivery_snapshot",
+    "versions": {
+      "delivery_release": "1.1",
+      "delivery_snapshot": "1.0"
+    }
+  },
+  "expected": {
+    "delivery_snapshot": {
+      "checklist_id": 1,
+      "checklist_payload_hash": "55a0c4deb568ca5412144b94ca178f4e4022de6813dc323fe4bc5a6ccb576bcb",
+      "checklist_revision": 0,
+      "generation": {
+        "attempt_id": "attempt-golden-0001",
+        "capability_pack_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+        "capability_pack_id": "zz-golden-pack",
+        "capability_pack_version": "9.9.9",
+        "config_hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "corpus_artifact_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+        "corpus_artifact_id": "zz-golden-corpus",
+        "corpus_artifact_version": "9.2",
+        "generation_input_hash": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+        "rules_artifact_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+        "rules_artifact_id": "zz-golden-rules",
+        "rules_artifact_version": "9.1",
+        "snapshot_hash": "abababababababababababababababababababababababababababababababab"
+      },
+      "mechanism": {
+        "answerability_gate": {
+          "compilation_id": "00000000-0000-4000-8000-000000000001",
+          "compiler_input_hash": "5e566256d9fa6e4fa56d06984684974b8a7be0b96997e0d8438ddd7d4c8ded0b",
+          "compiler_output_hash": "e731487bab93dd4b370037749f68eb1b7521ecd146c21d9e671ca59fc7a458ab",
+          "compiler_version": "0.2",
+          "coverage_proof_hash": "08536aca612ec799a86ff46715d27844c4af0eb1a328e892853bf9da6e129184",
+          "coverage_proof_id": "00000000-0000-4000-8000-000000000005",
+          "decision": "passed",
+          "denominator_hash": "9a1dbe05f1196fe77214ac7fac4004d3c70d1e99979354ebe65d03ff04c8c6ac",
+          "explicitly_unanswerable_count": 2,
+          "gate_version": "1.0",
+          "included_conclusion_codes": [
+            "ENV-001"
+          ],
+          "included_conclusions_hash": "06dae47b0a715ef719c13cf16971f0be1260dbffc80fd20ae0c1d36174964288",
+          "provisional_evidence_promoted": false,
+          "provisional_evidence_refs": [
+            "ENV-001:L-2"
+          ],
+          "supported_included_count": 1
+        },
+        "claim_count": 3,
+        "compilation_id": "00000000-0000-4000-8000-000000000001",
+        "compiler_input_hash": "5e566256d9fa6e4fa56d06984684974b8a7be0b96997e0d8438ddd7d4c8ded0b",
+        "compiler_output_hash": "e731487bab93dd4b370037749f68eb1b7521ecd146c21d9e671ca59fc7a458ab",
+        "compiler_version": "0.2",
+        "confirmed_claims_hash": "50a02a5f658ca9500bf41f30a380a8870eda32115fff95cb41b2feae5cda5744",
+        "coverage_denominator_hash": "9a1dbe05f1196fe77214ac7fac4004d3c70d1e99979354ebe65d03ff04c8c6ac",
+        "coverage_proof_hash": "08536aca612ec799a86ff46715d27844c4af0eb1a328e892853bf9da6e129184",
+        "coverage_proof_id": "00000000-0000-4000-8000-000000000005"
+      },
+      "review": {
+        "finalized_at": "2026-07-01T10:00:00+00:00",
+        "finalized_by_id": 2,
+        "revision": 3,
+        "status": "approved"
+      },
+      "scenario_id": 1,
+      "schema_version": "1.0",
+      "scope_snapshot_hash": "abababababababababababababababababababababababababababababababab"
+    },
+    "evidence_manifest": [
+      {
+        "content_length": 2048,
+        "content_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+        "evidence_kind": "signature_artifact",
+        "expires_at": "2026-12-31T12:00:00+00:00",
+        "filename": "sig.p7s",
+        "id": "evo-golden-0001",
+        "media_type": "application/pkcs7-signature",
+        "scenario_id": 1,
+        "source_url": null,
+        "status": "active",
+        "uploaded_at": "2026-07-01T12:00:00+00:00",
+        "uploaded_by": 2
+      },
+      {
+        "content_length": 1234,
+        "content_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+        "evidence_kind": "uat_test_evidence",
+        "expires_at": "2026-12-31T12:00:00+00:00",
+        "filename": "uat.pdf",
+        "id": "evo-golden-0002",
+        "media_type": "application/pdf",
+        "scenario_id": 1,
+        "source_url": "https://customer.invalid/uat.pdf",
+        "status": "active",
+        "uploaded_at": "2026-07-01T12:00:00+00:00",
+        "uploaded_by": 1
+      }
+    ],
+    "release_body": {
+      "artifact_manifest_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+      "delivery_evidence_manifest_hash": "611a15edc223c0da19f71b49f25cb5d32948fdc0a2c43fe54ae07e44a48e0079",
+      "deployment_evidence_hash": "159577b0c2c600425a6af813b6b4351866c612c781c20d5929d7613eac9847b1",
+      "deployment_evidence_id": "dep-golden-0001",
+      "expert_attestation_evidence_hash": "c6db79713f319ecf40f1b52f4a71b72f25517a5af56e0fdc75db63a2dbbaa71f",
+      "expert_attestation_id": "attn-golden-0001",
+      "expires_at": "2026-08-01T12:00:00+00:00",
+      "legal_content_certification_evidence_hash": "72aa493d625aa0357a29a87483127a7bb8c23f2426df5ab4cc5ea27c36d67781",
+      "legal_content_certification_id": "cert-golden-0001",
+      "primary_content_credential_evidence_hash": "386b2498bacf2aee92f65e8cf5b691d78236659952af3acfed1e7dc1f902ca8d",
+      "release_note_hash": "af2d01410866531ddde724cf82ccfe61ca8ca580742af2bb229398b547a1cc2e",
+      "released_at": "2026-07-01T12:00:00+00:00",
+      "released_by": 6,
+      "scenario_credential_evidence_hash": "8d21b3c55b06db887e3a908eeb600b3769414459104349c3e23c7d30c479e862",
+      "scenario_id": 1,
+      "schema_version": "1.1",
+      "secondary_content_credential_evidence_hash": "6f37a0fe1cd4993417a5a5981d89533ef79d1e85c6248a13c8454ca9f6133d0b",
+      "snapshot_hash": "e3dfe7519897ff9c906270ed7d2c44a8605c0094f86e6d8c33bc340c2f401f88",
+      "uat_acceptance_id": "uat-golden-0001",
+      "uat_evidence_hash": "0b679b4883a33029bec0f29b3de6f79494c8a57aed0f4924971cce751c825cff"
+    },
+    "release_hash": "92a351721f71f0c2f7634235dacc79559a3258d221976575e9c19606c25aad73",
+    "snapshot_hash": "e3dfe7519897ff9c906270ed7d2c44a8605c0094f86e6d8c33bc340c2f401f88"
+  },
+  "inputs": {
+    "datetime_fields": {
+      "acceptance": [
+        "accepted_at",
+        "expires_at"
+      ],
+      "attestation": [
+        "signature_verified_at",
+        "certificate_valid_until",
+        "signed_at",
+        "expires_at"
+      ],
+      "content_certification": [
+        "certified_at",
+        "expires_at"
+      ],
+      "deployment": [
+        "verified_at",
+        "expires_at"
+      ],
+      "evidence_objects": [
+        "uploaded_at",
+        "expires_at"
+      ],
+      "primary_credential": [
+        "verified_at",
+        "valid_until"
+      ],
+      "scenario_credential": [
+        "verified_at",
+        "valid_until"
+      ],
+      "secondary_credential": [
+        "verified_at",
+        "valid_until"
+      ]
+    },
+    "generation_config_kwargs": {
+      "action_type": "act",
+      "artifact_binding": {
+        "action_type": "act",
+        "country": "zz",
+        "industry": "ind",
+        "state": "zz-state"
+      },
+      "attempt_id": "attempt-golden-0001",
+      "capability_pack_description": "synthetic",
+      "capability_pack_display_name": "Golden Pack",
+      "capability_pack_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+      "capability_pack_id": "zz-golden-pack",
+      "capability_pack_version": "9.9.9",
+      "city": "zz-city",
+      "code_adjustments": [],
+      "compliance_dimensions": [
+        "environment"
+      ],
+      "config_hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "corpus_artifact_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+      "corpus_artifact_id": "zz-golden-corpus",
+      "corpus_artifact_path": "/dev/null",
+      "corpus_artifact_version": "9.2",
+      "corpus_data": {},
+      "corpus_manifest_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+      "corpus_version": "9.2",
+      "country": "zz",
+      "expansion_candidate_top_k": 0,
+      "expansion_context_limit": 0,
+      "expansion_enabled": false,
+      "expansion_min_keyword_score": 0.0,
+      "generation_input": {},
+      "generation_input_hash": "efefefefefefefefefefefefefefefefefefefefefefefefefefefefefefefef",
+      "generation_input_id": "geninput-golden-0001",
+      "include_playbook_suggestions": false,
+      "industry": "ind",
+      "intent_dimension_expansion": false,
+      "issue_modules": [
+        "environment"
+      ],
+      "lease_owner": "golden",
+      "lease_token": "lease-golden",
+      "match_threshold": 70,
+      "output_profile": {
+        "profile_id": "golden_output",
+        "version": "1.0"
+      },
+      "playbook_suggestion_codes": [],
+      "polish": false,
+      "profile_hash": "4444444444444444444444444444444444444444444444444444444444444444",
+      "retrieval_config": {
+        "match_threshold_default": 70
+      },
+      "retrieval_top_k": 3,
+      "rules_artifact_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+      "rules_artifact_id": "zz-golden-rules",
+      "rules_artifact_path": "/dev/null",
+      "rules_artifact_version": "9.1",
+      "rules_data": {},
+      "rules_pack_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+      "rules_pack_id": "zz-golden-rules",
+      "rules_pack_version": "9.1",
+      "scenario_id": 1,
+      "selected_issue_codes": [],
+      "snapshot_hash": "abababababababababababababababababababababababababababababababab",
+      "state": "zz-state"
+    },
+    "release_chain": {
+      "acceptance": {
+        "acceptance_statement": "accepted",
+        "accepted_at": "2026-07-01T12:00:00+00:00",
+        "accepted_by": 1,
+        "customer_organization": "Golden Customer Ltda",
+        "environment": "customer_acceptance",
+        "evidence_reference": "https://customer.invalid/uat",
+        "expert_attestation_id": "attn-golden-0001",
+        "expires_at": "2026-12-31T12:00:00+00:00",
+        "id": "uat-golden-0001",
+        "scenario_id": 1,
+        "snapshot_hash": "abababababababababababababababababababababababababababababababab",
+        "status": "accepted",
+        "target_environment_id": "env-golden-1",
+        "test_evidence_hash": "9999999999999999999999999999999999999999999999999999999999999999",
+        "test_plan_hash": "8888888888888888888888888888888888888888888888888888888888888888"
+      },
+      "attestation": {
+        "artifact_manifest_hash": "5555555555555555555555555555555555555555555555555555555555555555",
+        "certificate_serial": "SER-1",
+        "certificate_subject": "CN=Golden Counsel",
+        "certificate_valid_until": "2027-07-01T12:00:00+00:00",
+        "credential_id": "cred-scenario-0001",
+        "expires_at": "2026-12-31T12:00:00+00:00",
+        "id": "attn-golden-0001",
+        "limitations": "none",
+        "scenario_id": 1,
+        "signature_artifact_hash": "6666666666666666666666666666666666666666666666666666666666666666",
+        "signature_format": "pades",
+        "signature_validation_report_hash": "7777777777777777777777777777777777777777777777777777777777777777",
+        "signature_validation_status": "valid",
+        "signature_validation_url": "https://validar.iti.gov.br/report/1",
+        "signature_verification_note": "ok",
+        "signature_verified_at": "2026-07-01T12:00:00+00:00",
+        "signature_verified_by": 3,
+        "signed_at": "2026-07-01T12:00:00+00:00",
+        "signed_by": 2,
+        "snapshot_hash": "abababababababababababababababababababababababababababababababab",
+        "statement": "signed",
+        "status": "verified"
+      },
+      "content_certification": {
+        "certification_manifest_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "certified_at": "2026-07-01T12:00:00+00:00",
+        "certified_by": 3,
+        "expires_at": "2026-12-31T12:00:00+00:00",
+        "id": "cert-golden-0001",
+        "primary_certificate_serial": "SER-P",
+        "primary_certificate_subject": "CN=Primary",
+        "primary_credential_id": "cred-primary-0001",
+        "primary_signature_hash": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+        "primary_validation_report_hash": "cececececececececececececececececececececececececececececececece",
+        "primary_validation_url": "https://validar.iti.gov.br/report/p",
+        "secondary_certificate_serial": "SER-S",
+        "secondary_certificate_subject": "CN=Secondary",
+        "secondary_credential_id": "cred-secondary-0001",
+        "secondary_signature_hash": "cfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcfcf",
+        "secondary_validation_report_hash": "d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1",
+        "secondary_validation_url": "https://validar.iti.gov.br/report/s",
+        "status": "certified"
+      },
+      "deployment": {
+        "artifact_receipt_hash": "abababababababababababababababababababababababababababababababab",
+        "artifact_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "backend_image_digest": "sha256:b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1",
+        "capability_pack_hash": "1111111111111111111111111111111111111111111111111111111111111111",
+        "ci_run_url": "https://ci.invalid/run/1",
+        "commit_sha": "cccccccccccccccccccccccccccccccccccccccc",
+        "config_schema_sha256": "babababababababababababababababababababababababababababababababa",
+        "corpus_artifact_hash": "3333333333333333333333333333333333333333333333333333333333333333",
+        "database_image_digest": "sha256:b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3",
+        "environment": "production",
+        "evaluation_policy_sha256": "bcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbcbc",
+        "evaluation_run_sha256": "bdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbd",
+        "expires_at": "2026-12-31T12:00:00+00:00",
+        "frontend_image_digest": "sha256:b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2",
+        "gold_dataset_sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "id": "dep-golden-0001",
+        "legal_content_certification_id": "cert-golden-0001",
+        "migration_head": "20260718_0006",
+        "provenance_sha256": "aeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeaeae",
+        "provenance_url": "https://ci.invalid/prov",
+        "regression_status": "passed",
+        "rules_artifact_hash": "2222222222222222222222222222222222222222222222222222222222222222",
+        "runtime_probe_sha256": "afafafafafafafafafafafafafafafafafafafafafafafafafafafafafafafaf",
+        "runtime_probe_url": "https://customer.invalid/probe",
+        "sbom_sha256": "acacacacacacacacacacacacacacacacacacacacacacacacacacacacacacacac",
+        "security_evidence_sha256": "adadadadadadadadadadadadadadadadadadadadadadadadadadadadadadadad",
+        "security_evidence_url": "https://ci.invalid/sec",
+        "status": "verified",
+        "target_environment_id": "env-golden-1",
+        "verification_note": "ok",
+        "verified_at": "2026-07-01T12:00:00+00:00",
+        "verified_by": 3
+      },
+      "evidence_objects": [
+        {
+          "content_length": 1234,
+          "content_sha256": "9999999999999999999999999999999999999999999999999999999999999999",
+          "evidence_kind": "uat_test_evidence",
+          "expires_at": "2026-12-31T12:00:00+00:00",
+          "filename": "uat.pdf",
+          "id": "evo-golden-0002",
+          "media_type": "application/pdf",
+          "scenario_id": 1,
+          "source_url": "https://customer.invalid/uat.pdf",
+          "status": "active",
+          "uploaded_at": "2026-07-01T12:00:00+00:00",
+          "uploaded_by": 1
+        },
+        {
+          "content_length": 2048,
+          "content_sha256": "6666666666666666666666666666666666666666666666666666666666666666",
+          "evidence_kind": "signature_artifact",
+          "expires_at": "2026-12-31T12:00:00+00:00",
+          "filename": "sig.p7s",
+          "id": "evo-golden-0001",
+          "media_type": "application/pkcs7-signature",
+          "scenario_id": 1,
+          "source_url": null,
+          "status": "active",
+          "uploaded_at": "2026-07-01T12:00:00+00:00",
+          "uploaded_by": 2
+        }
+      ],
+      "expires_at": "2026-08-01T12:00:00+00:00",
+      "primary_credential": {
+        "authority": "ZZ-BAR",
+        "decision_note": "ok",
+        "holder_name": "Primary Counsel",
+        "id": "cred-primary-0001",
+        "jurisdiction": "zz",
+        "official_register_url": "https://consulta.oab.org.br/2",
+        "registration_number": "ZZ-2",
+        "registration_status": "regular",
+        "revision": 1,
+        "status": "verified",
+        "submitted_evidence_hash": "d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4d4",
+        "user_id": 4,
+        "valid_until": "2027-07-01T12:00:00+00:00",
+        "verification_evidence_hash": "d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5d5",
+        "verification_reference": "ref-2",
+        "verified_at": "2026-07-01T12:00:00+00:00",
+        "verified_by": 3
+      },
+      "release_note": "golden release note",
+      "released_at": "2026-07-01T12:00:00+00:00",
+      "released_by": 6,
+      "scenario_credential": {
+        "authority": "ZZ-BAR",
+        "decision_note": "ok",
+        "holder_name": "Golden Counsel",
+        "id": "cred-scenario-0001",
+        "jurisdiction": "zz",
+        "official_register_url": "https://consulta.oab.org.br/1",
+        "registration_number": "ZZ-1",
+        "registration_status": "regular",
+        "revision": 1,
+        "status": "verified",
+        "submitted_evidence_hash": "d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2",
+        "user_id": 2,
+        "valid_until": "2027-07-01T12:00:00+00:00",
+        "verification_evidence_hash": "d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3d3",
+        "verification_reference": "ref-1",
+        "verified_at": "2026-07-01T12:00:00+00:00",
+        "verified_by": 3
+      },
+      "secondary_credential": {
+        "authority": "ZZ-BAR",
+        "decision_note": "ok",
+        "holder_name": "Secondary Counsel",
+        "id": "cred-secondary-0001",
+        "jurisdiction": "zz",
+        "official_register_url": "https://consulta.oab.org.br/3",
+        "registration_number": "ZZ-3",
+        "registration_status": "regular",
+        "revision": 1,
+        "status": "verified",
+        "submitted_evidence_hash": "d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6d6",
+        "user_id": 5,
+        "valid_until": "2027-07-01T12:00:00+00:00",
+        "verification_evidence_hash": "d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7d7",
+        "verification_reference": "ref-3",
+        "verified_at": "2026-07-01T12:00:00+00:00",
+        "verified_by": 3
+      }
+    }
+  }
+}
