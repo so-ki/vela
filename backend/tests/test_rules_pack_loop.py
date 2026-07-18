@@ -1,7 +1,18 @@
 """Tests for rules pack closed-loop suggestions."""
 
+import pytest
+
 from app.services.playbook_deviation_service import record_deviation
 from app.services.rules_pack_loop_service import generate_rules_pack_suggestions
+
+
+@pytest.fixture(autouse=True)
+def isolated_deviation_store(tmp_path, monkeypatch):
+    """Never let tests mutate the repository's tracked deviation log."""
+    monkeypatch.setattr(
+        "app.services.playbook_deviation_service.DEVIATIONS_PATH",
+        tmp_path / "playbook_deviations.json",
+    )
 
 
 def test_rules_pack_suggestions_empty_when_no_deviations():

@@ -1,6 +1,6 @@
 # GitHub 上传与邀请测试者
 
-本地仓库已初始化并完成首次提交（**不含** `backend/.env` 与 API Key）。
+本地仓库已初始化并完成提交（**不含** `backend/.env` 与 API Key）。当前远端可见性必须在 GitHub 设置页单独核验；本文档不把“计划设为私有”写成“已经私有”。
 
 ## 一、在 GitHub 创建私有仓库
 
@@ -16,7 +16,7 @@
 将 `<你的GitHub用户名>` 换成你的账号：
 
 ```bash
-cd /Users/kys/test/vela-platform
+cd <本地仓库路径>
 
 git remote add origin https://github.com/<你的GitHub用户名>/vela-platform.git
 git branch -M main
@@ -58,11 +58,10 @@ cd vela-platform
 
 ```bash
 cd backend
-cp .env.example .env
-# 可选：填入自己的 QWEN_API_KEY 以测试 LLM 润色
+# 发布 ZIP 不含任何 .env*；可选 LLM Key 应由测试者通过自己的环境变量或密钥管理工具注入
 ```
 
-演示账号由种子脚本创建：`legal@demo.vela` / `Demo1234!`
+本地演示账号由 `./scripts/start.sh` 或手工种子脚本创建。生产启动路径不提供演示账号开关，不得公开固定密码账号。
 
 ## 五、安全清单
 
@@ -73,12 +72,14 @@ cp .env.example .env
 
 ## 六、可选：发布 Release 供下载 zip
 
-若对方不使用 Git，可在 GitHub 打 Release 附 zip：
+若对方不使用 Git，只能上传 allowlist 构建并通过自动扫描的 ZIP；不要在 Finder 或命令行直接压缩工作区：
 
-1. 仓库 → **Releases** → **Create a new release**
-2. Tag：`v0.1.0-mvp`
-3. 上传 `Vela_MVP_给Gemini.zip` 或让 GitHub 自动生成 Source code
+1. 运行 `./scripts/build_submission_package.sh /tmp/vela-capability-pack-mvp.zip`
+2. 再运行 `./scripts/check_release_boundaries.sh /tmp/vela-capability-pack-mvp.zip`
+3. 仓库 → **Releases** → **Create a new release**，上传该已扫描文件
+
+发布包不含任何 `.env*`；接收方必须通过自己的密钥管理渠道创建运行环境配置。
 
 ---
 
-**当前本地状态：** 已 commit，等待 `git push` 到你在 GitHub 新建的 remote。
+发布前仍须人工复核分支、变更清单和自动扫描结果。

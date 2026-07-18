@@ -27,7 +27,12 @@ def load_index() -> dict[str, Any]:
 
 
 def get_default_pack_id() -> str:
-    return load_index().get("default_pack_id", "brazil_new_energy")
+    from app.capability_packs.registry import get_capability_pack_registry
+
+    active = get_capability_pack_registry().list_active()
+    if len(active) != 1:
+        raise RulesPackNotFoundError("当前 active Capability Pack 数量不唯一")
+    return active[0].manifest.rules_artifact.artifact_id
 
 
 def get_pack_entry(pack_id: str) -> dict[str, Any] | None:
@@ -97,7 +102,9 @@ def load_rules(pack_id: str | None = None) -> dict[str, Any]:
 def build_supported_locations(rules: dict[str, Any]) -> list[dict[str, str]]:
     jurisdiction = rules.get("jurisdiction", {})
     pack = rules.get("pack", {})
-    country = pack.get("primary_country") or jurisdiction.get("id") or "brazil"
+    country = pack.get("primary_country") or jurisdiction.get("id")
+    if not country:
+        raise RulesPackNotFoundError("规则包缺少 primary_country/jurisdiction.id")
     locations: list[dict[str, str]] = []
 
     overlays = rules.get("state_overlays") or {}
@@ -150,13 +157,17 @@ def get_scene_defaults(pack_id: str | None = None) -> dict[str, str]:
     industries = list(rules.get("industries", {}).keys())
     actions = list(rules.get("action_types", {}).keys())
     resolved = resolve_pack_id(pack_id)
+    country = pack.get("primary_country") or jurisdiction.get("id")
+    state = loc.get("state") or jurisdiction.get("default_state")
+    if not country or not state or not industries or not actions:
+        raise RulesPackNotFoundError("规则包缺少生成场景默认值所需的法域、州、行业或动作")
     return {
         "rules_pack_id": pack.get("id") or resolved,
-        "country": pack.get("primary_country") or jurisdiction.get("id") or "brazil",
-        "state": loc.get("state") or jurisdiction.get("default_state") or "sao_paulo",
-        "city": loc.get("city") or "campinas",
-        "industry": industries[0] if industries else "new_energy",
-        "action_type": actions[0] if actions else "greenfield_plant",
+        "country": country,
+        "state": state,
+        "city": loc.get("city") or "",
+        "industry": industries[0],
+        "action_type": actions[0],
     }
 
 

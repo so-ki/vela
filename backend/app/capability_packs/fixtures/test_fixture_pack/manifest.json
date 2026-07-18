@@ -1,0 +1,62 @@
+{
+  "manifest_schema_version": "1.1",
+  "pack_id": "test_fixture_pack",
+  "version": "0.1.0",
+  "status": "active",
+  "content_status": "expert_verified",
+  "display_name": "非真实测试能力包",
+  "description": "仅用于证明平台 Registry 不依赖任何真实国家或法律能力。",
+  "country": "ZZ-TEST",
+  "state": "ZZ-STATE",
+  "industry": "fixture_industry",
+  "action_type": "fixture_action",
+  "languages": ["test"],
+  "issue_modules": ["fixture_supported", "fixture_missing"],
+  "rules_artifact": {
+    "artifact_id": "test_fixture_rules",
+    "version": "0.1.0",
+    "content_hash": "a3fe49080fe77632e6925d80c091a2c31bfce795c47383d658f820f4506235c3",
+    "resource": "fixture://rules.json"
+  },
+  "corpus_artifact": {
+    "artifact_id": "test_fixture_corpus",
+    "version": "0.1.0",
+    "content_hash": "82c01f470226abd5804f3de4135ade1e9f0b113aa3a32ca6bd6e46353694936d",
+    "resource": "fixture://corpus.json"
+  },
+  "artifact_binding": {
+    "country": "fixture_country",
+    "state": "fixture_state",
+    "industry": "fixture_industry_rules",
+    "action_type": "fixture_action"
+  },
+  "routing_hints": {
+    "country": ["fixture-country-token"],
+    "state": ["fixture-state-token"],
+    "industry": ["fixture-industry-token"],
+    "action_type": ["fixture-action-token"],
+    "excluded_states": [],
+    "excluded_action_types": []
+  },
+  "retrieval_config": {
+    "match_threshold_default": 70,
+    "match_threshold_min": 50,
+    "match_threshold_max": 95,
+    "top_k_default": 2,
+    "top_k_min": 0,
+    "top_k_max": 2,
+    "expansion_enabled": false,
+    "expansion_candidate_extra": 0,
+    "expansion_min_keyword_score": 0.0,
+    "expansion_context_limit": 0
+  },
+  "output_profile": {
+    "profile_id": "fixture_output",
+    "version": "0.1.0",
+    "brief_languages": ["test"],
+    "brief_title": "测试输出",
+    "export_template": "legacy",
+    "disclaimer": "非真实法律内容。"
+  },
+  "semantic_hash": "e79c6a03e7129dfb9a60b7b6a211ecf4c6e2579b0a9a239917e096ff8dc17dee"
+}

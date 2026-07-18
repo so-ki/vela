@@ -1,0 +1,19 @@
+{
+  "experiment_id": "ingestion-qa-v2",
+  "observed_at": "2026-07-17",
+  "status": "invalidated_by_pre_measurement_source_gate",
+  "decision": "source_anchor_validation_failed_no_ingestion_decision",
+  "sample_size": 10,
+  "expected_anchor_count": 30,
+  "pre_registered_maximum_omission_rate": 0.05,
+  "invalidation": {
+    "reason": "Three corrected title anchors still omitted the leading zero used by the official HTML date, and therefore were absent before PDF rendering.",
+    "affected_targets": {
+      "decreto-69120-2024": ["69.120, de 9 de dezembro de 2024"],
+      "decreto-64512-2019": ["64.512, de 3 de outubro de 2019"],
+      "decreto-53205-2008": ["53.205, de 3 de julho de 2008"]
+    },
+    "superseded_by": "ingestion-qa-v3"
+  },
+  "limitations": "The source gate blocked calculation of an ingestion omission rate. This record is evidence of an invalid annotation iteration, not a PDF ingestion result."
+}

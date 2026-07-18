@@ -49,7 +49,7 @@ def run_investigation_red_team(
             "agent_step": {"step": "red_team", "status": "skipped", "reason": "no_s2"},
         }
 
-    if not is_llm_enabled(user_id):
+    if not is_llm_enabled(user_id, task="red_team"):
         return {
             "challenges": [],
             "agent_step": {"step": "red_team", "status": "skipped", "reason": "llm_disabled"},

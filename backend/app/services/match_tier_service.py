@@ -9,7 +9,7 @@ TIER_S2 = "S2"
 TIER_S3 = "S3"
 
 TIER_LABELS = {
-    TIER_S1: "自动通过",
+    TIER_S1: "检索门控通过（仍待法务确认）",
     TIER_S2: "人工复核",
     TIER_S3: "硬阻断",
 }
@@ -47,6 +47,9 @@ def classify_item_tier(
     )
     has_hits = bool(legal_hits)
     score = float(match_score or 0)
+    has_only_expert_reviewed_sources = bool(legal_hits) and all(
+        hit.get("review_status") == "expert_verified" for hit in legal_hits
+    )
 
     if not has_hits:
         tier = TIER_S3
@@ -57,9 +60,12 @@ def classify_item_tier(
     elif score < threshold - 15 and priority == "high":
         tier = TIER_S3
         reason = f"高优先级匹配度 {score:.0f} 低于硬阻断线 {threshold - 15}"
-    elif score >= threshold and grounded:
+    elif score >= threshold and grounded and has_only_expert_reviewed_sources:
         tier = TIER_S1
         reason = None
+    elif score >= threshold and grounded:
+        tier = TIER_S2
+        reason = "法源条目仍为 provisional，检索相关但必须由法务逐项确认"
     elif score >= threshold - 10 and has_hits:
         tier = TIER_S2
         reason = f"匹配度 {score:.0f} 接近阈值 {threshold}，建议法务确认"
@@ -81,7 +87,7 @@ def classify_item_tier(
         "grounded": grounded,
         "block_reason": reason,
         "requires_review": tier != TIER_S1,
-        "human_review_hint": reason or "可纳入自动简报",
+        "human_review_hint": reason or "检索门控通过，仍待法务确认",
     }
 
 
@@ -134,5 +140,5 @@ def classify_sections(
             "has_hard_block": s3 > 0,
         },
         "base_threshold": base_threshold,
-        "tier_policy": "Legal-Skills 分层：S1 自动通过 · S2 人工复核 · S3 硬阻断",
+        "tier_policy": "分层门控：S1 检索门控通过（仍待法务确认）· S2 人工逐项复核 · S3 硬阻断",
     }

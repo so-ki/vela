@@ -1,0 +1,601 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vela.invalid/schemas/rule-card-dual-track-experiment-v1.json",
+  "title": "Vela dual-track provisional rule-card experiment",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "experiment_id",
+    "version",
+    "pack_id",
+    "jurisdiction",
+    "industry",
+    "action_type",
+    "status",
+    "certification_status",
+    "runtime_integration",
+    "as_of",
+    "disclaimer",
+    "methodology",
+    "timing",
+    "source_registry",
+    "excluded_sources",
+    "cards",
+    "summary",
+    "limitations"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0"
+    },
+    "experiment_id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._-]+$"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^0\\.[0-9]+\\.[0-9]+$"
+    },
+    "pack_id": {
+      "const": "brazil_new_energy_greenfield"
+    },
+    "jurisdiction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["country", "state"],
+      "properties": {
+        "country": {
+          "const": "BR"
+        },
+        "state": {
+          "const": "SP"
+        }
+      }
+    },
+    "industry": {
+      "const": "new_energy_manufacturing"
+    },
+    "action_type": {
+      "const": "greenfield_plant"
+    },
+    "status": {
+      "const": "evidence_only"
+    },
+    "certification_status": {
+      "const": "provisional"
+    },
+    "runtime_integration": {
+      "const": false
+    },
+    "as_of": {
+      "type": "string",
+      "format": "date"
+    },
+    "disclaimer": {
+      "type": "string",
+      "minLength": 20
+    },
+    "methodology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sample_size",
+        "tracks",
+        "selection_rationale",
+        "comparison_question",
+        "generalisability_notice",
+        "time_capture_method",
+        "time_capture_reason"
+      ],
+      "properties": {
+        "sample_size": {
+          "const": 10
+        },
+        "tracks": {
+          "type": "array",
+          "prefixItems": [
+            {
+              "const": "statute_forward"
+            },
+            {
+              "const": "form_reverse"
+            }
+          ],
+          "items": false,
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "selection_rationale": {
+          "type": "string",
+          "minLength": 20
+        },
+        "comparison_question": {
+          "type": "string",
+          "minLength": 20
+        },
+        "generalisability_notice": {
+          "type": "string",
+          "minLength": 20
+        },
+        "time_capture_method": {
+          "const": "not_measured"
+        },
+        "time_capture_reason": {
+          "type": "string",
+          "minLength": 20
+        }
+      }
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "statute_forward_total_minutes",
+        "form_reverse_total_minutes",
+        "unavailable_reason"
+      ],
+      "properties": {
+        "statute_forward_total_minutes": {
+          "type": "null"
+        },
+        "form_reverse_total_minutes": {
+          "type": "null"
+        },
+        "unavailable_reason": {
+          "type": "string",
+          "minLength": 20
+        }
+      }
+    },
+    "source_registry": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "$ref": "#/$defs/source"
+      }
+    },
+    "excluded_sources": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/excludedSource"
+      }
+    },
+    "cards": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "items": {
+        "$ref": "#/$defs/card"
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "card_count",
+        "difference_type_counts",
+        "measured_statute_forward_minutes",
+        "measured_form_reverse_minutes",
+        "result"
+      ],
+      "properties": {
+        "card_count": {
+          "const": 10
+        },
+        "difference_type_counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "measured_statute_forward_minutes": {
+          "type": "null"
+        },
+        "measured_form_reverse_minutes": {
+          "type": "null"
+        },
+        "result": {
+          "type": "string",
+          "minLength": 20
+        }
+      }
+    },
+    "limitations": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "string",
+        "minLength": 10
+      }
+    }
+  },
+  "$defs": {
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "authority",
+        "instrument_type",
+        "title",
+        "official_url",
+        "official_host",
+        "access_verified_at",
+        "access_status",
+        "usable_pinpoints",
+        "review_status"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9._-]+$"
+        },
+        "authority": {
+          "type": "string",
+          "minLength": 3
+        },
+        "instrument_type": {
+          "type": "string",
+          "enum": [
+            "state_law",
+            "state_decree",
+            "official_application_guidance",
+            "official_service_portal"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 5
+        },
+        "official_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "official_host": {
+          "type": "string",
+          "minLength": 5
+        },
+        "access_verified_at": {
+          "type": "string",
+          "format": "date"
+        },
+        "access_status": {
+          "type": "string",
+          "enum": [
+            "verified_official_html",
+            "verified_official_service"
+          ]
+        },
+        "usable_pinpoints": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 3
+          }
+        },
+        "review_status": {
+          "const": "provisional"
+        }
+      }
+    },
+    "excludedSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "reason", "decision"],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 15
+        },
+        "decision": {
+          "const": "not_used_for_rule_claims"
+        }
+      }
+    },
+    "citation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_id",
+        "official_url",
+        "pinpoint",
+        "claim_scope",
+        "access_verified_at"
+      ],
+      "properties": {
+        "source_id": {
+          "type": "string",
+          "minLength": 3
+        },
+        "official_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "pinpoint": {
+          "type": "string",
+          "minLength": 3
+        },
+        "claim_scope": {
+          "type": "string",
+          "minLength": 10
+        },
+        "access_verified_at": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "element": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["element_id", "statement", "source_track"],
+      "properties": {
+        "element_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]+$"
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 10
+        },
+        "source_track": {
+          "type": "string",
+          "enum": ["statute_forward", "form_reverse", "both"]
+        }
+      }
+    },
+    "factField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "field_id",
+        "label",
+        "value_type",
+        "introduced_by",
+        "required_state",
+        "evidence_hint"
+      ],
+      "properties": {
+        "field_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]+$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 2
+        },
+        "value_type": {
+          "type": "string",
+          "enum": ["string", "boolean", "enum", "identifier", "document", "string_list"]
+        },
+        "introduced_by": {
+          "type": "string",
+          "enum": ["statute_forward", "form_reverse", "both"]
+        },
+        "required_state": {
+          "type": "string",
+          "enum": ["required", "conditional", "unknown_pending_expert_review"]
+        },
+        "evidence_hint": {
+          "type": "string",
+          "minLength": 5
+        }
+      }
+    },
+    "exception": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exception_id", "condition", "effect", "review_status"],
+      "properties": {
+        "exception_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]+$"
+        },
+        "condition": {
+          "type": "string",
+          "minLength": 10
+        },
+        "effect": {
+          "type": "string",
+          "minLength": 10
+        },
+        "review_status": {
+          "const": "provisional"
+        }
+      }
+    },
+    "redFlag": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["severity", "condition", "response"],
+      "properties": {
+        "severity": {
+          "type": "string",
+          "enum": ["medium", "high"]
+        },
+        "condition": {
+          "type": "string",
+          "minLength": 10
+        },
+        "response": {
+          "type": "string",
+          "minLength": 10
+        }
+      }
+    },
+    "track": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "source_ids",
+        "required_facts",
+        "derived_output",
+        "effort_minutes",
+        "effort_unavailable_reason"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": ["completed_provisional", "partial_provisional"]
+        },
+        "source_ids": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 3
+          }
+        },
+        "required_facts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]+$"
+          }
+        },
+        "derived_output": {
+          "type": "string",
+          "minLength": 15
+        },
+        "effort_minutes": {
+          "type": "null"
+        },
+        "effort_unavailable_reason": {
+          "type": "string",
+          "minLength": 20
+        }
+      }
+    },
+    "card": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "pack_id",
+        "version",
+        "title",
+        "certification_status",
+        "production_ready",
+        "non_legal_opinion",
+        "citations",
+        "elements",
+        "fact_fields",
+        "exceptions",
+        "exception_review_note",
+        "consequence",
+        "red_flag",
+        "difference_type",
+        "difference_summary",
+        "production_tracks",
+        "open_questions"
+      ],
+      "properties": {
+        "rule_id": {
+          "type": "string",
+          "pattern": "^BR-SP-ENV-RC-[0-9]{3}$"
+        },
+        "pack_id": {
+          "const": "brazil_new_energy_greenfield"
+        },
+        "version": {
+          "const": "0.1.0"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 5
+        },
+        "certification_status": {
+          "const": "provisional"
+        },
+        "production_ready": {
+          "const": false
+        },
+        "non_legal_opinion": {
+          "const": true
+        },
+        "citations": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/citation"
+          }
+        },
+        "elements": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/element"
+          }
+        },
+        "fact_fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/factField"
+          }
+        },
+        "exceptions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/exception"
+          }
+        },
+        "exception_review_note": {
+          "type": "string",
+          "minLength": 15
+        },
+        "consequence": {
+          "type": "string",
+          "minLength": 15
+        },
+        "red_flag": {
+          "$ref": "#/$defs/redFlag"
+        },
+        "difference_type": {
+          "type": "string",
+          "enum": [
+            "scope_to_form_fields",
+            "form_adds_branching_logic",
+            "form_adds_identity_control",
+            "form_adds_property_evidence"
+          ]
+        },
+        "difference_summary": {
+          "type": "string",
+          "minLength": 20
+        },
+        "production_tracks": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["statute_forward", "form_reverse"],
+          "properties": {
+            "statute_forward": {
+              "$ref": "#/$defs/track"
+            },
+            "form_reverse": {
+              "$ref": "#/$defs/track"
+            }
+          }
+        },
+        "open_questions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 10
+          }
+        }
+      }
+    }
+  }
+}

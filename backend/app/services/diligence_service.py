@@ -9,6 +9,7 @@ from typing import Any, Optional
 
 from app.services.document_extractor import read_upload_text
 from app.services.project_hub_service import project_context
+from app.services.upload_security import enforce_project_document_quota
 
 DD_CATEGORIES = [
     {"id": "corporate", "label": "公司主体与股权", "keywords": ["contrato social", "bylaws", "章程", "股权", "quota", "CADE"]},
@@ -45,6 +46,7 @@ def upload_diligence_document(
 
     ensure_project_hub(payload)
     text = read_upload_text(filename, content)
+    enforce_project_document_quota(payload, text)
     cats = [doc_category] if doc_category else _categorize_text(text)
     doc_id = uuid.uuid4().hex[:16]
     doc = {

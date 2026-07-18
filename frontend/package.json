@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:components": "vitest run src",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "axios": "^1.7.9",
@@ -15,9 +17,13 @@
     "vue-router": "^4.5.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.61.1",
     "@vitejs/plugin-vue": "^5.2.1",
+    "@vue/test-utils": "^2.4.6",
+    "jsdom": "^26.1.0",
     "typescript": "~5.6.2",
     "vite": "^6.0.5",
+    "vitest": "^3.2.4",
     "vue-tsc": "^2.2.0"
   }
 }

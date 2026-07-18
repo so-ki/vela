@@ -9,6 +9,7 @@ import {
   submitInterviewAnswer,
   uploadInterviewAttachment,
 } from '@/api/client'
+import { useAuthStore } from '@/stores/auth'
 
 interface QuestionOption {
   value: string
@@ -46,6 +47,7 @@ interface InterviewQuestion {
 }
 
 const router = useRouter()
+const auth = useAuthStore()
 const loading = ref(true)
 const sessionId = ref('')
 const script = ref<{ title?: string; subtitle?: string; questions?: InterviewQuestion[] }>({})
@@ -61,6 +63,7 @@ const uploadErrors = ref<Record<string, string>>({})
 
 const questions = computed(() => script.value.questions || [])
 const current = computed(() => questions.value[step.value])
+const currentUploadField = computed(() => current.value?.upload_field)
 const progress = computed(() =>
   questions.value.length ? Math.round(((step.value + 1) / questions.value.length) * 100) : 0,
 )
@@ -249,11 +252,22 @@ function onUploadChange(ev: Event, field: UploadFieldConfig) {
   input.value = ''
 }
 
-onMounted(async () => {
+async function loadOnboarding() {
+  loading.value = true
+  error.value = null
+  if (!auth.isLegal) {
+    await router.replace({ name: 'dashboard' })
+    loading.value = false
+    return
+  }
+
+  sessionId.value = ''
+  script.value = {}
+  step.value = 0
   try {
     const status = await fetchOnboardingStatus()
     if (status.completed) {
-      router.replace('/')
+      await router.replace({ name: 'dashboard' })
       return
     }
     script.value = await fetchInterviewScript()
@@ -266,6 +280,10 @@ onMounted(async () => {
   } finally {
     loading.value = false
   }
+}
+
+onMounted(() => {
+  void loadOnboarding()
 })
 
 function prevStep() {
@@ -414,31 +432,31 @@ async function nextStep() {
         />
 
         <div
-          v-if="showUploadField(current)"
+          v-if="currentUploadField && showUploadField(current)"
           class="upload-block"
           :class="{ required: uploadRequired(current) }"
         >
           <label class="upload-label">
             <span class="upload-title">
-              {{ current.upload_field.label }}
+              {{ currentUploadField.label }}
               <span v-if="uploadRequired(current)" class="req-tag">必传</span>
             </span>
-            <span class="upload-hint">{{ current.upload_field.hint }}</span>
+            <span class="upload-hint">{{ currentUploadField.hint }}</span>
             <input
               type="file"
-              :accept="current.upload_field.accept || '.docx,.pdf,.txt,.md'"
-              :disabled="uploadBusy[current.upload_field.purpose]"
-              @change="onUploadChange($event, current.upload_field!)"
+              :accept="currentUploadField.accept || '.docx,.pdf,.txt,.md'"
+              :disabled="uploadBusy[currentUploadField.purpose]"
+              @change="onUploadChange($event, currentUploadField)"
             />
-            <span v-if="uploadBusy[current.upload_field.purpose]" class="upload-status">正在上传并解析…</span>
-            <span v-else-if="uploadFiles[current.upload_field.purpose]" class="upload-file">
-              已上传：{{ uploadFiles[current.upload_field.purpose] }}
+            <span v-if="uploadBusy[currentUploadField.purpose]" class="upload-status">正在上传并解析…</span>
+            <span v-else-if="uploadFiles[currentUploadField.purpose]" class="upload-file">
+              已上传：{{ uploadFiles[currentUploadField.purpose] }}
             </span>
-            <p v-if="uploadPreview[current.upload_field.purpose]" class="upload-preview muted">
-              解析预览：{{ uploadPreview[current.upload_field.purpose] }}
+            <p v-if="uploadPreview[currentUploadField.purpose]" class="upload-preview muted">
+              解析预览：{{ uploadPreview[currentUploadField.purpose] }}
             </p>
-            <p v-if="uploadErrors[current.upload_field.purpose]" class="upload-error">
-              {{ uploadErrors[current.upload_field.purpose] }}
+            <p v-if="uploadErrors[currentUploadField.purpose]" class="upload-error">
+              {{ uploadErrors[currentUploadField.purpose] }}
             </p>
           </label>
         </div>
@@ -454,6 +472,11 @@ async function nextStep() {
           </button>
         </div>
       </section>
+    </div>
+
+    <div v-else class="state-card">
+      <p class="error-banner">{{ error || '访谈脚本暂时不可用，请重试。' }}</p>
+      <button type="button" class="btn primary" @click="loadOnboarding">重试加载</button>
     </div>
   </div>
 </template>

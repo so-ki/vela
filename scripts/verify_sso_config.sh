@@ -23,8 +23,8 @@ if [ "$enabled" = "True" ] || [ "$enabled" = "true" ]; then
   fi
   echo "OK: 重定向至 IdP → $loc"
 else
-  echo "SSO 未启用（开发环境正常）。生产请在 .env.prod 设置 SSO_ENABLED=true 及 OIDC 四元组。"
-  echo "详见 DEPLOYMENT.md「SSO 配置」与「本地 Keycloak 联调」。"
+  echo "SSO 未启用。当前受控试点的生产配置必须保持 SSO_ENABLED=false。"
+  echo "仅可在隔离开发环境联调 OIDC；进入生产前须完成独立安全验收。"
 fi
 
 echo "Done."

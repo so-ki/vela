@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import {
   fetchLlmSettings,
   patchLlmSettings,
+  clearLlmApiKey,
   testLlmConnection,
   type LlmSettings,
 } from '@/api/client'
@@ -14,6 +15,8 @@ const error = ref<string | null>(null)
 const testResult = ref<string | null>(null)
 
 const settings = ref<LlmSettings>({
+  available: true,
+  disabled_reason: null,
   enabled: null,
   provider: 'qwen',
   base_url: '',
@@ -37,8 +40,17 @@ const providerOptions = [
   { id: 'qwen', label: '通义千问 (Qwen)' },
   { id: 'deepseek', label: 'DeepSeek' },
   { id: 'siliconflow', label: 'SiliconFlow' },
-  { id: 'ollama', label: 'Ollama (本地)' },
-  { id: 'openai_compatible', label: 'OpenAI 兼容' },
+]
+
+const taskModelFields: Array<{
+  key: keyof LlmSettings['task_models']
+  label: string
+}> = [
+  { key: 'extract', label: '材料抽取' },
+  { key: 'issue_id', label: '议题识别' },
+  { key: 'gap', label: '缺口说明' },
+  { key: 'red_team', label: 'Red Team' },
+  { key: 'polish', label: '简报润色' },
 ]
 
 const defaultBaseUrl = computed(() => {
@@ -70,7 +82,7 @@ async function saveSettings() {
     const payload: Record<string, unknown> = {
       enabled: enabledToggle.value,
       provider: settings.value.provider,
-      base_url: settings.value.base_url || defaultBaseUrl.value,
+      base_url: defaultBaseUrl.value,
       default_model: settings.value.default_model || defaultModel.value,
       task_models: settings.value.task_models,
     }
@@ -93,7 +105,7 @@ async function runTest() {
   try {
     const res = await testLlmConnection({
       provider: settings.value.provider,
-      base_url: settings.value.base_url || defaultBaseUrl.value,
+      base_url: defaultBaseUrl.value,
       api_key: apiKeyInput.value,
       model: settings.value.default_model || defaultModel.value,
     })
@@ -108,16 +120,35 @@ async function runTest() {
     testing.value = false
   }
 }
+
+async function clearKey() {
+  saving.value = true
+  error.value = null
+  testResult.value = null
+  try {
+    settings.value = await clearLlmApiKey()
+    apiKeyInput.value = ''
+    testResult.value = '短期 API Key 已从当前进程清除'
+  } catch {
+    error.value = '清除失败'
+  } finally {
+    saving.value = false
+  }
+}
 </script>
 
 <template>
   <section class="panel llm-settings-panel">
     <h2>AI 模型与 API 设置</h2>
     <p class="muted">
-      配置后将覆盖服务端 <code>.env</code> 默认项；API Key 仅存于本机用户偏好，不会提交到 git。
+      API Key 不写入数据库或 JSON，仅在当前服务进程内短期保存并绑定官方 HTTPS 端点；服务重启或到期后需重新输入。
     </p>
 
     <div v-if="loading" class="muted">加载中…</div>
+    <div v-else-if="!settings.available" class="llm-disabled-notice">
+      <strong>生产受控试点：第三方模型外发已关闭</strong>
+      <p>{{ settings.disabled_reason || '系统不会接收 API Key，材料与提示词保持在本部署内。' }}</p>
+    </div>
     <form v-else class="llm-settings-form" @submit.prevent="saveSettings">
       <label class="toggle-row">
         <input v-model="enabledToggle" type="checkbox" />
@@ -132,11 +163,11 @@ async function runTest() {
       </label>
 
       <label>
-        <strong>Base URL</strong>
+        <strong>已批准的官方 Base URL</strong>
         <input
-          v-model="settings.base_url"
+          :value="defaultBaseUrl"
           type="text"
-          :placeholder="defaultBaseUrl || 'https://...'"
+          readonly
         />
       </label>
 
@@ -148,21 +179,15 @@ async function runTest() {
       <label>
         <strong>API Key</strong>
         <input v-model="apiKeyInput" type="password" autocomplete="off" placeholder="sk-..." />
-        <span v-if="settings.has_api_key" class="muted">已保存：{{ settings.api_key_masked }}</span>
+        <span v-if="settings.has_api_key" class="muted">当前进程已配置：{{ settings.api_key_masked }}</span>
       </label>
 
       <details class="task-models-details">
         <summary>按任务选模型（高级，留空则用默认 model）</summary>
         <div class="task-models-grid">
-          <label v-for="(label, key) in {
-            extract: '材料抽取',
-            issue_id: '议题识别',
-            gap: '缺口说明',
-            red_team: 'Red Team',
-            polish: '简报润色',
-          }" :key="key">
-            {{ label }}
-            <input v-model="settings.task_models[key as keyof typeof settings.task_models]" type="text" />
+          <label v-for="field in taskModelFields" :key="field.key">
+            {{ field.label }}
+            <input v-model="settings.task_models[field.key]" type="text" />
           </label>
         </div>
       </details>
@@ -173,6 +198,15 @@ async function runTest() {
         </button>
         <button type="submit" class="btn primary" :disabled="saving">
           {{ saving ? '保存中…' : '保存设置' }}
+        </button>
+        <button
+          v-if="settings.has_api_key"
+          type="button"
+          class="btn secondary"
+          :disabled="saving"
+          @click="clearKey"
+        >
+          清除 API Key
         </button>
       </div>
 
@@ -191,6 +225,16 @@ async function runTest() {
   flex-direction: column;
   gap: 0.75rem;
   max-width: 520px;
+}
+.llm-disabled-notice {
+  max-width: 620px;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-muted, #f6f7f9);
+}
+.llm-disabled-notice p {
+  margin: 0.4rem 0 0;
 }
 .llm-settings-form label {
   display: flex;

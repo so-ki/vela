@@ -4,19 +4,19 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
+from sqlalchemy.orm import Session
+
 from app.core.config import get_settings
-from app.services.brazil_connector_service import connector_retrieve_for_sections
-from app.services.cold_start_service import profile_for_generation
 from app.services.grounding_verifier_service import verify_sections_grounding
 from app.services.legal_rag import retrieve_for_checklist
 from app.services.llm_client import llm_status
 from app.services.match_tier_service import classify_sections
-from app.services.project_hub_service import apply_profile_threshold
 from app.services.quality_reports_service import attach_quality_reports
-from app.services.user_preference_service import get_retrieval_preferences, resolve_retrieval_top_k
+from app.services.generation_guard import GenerationConfig, require_generation_config
 
 
 def run_investigation_agent(
+    db: Session,
     sections: list[dict[str, Any]],
     *,
     match_threshold: int = 70,
@@ -27,39 +27,34 @@ def run_investigation_agent(
     brief_input: Optional[dict[str, Any]] = None,
     state: Optional[str] = None,
     use_brazil_connector: bool = True,
+    generation_config: GenerationConfig | None = None,
 ) -> dict[str, Any]:
     """Orchestrate RAG + grounding + tier classification + verification passes."""
-    prefs = get_retrieval_preferences(user_id)
-    profile = profile_for_generation(user_id)
-    effective_threshold = apply_profile_threshold(
-        int(prefs.get("match_threshold") or match_threshold),
-        profile,
-    )
-    effective_top_k = resolve_retrieval_top_k(user_id, retrieval_top_k)
+    config = require_generation_config(db, generation_config)
+    if match_threshold != config.match_threshold or retrieval_top_k != config.retrieval_top_k:
+        raise ValueError("Agent 参数与冻结配置不一致")
+    effective_threshold = config.match_threshold
+    effective_top_k = config.retrieval_top_k
 
     if use_brazil_connector:
-        retrieval = connector_retrieve_for_sections(
-            sections,
-            state=state,
-            match_threshold=effective_threshold,
-            top_k=effective_top_k,
-        )
-    else:
-        retrieval = retrieve_for_checklist(
-            sections,
-            top_k=effective_top_k,
-            match_threshold=effective_threshold,
-            expansion_context=expansion_context,
-        )
+        raise ValueError("冻结生成当前仅允许可复现的本地语料检索")
+    retrieval = retrieve_for_checklist(
+        db,
+        sections,
+        top_k=effective_top_k,
+        match_threshold=effective_threshold,
+        expansion_context=expansion_context,
+        generation_config=config,
+    )
     enriched = retrieval["sections"]
 
-    grounding = verify_sections_grounding(enriched)
+    grounding = verify_sections_grounding(enriched, corpus_data=config.corpus_data)
     grounded_sections = grounding.get("sections") or enriched
     tiered = classify_sections(
         grounded_sections,
         base_threshold=effective_threshold,
         grounding_report=grounding,
-        user_threshold_adjustments=prefs.get("code_adjustments"),
+        user_threshold_adjustments=dict(config.code_adjustments),
     )
 
     payload: dict[str, Any] = {
@@ -77,7 +72,7 @@ def run_investigation_agent(
         "requested_threshold": match_threshold,
         "retrieval_top_k": effective_top_k,
         "requested_retrieval_top_k": retrieval_top_k,
-        "user_preferences_applied": bool(user_id and prefs.get("code_adjustments")),
+        "user_preferences_applied": False,
         "agent_steps": [
             {"step": "retrieve", "status": "ok", "connector": use_brazil_connector},
             {"step": "grounding", "status": "ok" if not grounding.get("requires_legal_check") else "review"},
@@ -95,12 +90,7 @@ def run_investigation_agent(
         payload.update(brief_input)
         payload = attach_quality_reports(payload, brief_input.get("brief"))
 
-    llm = llm_status()
-    payload["llm_config"] = {
-        **llm,
-        "polish_enabled": get_settings().llm_polish_enabled and llm.get("available"),
-        "polish_requested": polish,
-    }
+    payload["llm_config"] = {"policy": "disabled_by_snapshot", "polish_requested": False}
     return payload
 
 

@@ -14,9 +14,13 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
 
-from app.core.config import get_settings
 from app.models.scenario import InvestigationScenario
 from app.services.disclaimer import DISCLAIMER_FULL_TEXT
+from app.services.export_citation_service import (
+    add_external_hyperlink,
+    source_trace,
+    source_trace_lines,
+)
 from app.services.export_context import export_context, format_export_datetime, safe_export_filename
 from app.services.export_template_law_school import build_law_school_docx
 
@@ -38,19 +42,28 @@ def _pdf_escape(text: str) -> str:
     )
 
 
-def build_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
-    settings = get_settings()
-    if settings.export_template == "law_school":
-        return build_law_school_docx(scenario)
-    return build_legacy_docx(scenario)
+def build_docx(scenario: InvestigationScenario, *, generation_config: Any) -> tuple[bytes, str]:
+    template = str(generation_config.output_profile.get("export_template") or "")
+    if template == "law_school":
+        return build_law_school_docx(scenario, output_profile=generation_config.output_profile)
+    if template == "legacy":
+        return build_legacy_docx(scenario, output_profile=generation_config.output_profile)
+    raise ValueError("冻结 output profile 的导出模板无效")
 
 
-def build_sample_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
-    """Backward-compatible alias."""
-    return build_docx(scenario)
+def build_sample_docx(
+    scenario: InvestigationScenario, *, generation_config: Any = None
+) -> tuple[bytes, str]:
+    if scenario.is_demo:
+        raise ValueError("演示项目不得使用正式 Word 导出")
+    if generation_config is None:
+        raise ValueError("正式 Word 导出缺少冻结 Capability Pack 上下文")
+    return build_docx(scenario, generation_config=generation_config)
 
 
-def build_legacy_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
+def build_legacy_docx(
+    scenario: InvestigationScenario, *, output_profile: dict[str, Any] | None = None
+) -> tuple[bytes, str]:
     ctx = export_context(scenario)
     payload = ctx["payload"]
     brief = ctx["brief"]
@@ -116,6 +129,17 @@ def build_legacy_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
                     f"  · {hit.get('title_zh') or hit.get('title_pt')} "
                     f"(匹配度 {hit.get('match_score', 0)}，{hit.get('source_label', '')})"
                 )
+                for trace_line in source_trace_lines(hit):
+                    doc.add_paragraph(f"    {trace_line}")
+                link = doc.add_paragraph("    官方链接：")
+                trace = source_trace(hit)
+                add_external_hyperlink(
+                    link,
+                    url=trace["official_url"],
+                    label=trace["official_url"] or "—",
+                    font_name="PingFang SC",
+                    size_pt=11,
+                )
 
     if brief:
         doc.add_heading("四、中葡双语法律风险简报", level=1)
@@ -159,7 +183,8 @@ def build_legacy_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
             doc.add_paragraph(line, style="List Bullet")
 
     doc.add_heading("六、免责声明", level=1)
-    for para in DISCLAIMER_FULL_TEXT.split("\n\n"):
+    disclaimer = str((output_profile or {}).get("disclaimer") or DISCLAIMER_FULL_TEXT)
+    for para in disclaimer.split("\n\n"):
         doc.add_paragraph(para)
 
     buf = io.BytesIO()
@@ -168,7 +193,13 @@ def build_legacy_docx(scenario: InvestigationScenario) -> tuple[bytes, str]:
     return buf.getvalue(), filename
 
 
-def build_sample_pdf(scenario: InvestigationScenario) -> tuple[bytes, str]:
+def build_sample_pdf(
+    scenario: InvestigationScenario, *, generation_config: Any = None
+) -> tuple[bytes, str]:
+    if scenario.is_demo:
+        raise ValueError("演示项目不得使用正式 PDF 导出")
+    if generation_config is None:
+        raise ValueError("正式 PDF 导出缺少冻结 Capability Pack 上下文")
     ctx = export_context(scenario)
     payload = ctx["payload"]
     brief = ctx["brief"]
@@ -211,6 +242,10 @@ def build_sample_pdf(scenario: InvestigationScenario) -> tuple[bytes, str]:
                 f"(匹配度 {hit.get('match_score', 0)})"
             )
             story.append(Paragraph(_pdf_escape(line), body))
+            for trace_line in source_trace_lines(hit):
+                story.append(Paragraph(_pdf_escape(trace_line), body))
+            trace = source_trace(hit)
+            story.append(Paragraph(_pdf_escape(f"官方链接：{trace['official_url'] or '—'}"), body))
 
     if brief:
         story.append(Paragraph(_pdf_escape("四、双语简报摘要"), h2))
@@ -227,7 +262,8 @@ def build_sample_pdf(scenario: InvestigationScenario) -> tuple[bytes, str]:
         )
 
     story.append(Paragraph(_pdf_escape("六、免责声明"), h2))
-    for para in DISCLAIMER_FULL_TEXT.split("\n\n")[:4]:
+    disclaimer = str(generation_config.output_profile.get("disclaimer") or DISCLAIMER_FULL_TEXT)
+    for para in disclaimer.split("\n\n")[:4]:
         story.append(Paragraph(_pdf_escape(para), body))
 
     doc.build(story)

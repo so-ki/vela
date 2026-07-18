@@ -10,6 +10,8 @@ class ExtractedFact(BaseModel):
     value: str
     source_snippet: Optional[str] = None
     source_filename: Optional[str] = None
+    verification_status: Optional[str] = None
+    grounding_score: Optional[float] = None
 
 
 class FieldConflictSource(BaseModel):
@@ -27,6 +29,8 @@ class FieldConflict(BaseModel):
 class DocumentExtractResponse(BaseModel):
     filename: str
     mode: str = Field(description="rules | llm")
+    scan_or_empty: bool = False
+    extraction_warning: Optional[str] = None
     project_name: Optional[str] = None
     investment_destination: Optional[str] = None
     investment_structure: Optional[str] = None

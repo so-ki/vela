@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from jose import JWTError, jwt
+import jwt
 from passlib.context import CryptContext
 
 from app.core.config import get_settings
@@ -33,5 +33,5 @@ def decode_access_token(token: str) -> Optional[str]:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
         subject = payload.get("sub")
         return subject if isinstance(subject, str) else None
-    except JWTError:
+    except jwt.PyJWTError:
         return None

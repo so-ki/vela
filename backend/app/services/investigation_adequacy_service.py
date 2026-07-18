@@ -106,14 +106,21 @@ def aggregate_investigation_adequacy(
     scenario: InvestigationScenario,
     checklist_payload: dict[str, Any],
     compliance_dimensions: list[str],
+    *,
+    generation_config: Any = None,
 ) -> dict[str, Any]:
     """Build dimension-level adequacy view from generated brief + material pre-scan."""
     pack_id = scenario.rules_pack_id
-    rules = load_rules_pack(pack_id)
+    rules = generation_config.rules_data if generation_config is not None else load_rules_pack(pack_id)
     dim_meta = rules.get("dimensions") or {}
     dim_elements_cfg = rules.get("dimension_elements") or {}
 
-    material_preview = assess_gate_a_preview(scenario, compliance_dimensions)
+    material_preview = assess_gate_a_preview(
+        scenario,
+        compliance_dimensions,
+        rules_data=rules if generation_config is not None else None,
+        corpus_data=generation_config.corpus_data if generation_config is not None else None,
+    )
     mat_blocks = _material_block_by_dimension(material_preview)
     brief_by_code = _brief_items_by_code(checklist_payload)
 

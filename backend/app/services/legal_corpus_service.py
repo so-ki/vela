@@ -1,16 +1,31 @@
 from __future__ import annotations
 
-import json
 import re
 from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import HTTPException, status
 
-from app.services.legal_ingest import CORPUS_PATH, ingest_corpus, load_corpus
+from app.services.legal_ingest import CORPUS_PATH, corpus_review_status, ingest_corpus, load_corpus
 from app.services.rules_registry import load_rules
 
-VALID_SOURCES = {"lexml", "stf", "stj", "jusbrasil"}
+VALID_SOURCES = {
+    "alesp",
+    "apexbrasil",
+    "campinas",
+    "gov-br",
+    "ibama",
+    "investsp",
+    "jusbrasil",
+    "lexml",
+    "planalto-legislacao",
+    "previdencia",
+    "receita-federal",
+    "sefaz-sp",
+    "stf",
+    "stj",
+    "trabalho",
+}
 VALID_LEVELS = {"federal", "state", "municipal", "case_law"}
 VALID_DIMENSIONS = {
     "labor",
@@ -22,10 +37,18 @@ VALID_DIMENSIONS = {
 }
 
 
+def _reject_active_mutation() -> None:
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail=(
+            "当前能力包语料是内容寻址的只读发布制品；请提交候选变更并经复核后发布新版本，"
+            "禁止原地改写 active corpus"
+        ),
+    )
+
+
 def _save_corpus(corpus: dict[str, Any]) -> None:
-    with open(CORPUS_PATH, "w", encoding="utf-8") as f:
-        json.dump(corpus, f, ensure_ascii=False, indent=2)
-        f.write("\n")
+    _reject_active_mutation()
 
 
 def _bump_version(version: str) -> str:
@@ -122,6 +145,8 @@ def get_corpus_meta() -> dict[str, Any]:
 
     return {
         "version": corpus.get("version", "1.0"),
+        "content_status": corpus.get("content_status", "undeclared"),
+        "quality_notice": corpus.get("quality_notice"),
         "jurisdiction": corpus.get("jurisdiction", "brazil"),
         "document_count": len(corpus.get("sources", [])),
         "sources": sorted(VALID_SOURCES),
@@ -138,7 +163,15 @@ def list_corpus_sources(
     source: Optional[str] = None,
 ) -> dict[str, Any]:
     corpus = load_corpus()
-    items = list(corpus.get("sources", []))
+    items = [
+        {
+            **item,
+            "review_status": corpus_review_status(corpus, item),
+            "verification_scope": item.get("verification_scope")
+            or "法源条目尚待巴西法务逐项确认",
+        }
+        for item in corpus.get("sources", [])
+    ]
 
     if dimension:
         items = [i for i in items if i.get("dimension") == dimension]
@@ -166,11 +199,17 @@ def get_corpus_source(doc_id: str) -> dict[str, Any]:
     corpus = load_corpus()
     for item in corpus.get("sources", []):
         if item.get("id") == doc_id:
-            return item
+            return {
+                **item,
+                "review_status": corpus_review_status(corpus, item),
+                "verification_scope": item.get("verification_scope")
+                or "法源条目尚待巴西法务逐项确认",
+            }
     raise HTTPException(status_code=404, detail="法源条目不存在")
 
 
 def create_corpus_source(payload: dict[str, Any]) -> dict[str, Any]:
+    _reject_active_mutation()
     corpus = load_corpus()
     sources: list[dict[str, Any]] = list(corpus.get("sources", []))
     existing_ids = {s["id"] for s in sources}
@@ -194,6 +233,7 @@ def create_corpus_source(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 def update_corpus_source(doc_id: str, payload: dict[str, Any]) -> dict[str, Any]:
+    _reject_active_mutation()
     corpus = load_corpus()
     sources: list[dict[str, Any]] = list(corpus.get("sources", []))
     existing_ids = {s["id"] for s in sources}
@@ -213,6 +253,7 @@ def update_corpus_source(doc_id: str, payload: dict[str, Any]) -> dict[str, Any]
 
 
 def delete_corpus_source(doc_id: str) -> dict[str, Any]:
+    _reject_active_mutation()
     corpus = load_corpus()
     sources: list[dict[str, Any]] = list(corpus.get("sources", []))
     new_sources = [s for s in sources if s.get("id") != doc_id]

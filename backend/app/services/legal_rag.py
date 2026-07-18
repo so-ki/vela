@@ -1,15 +1,24 @@
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from typing import Any
+
+from sqlalchemy.orm import Session
 
 from app.core.chroma_client import _chroma_available
 from app.services.corpus_text_cleaner import excerpt_for_display, text_for_retrieval
-from app.services.legal_ingest import load_corpus
+from app.services.legal_ingest import corpus_review_status, load_corpus, retrievable_corpus_sources
 
 SOURCE_LABELS = {
     "lexml": "LexML Brasil",
     "planalto-legislacao": "Planalto 立法",
+    "alesp": "圣保罗州议会官方立法库",
+    "apexbrasil": "ApexBrasil 官方门户",
+    "gov-br": "Gov.br 官方门户",
+    "investsp": "InvestSP 官方门户",
+    "sefaz-sp": "圣保罗州财政与规划厅官方门户",
+    "campinas": "坎皮纳斯市政府官方门户",
     "stf": "STF 最高法院",
     "stj": "STJ 高等司法法院",
     "trabalho": "劳动与就业部 gov.br",
@@ -20,9 +29,89 @@ SOURCE_LABELS = {
 }
 
 
+def _retrieval_disclaimer(
+    sections: list[dict[str, Any]], *, match_threshold: int
+) -> str:
+    """Describe only sources actually returned by this frozen retrieval result."""
+    source_labels: list[str] = []
+    seen: set[tuple[str, str]] = set()
+    for section in sections:
+        for item in section.get("items") or []:
+            for hit in item.get("legal_hits") or []:
+                source_id = str(hit.get("source") or "").strip()
+                source_label = str(hit.get("source_label") or source_id).strip()
+                if not source_label:
+                    continue
+                identity = (source_id, source_label)
+                if identity in seen:
+                    continue
+                seen.add(identity)
+                source_labels.append(source_label)
+
+    if source_labels:
+        source_text = f"本次冻结检索实际返回的法源（{'、'.join(source_labels)}）"
+    else:
+        source_text = "本次冻结检索未命中可列示法源；未命中不代表不存在相关法律要求"
+    return (
+        f"以下结果基于{source_text}，仅供协查参考，不构成正式法律意见。"
+        f"匹配度低于 {match_threshold} 分的条目须标注「需法务复核」。"
+    )
+
+# Generic function words and citation boilerplate are not legal subject matter.
+# Without this filter, a shared token such as ``lei`` can turn the dimension's
+# 20-point prior into a false candidate (20 + 8 >= the 25-point floor).
+_RETRIEVAL_STOPWORDS = {
+    "a",
+    "as",
+    "art",
+    "article",
+    "articles",
+    "artigo",
+    "artigos",
+    "arts",
+    "com",
+    "da",
+    "das",
+    "de",
+    "do",
+    "dos",
+    "e",
+    "em",
+    "for",
+    "in",
+    "law",
+    "laws",
+    "lei",
+    "leis",
+    "na",
+    "nas",
+    "no",
+    "nos",
+    "nº",
+    "n°",
+    "número",
+    "numero",
+    "o",
+    "of",
+    "on",
+    "os",
+    "para",
+    "por",
+    "que",
+    "sem",
+    "the",
+    "to",
+    "um",
+    "uma",
+    "with",
+    "without",
+    "and",
+}
+
+
 def _tokenize(text: str) -> set[str]:
     parts = re.split(r"[\s,、/\.]+", text.lower())
-    return {p for p in parts if len(p) >= 2}
+    return {p for p in parts if len(p) >= 2 and p not in _RETRIEVAL_STOPWORDS}
 
 
 def _score_doc(
@@ -45,10 +134,17 @@ def _score_doc(
     return score
 
 
-def _format_hit(doc: dict[str, Any], match_score: float, item_code: str, *, match_threshold: int = 70) -> dict[str, Any]:
+def _format_hit(
+    doc: dict[str, Any],
+    match_score: float,
+    item_code: str,
+    *,
+    match_threshold: int = 70,
+    review_status: str = "pending",
+) -> dict[str, Any]:
     source = doc.get("source", "lexml")
     excerpt_pt, excerpt_zh = excerpt_for_display(doc)
-    requires_review = match_score < match_threshold
+    requires_review = match_score < match_threshold or review_status != "expert_verified"
     return {
         "id": doc["id"],
         "source": source,
@@ -66,6 +162,19 @@ def _format_hit(doc: dict[str, Any], match_score: float, item_code: str, *, matc
         "vector_similarity": 0.0,
         "keyword_overlap": round(match_score / 100, 3),
         "requires_review": requires_review,
+        "review_status": review_status,
+        "verification_scope": doc.get("verification_scope")
+        or (
+            "expert-reviewed source metadata"
+            if review_status == "expert_verified"
+            else "provisional corpus entry"
+        ),
+        "authority": doc.get("authority", ""),
+        "instrument_type": doc.get("instrument_type", ""),
+        "pinpoint": doc.get("pinpoint", ""),
+        "status_as_of": doc.get("status_as_of", ""),
+        "last_verified_at": doc.get("last_verified_at", ""),
+        "official_url": doc.get("official_url") or doc.get("url", ""),
     }
 
 
@@ -78,18 +187,52 @@ def _retrieve_keyword(
     top_k: int,
     match_threshold: int = 70,
     min_keyword_score: float = 25.0,
+    corpus_path: Path | str | None = None,
 ) -> list[dict[str, Any]]:
-    corpus = load_corpus()
+    corpus = load_corpus(corpus_path)
     query_tokens = _tokenize(f"{title} {description} {dimension} {item_code}")
     scored: list[tuple[float, dict[str, Any]]] = []
-    for doc in corpus["sources"]:
+    for doc in retrievable_corpus_sources(corpus):
         if doc.get("validity") in ("revogado", "repealed", "revoked"):
             continue
         s = _score_doc(doc, item_code=item_code, dimension=dimension, query_tokens=query_tokens)
         if s >= min_keyword_score:
             scored.append((s, doc))
     scored.sort(key=lambda x: x[0], reverse=True)
-    return [_format_hit(doc, score, item_code, match_threshold=match_threshold) for score, doc in scored[:top_k]]
+    return [
+        _format_hit(
+            doc,
+            score,
+            item_code,
+            match_threshold=match_threshold,
+            review_status=corpus_review_status(corpus, doc),
+        )
+        for score, doc in scored[:top_k]
+    ]
+
+
+def query_corpus_readonly(
+    *,
+    item_code: str,
+    dimension: str,
+    title: str,
+    description: str,
+    top_k: int,
+    match_threshold: int = 70,
+    min_keyword_score: float = 25.0,
+) -> list[dict[str, Any]]:
+    """Standalone connector lookup; it cannot write a formal investigation result."""
+    if top_k < 0 or top_k > 20:
+        raise ValueError("只读检索 top-k 超出范围")
+    return _retrieve_keyword(
+        item_code=item_code,
+        dimension=dimension,
+        title=title,
+        description=description,
+        top_k=top_k,
+        match_threshold=match_threshold,
+        min_keyword_score=min_keyword_score,
+    )
 
 
 def _retrieve_chroma(
@@ -100,11 +243,12 @@ def _retrieve_chroma(
     description: str,
     top_k: int,
     match_threshold: int = 70,
+    corpus_path: Path | str | None = None,
 ) -> list[dict[str, Any]]:
     from app.core.chroma_client import get_legal_collection
 
-    corpus = load_corpus()
-    by_id = {d["id"]: d for d in corpus["sources"]}
+    corpus = load_corpus(corpus_path)
+    by_id = {d["id"]: d for d in retrievable_corpus_sources(corpus)}
     query_text = f"{title} {description} {dimension}"
     collection = get_legal_collection()
     if collection.count() == 0:
@@ -133,10 +277,20 @@ def _retrieve_chroma(
         base = max(0.0, (1.0 - distance) * 60)
         boost = 35.0 if item_code in codes else 0.0
         full = by_id.get(doc_id, {})
+        if not full:
+            # A stale vector index may still contain a now-quarantined id.
+            # Missing active metadata is therefore fail-closed, never a hit.
+            continue
         if full.get("validity") in ("revogado", "repealed", "revoked"):
             continue
         hits.append(
-            _format_hit(full or {"id": doc_id, **meta}, base + boost, item_code, match_threshold=match_threshold)
+            _format_hit(
+                full,
+                base + boost,
+                item_code,
+                match_threshold=match_threshold,
+                review_status=corpus_review_status(corpus, full),
+            )
         )
 
     hits.sort(key=lambda h: h["match_score"], reverse=True)
@@ -144,6 +298,7 @@ def _retrieve_chroma(
 
 
 def retrieve_for_checklist_item(
+    db: Session,
     *,
     item_code: str,
     dimension: str,
@@ -152,7 +307,20 @@ def retrieve_for_checklist_item(
     top_k: int = 3,
     match_threshold: int = 70,
     min_keyword_score: float = 25.0,
+    expansion_pass: bool = False,
+    generation_config: Any = None,
 ) -> list[dict[str, Any]]:
+    from app.services.generation_guard import require_generation_config
+
+    config = require_generation_config(db, generation_config)
+    expected_top_k = config.expansion_candidate_top_k if expansion_pass else config.retrieval_top_k
+    expected_min_score = config.expansion_min_keyword_score if expansion_pass else 25.0
+    if (
+        match_threshold != config.match_threshold
+        or top_k != expected_top_k
+        or min_keyword_score != expected_min_score
+    ):
+        raise ValueError("RAG 参数与冻结配置不一致")
     hits = _retrieve_keyword(
         item_code=item_code,
         dimension=dimension,
@@ -161,6 +329,7 @@ def retrieve_for_checklist_item(
         top_k=top_k,
         match_threshold=match_threshold,
         min_keyword_score=min_keyword_score,
+        corpus_path=config.corpus_artifact_path,
     )
 
     if _chroma_available and len(hits) < top_k:
@@ -172,6 +341,7 @@ def retrieve_for_checklist_item(
                 description=description,
                 top_k=top_k,
                 match_threshold=match_threshold,
+                corpus_path=config.corpus_artifact_path,
             )
             seen = {h["id"] for h in hits}
             for h in chroma_hits:
@@ -186,6 +356,7 @@ def retrieve_for_checklist_item(
 
 
 def retrieve_for_checklist_incremental(
+    db: Session,
     new_sections: list[dict[str, Any]],
     previous_sections_with_legal: list[dict[str, Any]],
     *,
@@ -193,7 +364,13 @@ def retrieve_for_checklist_incremental(
     top_k: int = 3,
     match_threshold: int = 70,
     expansion_context: str = "",
+    generation_config: Any = None,
 ) -> dict[str, Any]:
+    from app.services.generation_guard import require_generation_config
+
+    config = require_generation_config(db, generation_config)
+    if top_k != config.retrieval_top_k or match_threshold != config.match_threshold:
+        raise ValueError("增量 RAG 参数与冻结配置不一致")
     from app.services.retrieval_expansion import retrieve_item_with_expansion
 
     prev_by_code: dict[str, dict[str, Any]] = {}
@@ -215,7 +392,7 @@ def retrieve_for_checklist_incremental(
             code = item["code"]
             if code not in codes_to_refresh and code in prev_by_code:
                 prev_item = prev_by_code[code]
-                hits = list(prev_item.get("legal_hits") or [])
+                hits = list(prev_item.get("legal_hits") or [])[: config.retrieval_top_k]
                 carried += 1
                 items_out.append(
                     {
@@ -230,6 +407,7 @@ def retrieve_for_checklist_incremental(
                     zero_hit_items.append(code)
             else:
                 hits, rmeta = retrieve_item_with_expansion(
+                    db=db,
                     item_code=code,
                     dimension=section["dimension_id"],
                     title=item["title"],
@@ -237,6 +415,7 @@ def retrieve_for_checklist_incremental(
                     match_threshold=match_threshold,
                     expansion_context=expansion_context,
                     top_k=top_k,
+                    generation_config=config,
                 )
                 status = "ok" if hits else "no_match"
                 if rmeta.get("expanded") and rmeta.get("best_score", 0) < match_threshold:
@@ -261,20 +440,26 @@ def retrieve_for_checklist_incremental(
         "total_hits": total_hits,
         "zero_hit_items": zero_hit_items,
         "incremental_stats": {"refreshed": refreshed, "carried": carried},
-        "disclaimer": (
-            "以下法条片段来自 LexML / STF / STJ 开放法源索引，仅供协查参考，不构成正式法律意见。"
-            f"匹配度低于 {match_threshold} 分的条目须标注「需法务复核」。"
+        "disclaimer": _retrieval_disclaimer(
+            enriched_sections, match_threshold=match_threshold
         ),
     }
 
 
 def retrieve_for_checklist(
+    db: Session,
     sections: list[dict[str, Any]],
     top_k: int = 3,
     *,
     match_threshold: int = 70,
     expansion_context: str = "",
+    generation_config: Any = None,
 ) -> dict[str, Any]:
+    from app.services.generation_guard import require_generation_config
+
+    config = require_generation_config(db, generation_config)
+    if top_k != config.retrieval_top_k or match_threshold != config.match_threshold:
+        raise ValueError("RAG 参数与冻结配置不一致")
     from app.services.retrieval_expansion import retrieve_item_with_expansion
 
     enriched_sections: list[dict[str, Any]] = []
@@ -286,6 +471,7 @@ def retrieve_for_checklist(
         items_out: list[dict[str, Any]] = []
         for item in section.get("items", []):
             hits, rmeta = retrieve_item_with_expansion(
+                db=db,
                 item_code=item["code"],
                 dimension=section["dimension_id"],
                 title=item["title"],
@@ -293,6 +479,7 @@ def retrieve_for_checklist(
                 match_threshold=match_threshold,
                 expansion_context=expansion_context,
                 top_k=top_k,
+                generation_config=config,
             )
             if rmeta.get("expanded"):
                 expanded_count += 1
@@ -319,10 +506,9 @@ def retrieve_for_checklist(
         "retrieval_meta": {
             "match_threshold": match_threshold,
             "expanded_item_count": expanded_count,
-            "expansion_enabled": bool(expansion_context.strip()),
+            "expansion_enabled": config.expansion_enabled,
         },
-        "disclaimer": (
-            "以下法条片段来自 LexML / STF / STJ 开放法源索引，仅供协查参考，不构成正式法律意见。"
-            f"匹配度低于 {match_threshold} 分的条目须标注「需法务复核」。"
+        "disclaimer": _retrieval_disclaimer(
+            enriched_sections, match_threshold=match_threshold
         ),
     }

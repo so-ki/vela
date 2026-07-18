@@ -1,6 +1,6 @@
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -24,8 +24,15 @@ class LlmStatusResponse(BaseModel):
 
 
 @router.get("/health", response_model=HealthResponse)
-def health():
+def health(db: Session = Depends(get_db)):
     settings = get_settings()
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="service unavailable",
+        ) from exc
     return HealthResponse(
         status="ok",
         app=settings.app_name,
@@ -39,15 +46,15 @@ def system_status(db: Session = Depends(get_db), _: User = Depends(get_current_u
     try:
         db.execute(text("SELECT 1"))
         db_status = "ok"
-    except Exception as exc:
-        db_status = f"error: {exc}"
+    except Exception:
+        db_status = "unavailable"
 
     return SystemStatusResponse(database=db_status, chroma=chroma_health())
 
 
 @router.get("/llm/status", response_model=LlmStatusResponse)
-def llm_service_status(_: User = Depends(get_current_user)):
-    return LlmStatusResponse(**llm_status())
+def llm_service_status(current_user: User = Depends(get_current_user)):
+    return LlmStatusResponse(**llm_status(current_user.id))
 
 
 class ExportConfigResponse(BaseModel):
@@ -57,7 +64,7 @@ class ExportConfigResponse(BaseModel):
 
 
 @router.get("/export/config", response_model=ExportConfigResponse)
-def export_config():
+def export_config(_: User = Depends(get_current_user)):
     settings = get_settings()
     label = "法律研究意见书" if settings.export_template == "law_school" else "协查底稿"
     return ExportConfigResponse(

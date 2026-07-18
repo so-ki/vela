@@ -7,7 +7,7 @@ import copy
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy.orm.attributes import flag_modified
+from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
@@ -28,6 +28,11 @@ from app.services.project_hub_service import (
     project_context as build_project_context,
 )
 from app.services.project_intelligence_service import run_project_intelligence
+from app.services.upload_security import read_upload_limited
+from app.services.checklist_payload_service import (
+    ChecklistRevisionConflict,
+    commit_checklist_payload,
+)
 
 router = APIRouter(prefix="/projects", tags=["项目中心"])
 
@@ -42,7 +47,10 @@ def _load_scenario(db: Session, project_id: int, user: User) -> InvestigationSce
     scenario = (
         db.query(InvestigationScenario)
         .options(joinedload(InvestigationScenario.checklist))
-        .filter(InvestigationScenario.id == project_id)
+        .filter(
+            InvestigationScenario.id == project_id,
+            InvestigationScenario.is_demo.is_(False),
+        )
         .first()
     )
     if not scenario or not scenario.checklist:
@@ -53,9 +61,10 @@ def _load_scenario(db: Session, project_id: int, user: User) -> InvestigationSce
 
 
 def _save_payload(db: Session, scenario: InvestigationScenario, payload: dict) -> None:
-    scenario.checklist.payload = copy.deepcopy(payload)
-    flag_modified(scenario.checklist, "payload")
-    db.commit()
+    try:
+        commit_checklist_payload(db, scenario, payload)
+    except ChecklistRevisionConflict as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
 
 
 @router.get("/{project_id}/hub", response_model=ProjectHubResponse)
@@ -65,8 +74,9 @@ def get_project_hub(
     current_user: User = Depends(get_current_user),
 ):
     scenario = _load_scenario(db, project_id, current_user)
-    payload = ensure_project_hub(scenario.checklist.payload)
-    _save_payload(db, scenario, payload)
+    # Summary construction fills missing legacy hub defaults in memory only.
+    # A GET must never replace the shared checklist JSON document.
+    payload = ensure_project_hub(copy.deepcopy(scenario.checklist.payload))
     summary = hub_summary(payload, scenario)
     return ProjectHubResponse(**summary)
 
@@ -78,7 +88,7 @@ def get_project_context_api(
     current_user: User = Depends(get_current_user),
 ):
     scenario = _load_scenario(db, project_id, current_user)
-    payload = ensure_project_hub(scenario.checklist.payload)
+    payload = ensure_project_hub(copy.deepcopy(scenario.checklist.payload))
     return build_project_context(payload, scenario)
 
 
@@ -91,9 +101,13 @@ async def upload_contract(
     current_user: User = Depends(get_current_user),
 ):
     scenario = _load_scenario(db, project_id, current_user)
-    content = await file.read()
+    try:
+        content = await read_upload_limited(file)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     payload = ensure_project_hub(scenario.checklist.payload)
-    doc = upload_contract_document(
+    doc = await run_in_threadpool(
+        upload_contract_document,
         payload,
         filename=file.filename or "contract.pdf",
         content=content,
@@ -121,7 +135,15 @@ def analyze_project_contract(
     scenario = _load_scenario(db, project_id, current_user)
     payload = scenario.checklist.payload
     try:
-        result = analyze_contract(payload, scenario, doc_id=doc_id, user_id=current_user.id)
+        result = analyze_contract(
+            payload,
+            scenario,
+            doc_id=doc_id,
+            user_id=current_user.id,
+            owner_email=current_user.email,
+            owner_auth_provider=current_user.auth_provider,
+            owner_external_subject=current_user.external_subject,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     _save_payload(db, scenario, payload)
@@ -194,9 +216,13 @@ async def upload_diligence_doc(
     current_user: User = Depends(get_current_user),
 ):
     scenario = _load_scenario(db, project_id, current_user)
-    content = await file.read()
+    try:
+        content = await read_upload_limited(file)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     payload = ensure_project_hub(scenario.checklist.payload)
-    doc = upload_diligence_document(
+    doc = await run_in_threadpool(
+        upload_diligence_document,
         payload,
         filename=file.filename or "dd_doc.pdf",
         content=content,

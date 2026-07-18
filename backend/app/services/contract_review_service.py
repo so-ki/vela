@@ -17,6 +17,7 @@ from app.services.contract_house_rules_service import (
 from app.services.document_extractor import read_upload_text
 from app.services.project_hub_service import link_contract_to_investigation, project_context
 from app.services.user_preference_service import record_contract_finding_decision
+from app.services.upload_security import enforce_project_document_quota
 
 
 def _utcnow_iso() -> str:
@@ -230,6 +231,7 @@ def upload_contract_document(
     ensure_project_hub(payload)
     doc_id = uuid.uuid4().hex[:16]
     text = read_upload_text(filename, content)
+    enforce_project_document_quota(payload, text)
     doc = {
         "id": doc_id,
         "filename": filename,
@@ -252,6 +254,9 @@ def analyze_contract(
     *,
     doc_id: str,
     user_id: Optional[int] = None,
+    owner_email: Optional[str] = None,
+    owner_auth_provider: Optional[str] = None,
+    owner_external_subject: Optional[str] = None,
 ) -> dict[str, Any]:
     from app.services.project_hub_service import ensure_project_hub
 
@@ -264,7 +269,12 @@ def analyze_contract(
             raise ValueError(f"合同文档不存在: {doc_id}")
         raise ValueError("合同正文未缓存，请重新上传")
 
-    profile = profile_for_generation(user_id)
+    profile = profile_for_generation(
+        user_id,
+        owner_email=owner_email,
+        owner_auth_provider=owner_auth_provider,
+        owner_external_subject=owner_external_subject,
+    )
     house_rules = merge_profile_house_rules(
         load_structured_house_rules(),
         profile.get("contract_house_rules") or "",

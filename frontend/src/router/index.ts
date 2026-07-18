@@ -37,7 +37,7 @@ const router = createRouter({
           path: 'onboarding',
           name: 'cold-start',
           component: () => import('@/views/ColdStartView.vue'),
-          meta: { requiresDisclaimer: true },
+          meta: { requiresDisclaimer: true, legalOnly: true },
         },
         {
           path: 'projects/:id',
@@ -80,6 +80,18 @@ const router = createRouter({
           name: 'checklist',
           component: () => import('@/views/ChecklistView.vue'),
           meta: { requiresDisclaimer: true, businessReadOnly: true },
+        },
+        {
+          path: 'scenarios/:id/mechanism',
+          name: 'mechanism',
+          component: () => import('@/views/MechanismView.vue'),
+          meta: { requiresDisclaimer: true, mechanismAccess: true },
+        },
+        {
+          path: 'scenarios/:id/delivery-assurance',
+          name: 'delivery-assurance',
+          component: () => import('@/views/DeliveryAssuranceView.vue'),
+          meta: { requiresDisclaimer: true },
         },
         {
           path: 'scenarios/:id/brief',

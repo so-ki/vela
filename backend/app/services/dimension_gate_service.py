@@ -6,7 +6,12 @@ import re
 from typing import Any, Optional
 
 from app.models.scenario import InvestigationScenario
-from app.services.legal_ingest import load_corpus
+from app.services.corpus_text_cleaner import excerpt_for_display
+from app.services.legal_ingest import (
+    corpus_review_status,
+    load_corpus,
+    retrievable_corpus_sources,
+)
 from app.services.legal_rag import SOURCE_LABELS
 from app.services.material_review_service import (
     _field_value_from_scenario,
@@ -14,7 +19,7 @@ from app.services.material_review_service import (
     _serialize_field_value,
     is_material_field_empty,
 )
-from app.services.rule_engine import get_material_field_labels
+from app.services.rule_engine import get_material_field_labels, get_material_field_labels_from_rules
 from app.services.rules_registry import load_rules as load_rules_pack
 
 
@@ -144,8 +149,9 @@ def _law_preview_for_dimension(
     elements: list[dict[str, Any]],
     *,
     top_k: int = 3,
+    corpus_data: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
-    corpus_data = load_corpus()
+    corpus_data = corpus_data if corpus_data is not None else load_corpus()
     codes: set[str] = set()
     query_parts: list[str] = [dimension_id]
     for el in elements:
@@ -157,8 +163,10 @@ def _law_preview_for_dimension(
     query_tokens = {t for t in query_tokens if len(t) >= 2}
 
     scored: list[tuple[float, dict[str, Any]]] = []
-    for doc in corpus_data.get("sources", []):
+    for doc in retrievable_corpus_sources(corpus_data):
         if doc.get("dimension") != dimension_id:
+            continue
+        if doc.get("validity") in {"revogado", "repealed", "revoked"}:
             continue
         score = 15.0
         doc_codes = set(doc.get("checklist_codes") or [])
@@ -176,6 +184,8 @@ def _law_preview_for_dimension(
     hits: list[dict[str, Any]] = []
     for score, doc in scored[:top_k]:
         source = doc.get("source", "lexml")
+        review_status = corpus_review_status(corpus_data, doc)
+        _, excerpt_zh = excerpt_for_display(doc)
         hits.append(
             {
                 "id": doc["id"],
@@ -183,8 +193,15 @@ def _law_preview_for_dimension(
                 "title_pt": doc.get("title_pt", ""),
                 "source_label": SOURCE_LABELS.get(source, source),
                 "url": doc.get("url", ""),
-                "excerpt_zh": (doc.get("text_zh") or "")[:200],
+                "excerpt_zh": excerpt_zh[:200],
                 "preview_score": round(min(100.0, score), 1),
+                "review_status": review_status,
+                "requires_review": review_status != "expert_verified",
+                "verification_scope": (
+                    "expert-reviewed source metadata"
+                    if review_status == "expert_verified"
+                    else "provisional corpus entry"
+                ),
             }
         )
     return hits
@@ -193,12 +210,15 @@ def _law_preview_for_dimension(
 def assess_gate_a_preview(
     scenario: InvestigationScenario,
     compliance_dimensions: list[str],
+    *,
+    rules_data: dict[str, Any] | None = None,
+    corpus_data: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     if not compliance_dimensions:
         raise ValueError("请至少选择一个合规审查维度")
 
     pack_id = _scenario_pack_id(scenario)
-    rules = load_rules_pack(pack_id)
+    rules = rules_data if rules_data is not None else load_rules_pack(pack_id)
     dim_elements_cfg = rules.get("dimension_elements") or {}
     dim_meta = rules.get("dimensions") or {}
     field_defs = {item["key"]: item for item in rules.get("material_fields", []) if item.get("key")}
@@ -247,7 +267,9 @@ def assess_gate_a_preview(
                 "dimension_name_pt": meta.get("name_pt", ""),
                 "is_complete": filled_required >= required_count if required_count else True,
                 "elements": evaluated,
-                "law_preview": _law_preview_for_dimension(dim_id, evaluated),
+                "law_preview": _law_preview_for_dimension(
+                    dim_id, evaluated, corpus_data=corpus_data
+                ),
             }
         )
 
@@ -257,7 +279,11 @@ def assess_gate_a_preview(
         for el in dim_elements_cfg.get(dim_id) or []
     }
 
-    field_labels = get_material_field_labels(pack_id)
+    field_labels = (
+        get_material_field_labels_from_rules(rules)
+        if rules_data is not None
+        else get_material_field_labels(pack_id)
+    )
     required_fields = sorted(
         {
             fk

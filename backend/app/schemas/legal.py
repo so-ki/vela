@@ -22,6 +22,12 @@ class LegalHitResponse(BaseModel):
     vector_similarity: float
     keyword_overlap: float
     requires_review: bool
+    review_status: str = "pending"
+    verification_scope: str = "provisional corpus entry"
+    grounding_score: float = 0.0
+    citation_status: str = "ungrounded"
+    grounded: bool = False
+    grounding_note: Optional[str] = None
 
 
 class ChecklistItemWithLegalResponse(BaseModel):
@@ -72,8 +78,8 @@ class LegalStatusResponse(BaseModel):
     sources: dict[str, str] = Field(
         default_factory=lambda: {
             "lexml": "https://www.lexml.gov.br/",
-            "planalto": "http://www4.planalto.gov.br/legislacao/",
-            "stf": "http://www.stf.jus.br/",
+            "planalto": "https://www4.planalto.gov.br/legislacao/",
+            "stf": "https://portal.stf.jus.br/",
             "stj": "https://scon.stj.jus.br/SCON/",
             "trabalho": "https://www.gov.br/trabalho-e-emprego/pt-br",
             "previdencia": "https://www.gov.br/previdencia/pt-br",
@@ -152,6 +158,9 @@ class LegalCorpusDocument(BaseModel):
     checklist_codes: List[str] = Field(default_factory=list)
     text_pt: str
     text_zh: str
+    review_status: str = "pending"
+    verification_scope: str = "法源条目尚待巴西法务逐项确认"
+    quarantine_reason: Optional[str] = None
 
 
 class LegalCorpusDocumentCreate(BaseModel):
@@ -218,6 +227,8 @@ class LegalCorpusMetaChecklistCode(BaseModel):
 
 class LegalCorpusMetaResponse(BaseModel):
     version: str
+    content_status: str = "undeclared"
+    quality_notice: Optional[str] = None
     jurisdiction: str
     document_count: int
     sources: List[str]

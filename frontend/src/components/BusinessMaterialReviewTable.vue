@@ -31,6 +31,8 @@ export type ReviewFact = {
   value: string
   source_snippet?: string | null
   source_filename?: string | null
+  verification_status?: 'verified' | 'unverified' | 'weak_grounding'
+  grounding_score?: number
 }
 
 const props = withDefaults(

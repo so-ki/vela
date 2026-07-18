@@ -1,5 +1,43 @@
 [
   {
+    "source_id": "anpd-noticias",
+    "title": "ANPD 数据保护动态",
+    "url": "https://www.gov.br/anpd/pt-br/assuntos/noticias",
+    "summary": "源站不可达：[Errno 8] nodename nor servname provided, or not known",
+    "affected_checklist_codes": [
+      "DAT-001",
+      "DAT-002",
+      "DAT-003"
+    ],
+    "reason": "reg_feed_scan",
+    "status": "pending_review",
+    "queued_at": "2026-06-20T13:05:36.193826+00:00"
+  },
+  {
+    "source_id": "camex-resolucoes",
+    "title": "CAMEX / GECEX 外贸决议",
+    "url": "https://www.gov.br/mdic/pt-br/assuntos/camex/resolucoes",
+    "summary": "源站不可达：The read operation timed out",
+    "affected_checklist_codes": [
+      "TAX-004"
+    ],
+    "reason": "reg_feed_scan",
+    "status": "pending_review",
+    "queued_at": "2026-06-11T00:49:31.627453+00:00"
+  },
+  {
+    "source_id": "previdencia-govbr",
+    "title": "社会保障部 gov.br",
+    "url": "https://www.gov.br/previdencia/pt-br",
+    "summary": "源站不可达：[Errno 54] Connection reset by peer",
+    "affected_checklist_codes": [
+      "LAB-004"
+    ],
+    "reason": "reg_feed_scan",
+    "status": "pending_review",
+    "queued_at": "2026-06-11T00:49:31.627424+00:00"
+  },
+  {
     "source_id": "ibama-noticias",
     "title": "IBAMA 环保法规与新闻",
     "url": "https://www.gov.br/ibama/pt-br/assuntos/noticias",

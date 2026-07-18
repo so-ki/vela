@@ -3,8 +3,10 @@ import { ref, computed, onMounted, onUnmounted, nextTick, type Ref } from 'vue'
 import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import BusinessMaterialReviewTable from '@/components/BusinessMaterialReviewTable.vue'
+import CapabilityPackCard from '@/components/CapabilityPackCard.vue'
 import AddFieldMenuPopover from '@/components/AddFieldMenuPopover.vue'
 import { useMaterialReview } from '@/composables/useMaterialReview'
+import { capabilityPackFromCatalog, isUsableCapabilityCatalog } from '@/config/sceneClassification'
 import { fetchRulesCatalog, reviseAndResubmitScenario, submitMaterialsScenario } from '@/api/client'
 import { useMaterialReviewDraftStore } from '@/stores/materialReviewDraft'
 import { useAuthStore } from '@/stores/auth'
@@ -29,6 +31,9 @@ const submitting = ref(false)
 const error = ref<string | null>(null)
 const showFieldValidation = ref(false)
 const phase = ref<'edit' | 'confirm'>('edit')
+const scopeAcknowledged = ref(false)
+const supportedPack = computed(() => capabilityPackFromCatalog(catalog.value))
+const catalogReady = computed(() => isUsableCapabilityCatalog(catalog.value))
 
 const addFieldMenuOpen = ref(false)
 const sectionHeaderError = ref('')
@@ -131,16 +136,29 @@ function extractApiError(e: unknown): string {
 }
 
 async function finalSubmit() {
+  if (!catalogReady.value) {
+    error.value = '无法加载当前受控试点能力包，已禁止确认和提交，请刷新重试'
+    return
+  }
   showFieldValidation.value = true
   if (!validateReview()) {
     phase.value = 'edit'
     return
   }
   showFieldValidation.value = false
+  if (!editMode.value && !scopeAcknowledged.value) {
+    error.value = '请先勾选并确认已知悉当前受控试点覆盖范围'
+    return
+  }
   submitting.value = true
   error.value = null
   try {
-    const payload = await buildPayload()
+    const payload = {
+      ...(await buildPayload()),
+      ...(!editMode.value
+        ? { scope_acknowledged: true, scope_notice_version: 'scope-notice-v2' }
+        : {}),
+    }
     const uploadFiles = pendingFiles.value.length ? pendingFiles.value : undefined
     if (editMode.value && editScenarioId.value) {
       const scenario = await reviseAndResubmitScenario(editScenarioId.value, payload, uploadFiles)
@@ -172,7 +190,11 @@ onMounted(async () => {
     return
   }
   try {
-    catalog.value = await fetchRulesCatalog()
+    const loadedCatalog = await fetchRulesCatalog()
+    catalog.value = isUsableCapabilityCatalog(loadedCatalog) ? loadedCatalog : null
+    if (!catalog.value) {
+      error.value = '无法加载当前受控试点能力包，已禁止确认和提交，请刷新重试'
+    }
   } catch (e: unknown) {
     error.value = extractApiError(e)
   } finally {
@@ -262,6 +284,16 @@ onUnmounted(() => {
           </header>
 
           <div class="business-review-modal-body material-review-confirm-body">
+            <CapabilityPackCard v-if="!editMode" :pack="supportedPack" compact>
+              <p class="muted">
+                提交后由后端 Registry 根据项目事实提出能力包，法务仍会结合材料判断是否适用并确认最终协查范围。
+                业务确认仅表示知悉支持边界，不代表作出法律判断。
+              </p>
+              <label class="scope-acknowledgement">
+                <input v-model="scopeAcknowledged" type="checkbox" :disabled="!catalogReady" />
+                <span>我已知悉当前受控试点仅覆盖上述场景；法律内容为临时版本，仍须专家复核。</span>
+              </label>
+            </CapabilityPackCard>
             <BusinessMaterialReviewTable
               v-model="formModel"
               v-model:hidden-field-keys="hiddenFieldKeys"
@@ -286,7 +318,12 @@ onUnmounted(() => {
 
           <div class="modal-actions business-review-modal-actions">
             <button type="button" class="btn-secondary" @click="backToEdit">返回修改</button>
-            <button type="button" class="btn-primary" :disabled="submitting" @click="finalSubmit">
+            <button
+              type="button"
+              class="btn-primary"
+              :disabled="!catalogReady || submitting || (!editMode && !scopeAcknowledged)"
+              @click="finalSubmit"
+            >
               {{ submitting ? '提交中…' : '提交' }}
             </button>
           </div>

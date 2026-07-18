@@ -17,7 +17,13 @@ import {
   updateReviewItem,
 } from '@/api/client'
 import LegalMaterialGatePanel from '@/components/LegalMaterialGatePanel.vue'
+import CapabilityPackCard from '@/components/CapabilityPackCard.vue'
 import InvestigationAdequacyPanel from '@/components/InvestigationAdequacyPanel.vue'
+import {
+  capabilityPackFromSnapshot,
+  catalogMatchesSnapshot,
+  isUsableCapabilityCatalog,
+} from '@/config/sceneClassification'
 import { useAuthStore } from '@/stores/auth'
 import type { BriefItem, LegalHit, ReviewItem, ReviewState, RiskBrief, RulesCatalog, Scenario } from '@/types/scenario'
 
@@ -144,14 +150,16 @@ const isLocked = computed(() =>
 )
 
 const showScopePanel = computed(
-  () => auth.isLegal && scenario.value?.status === 'pending_scope',
+  () =>
+    auth.isLegal &&
+    ['pending_scope', 'scope_generating', 'scope_generation_failed'].includes(scenario.value?.status || ''),
 )
 
 const showInvestigationAdequacy = computed(
   () =>
     !!catalog.value &&
     !!scenario.value?.investigation_adequacy &&
-    scenario.value.status !== 'pending_scope',
+    !['pending_scope', 'scope_generating', 'scope_generation_failed'].includes(scenario.value.status),
 )
 
 const gateAAllowsReview = computed(
@@ -162,6 +170,13 @@ const showChecklistReview = computed(() => !showScopePanel.value && gateAAllowsR
 
 const showGateABlock = computed(
   () => !showScopePanel.value && showInvestigationAdequacy.value && !gateAAllowsReview.value,
+)
+
+const frozenCapabilityPack = computed(() =>
+  capabilityPackFromSnapshot(
+    scenario.value?.scenario_scope?.snapshot,
+    scenario.value?.scenario_scope?.proposed,
+  ),
 )
 
 const filteredItems = computed(() => {
@@ -238,7 +253,7 @@ watch(
 )
 
 async function loadReviewData(id: number) {
-  if (scenario.value?.status === 'pending_scope') {
+  if (['pending_scope', 'scope_generating', 'scope_generation_failed'].includes(scenario.value?.status || '')) {
     review.value = null
     return
   }
@@ -266,10 +281,21 @@ async function loadPage() {
   error.value = null
   const exportCfg = await fetchExportConfig()
   exportDocxLabel.value = exportCfg.docx_label
+  const loadedScenario = await fetchScenario(id)
+  scenario.value = loadedScenario
   if (auth.isLegal) {
-    catalog.value = await fetchRulesCatalog()
+    try {
+      const loadedCatalog = await fetchRulesCatalog()
+      const snapshot = loadedScenario.scenario_scope?.snapshot
+      catalog.value =
+        isUsableCapabilityCatalog(loadedCatalog) &&
+        (!snapshot || catalogMatchesSnapshot(loadedCatalog, snapshot))
+          ? loadedCatalog
+          : null
+    } catch {
+      catalog.value = null
+    }
   }
-  scenario.value = await fetchScenario(id)
   await loadReviewData(id)
 }
 
@@ -302,7 +328,7 @@ async function onMaterialsReturned() {
 }
 
 async function setDecision(code: string, decision: 'approved' | 'rejected') {
-  if (!scenario.value || isLocked.value) return
+  if (!scenario.value || !review.value || isLocked.value) return
   saving.value = code
   error.value = null
   try {
@@ -310,12 +336,21 @@ async function setDecision(code: string, decision: 'approved' | 'rejected') {
       decision,
       comment: comments.value[code] || undefined,
       external_counsel_required: review.value?.items.find((i) => i.code === code)?.external_counsel_required,
+      expected_revision: review.value.revision,
     })
   } catch (e: unknown) {
     error.value = extractError(e)
   } finally {
     saving.value = null
   }
+}
+
+function requiresApprovalBasis(item: ReviewItem) {
+  return item.tier === 'S3' || !!item.hard_block
+}
+
+function approvalBasisReady(item: ReviewItem) {
+  return !requiresApprovalBasis(item) || (comments.value[item.code] || '').trim().length >= 20
 }
 
 async function saveComment(code: string) {
@@ -328,6 +363,7 @@ async function saveComment(code: string) {
       decision: item.decision,
       comment: comments.value[code] || undefined,
       external_counsel_required: item.external_counsel_required,
+      expected_revision: review.value.revision,
     })
   } finally {
     saving.value = null
@@ -335,13 +371,14 @@ async function saveComment(code: string) {
 }
 
 async function toggleExternalCounsel(item: ReviewItem, value: boolean) {
-  if (!scenario.value || isLocked.value) return
+  if (!scenario.value || !review.value || isLocked.value) return
   saving.value = item.code
   try {
     review.value = await updateReviewItem(scenario.value.id, item.code, {
       decision: item.decision,
       comment: comments.value[item.code] || undefined,
       external_counsel_required: value,
+      expected_revision: review.value.revision,
     })
   } finally {
     saving.value = null
@@ -349,11 +386,11 @@ async function toggleExternalCounsel(item: ReviewItem, value: boolean) {
 }
 
 async function runApproveAll() {
-  if (!scenario.value || isLocked.value) return
+  if (!scenario.value || !review.value || isLocked.value) return
   saving.value = 'all'
   error.value = null
   try {
-    review.value = await approveAllReview(scenario.value.id)
+    review.value = await approveAllReview(scenario.value.id, review.value.revision)
   } catch (e: unknown) {
     error.value = extractError(e)
   } finally {
@@ -366,8 +403,9 @@ async function runFinalize() {
   finalizing.value = true
   error.value = null
   try {
-    review.value = await finalizeReview(scenario.value.id)
-    scenario.value.status = `review_${review.value.status}`
+    const finalizedReview = await finalizeReview(scenario.value.id, review.value.revision)
+    review.value = finalizedReview
+    scenario.value.status = `review_${finalizedReview.status}`
   } catch (e: unknown) {
     error.value = extractError(e)
   } finally {
@@ -381,7 +419,11 @@ async function runReturnToBusiness() {
   returning.value = true
   error.value = null
   try {
-    scenario.value = await returnScenarioToBusiness(scenario.value.id, note || undefined)
+    scenario.value = await returnScenarioToBusiness(
+      scenario.value.id,
+      review.value.revision,
+      note || undefined,
+    )
     await router.push({ name: 'dashboard' })
   } catch (e: unknown) {
     error.value = extractError(e)
@@ -474,10 +516,9 @@ async function ensureInlineSnippet(code: string) {
   snippetLoading.value = { ...snippetLoading.value, [code]: true }
   snippetErrors.value = { ...snippetErrors.value, [code]: '' }
   try {
-    if (!briefCache.value) {
-      briefCache.value = await fetchBrief(scenario.value.id)
-    }
-    const match = findBriefItem(briefCache.value, code)
+    const loadedBrief = briefCache.value ?? await fetchBrief(scenario.value.id)
+    briefCache.value = loadedBrief
+    const match = findBriefItem(loadedBrief, code)
     if (!match) {
       snippetErrors.value = {
         ...snippetErrors.value,
@@ -544,6 +585,10 @@ function openFullBrief(code: string) {
         <div class="header-actions" v-if="auth.isLegal">
           <div class="header-actions-primary">
             <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
+            <RouterLink
+              :to="{ name: 'mechanism', params: { id: scenario.id } }"
+              class="btn-secondary link-btn"
+            >保证机制</RouterLink>
             <template v-if="showChecklistReview && review">
               <button type="button" class="btn-secondary" @click="goBrief">查看简报</button>
               <button
@@ -553,7 +598,7 @@ function openFullBrief(code: string) {
                 :disabled="saving === 'all'"
                 @click="runApproveAll"
               >
-                全部确认
+                批量确认低风险 S1
               </button>
               <button
                 v-if="!isLocked && review.can_return_to_business"
@@ -604,10 +649,17 @@ function openFullBrief(code: string) {
       </header>
 
       <LegalMaterialGatePanel
-        v-if="showScopePanel && catalog"
+        v-if="showScopePanel"
         :scenario="scenario"
         :catalog="catalog"
         @investigation-generated="onInvestigationGenerated"
+      />
+
+      <CapabilityPackCard
+        v-else-if="frozenCapabilityPack"
+        :pack="frozenCapabilityPack"
+        frozen
+        compact
       />
 
       <InvestigationAdequacyPanel
@@ -657,7 +709,7 @@ function openFullBrief(code: string) {
         <div v-if="scenario.grounding_report" class="quality-report-block">
           <strong>引证 Grounding</strong>
           <span class="badge" :class="scenario.grounding_report.requires_legal_check ? 'warn' : 'ok'">
-            命中率 {{ Math.round((scenario.grounding_report.grounding_rate ?? 1) * 100) }}%
+            摘录一致率 {{ Math.round((scenario.grounding_report.excerpt_consistency_rate ?? scenario.grounding_report.grounding_rate ?? 1) * 100) }}%
           </span>
           <p v-if="scenario.grounding_report.ungrounded_codes?.length" class="muted">
             待核条目：{{ scenario.grounding_report.ungrounded_codes.join('、') }}
@@ -782,6 +834,8 @@ function openFullBrief(code: string) {
                     </span>
                     <span v-if="item.carry_forward && item.decision === 'approved'" class="badge ok sm">沿用</span>
                     <span v-if="item.invalidated" class="badge warn sm">材料变更</span>
+                    <span v-if="item.tier" class="badge warn sm">{{ item.tier }}</span>
+                    <span v-if="item.hard_block" class="badge rejected sm">硬阻断</span>
                   </div>
                   <h3>{{ item.title }}</h3>
                 </div>
@@ -841,9 +895,9 @@ function openFullBrief(code: string) {
                         <span
                           v-if="cite.citation_status"
                           class="badge"
-                          :class="cite.citation_status === 'corpus_verified' ? 'ok' : 'warn'"
+                          :class="cite.citation_status === 'excerpt_matched' || cite.citation_status === 'corpus_verified' ? 'ok' : 'warn'"
                         >
-                          {{ cite.citation_status === 'corpus_verified' ? '已验' : cite.citation_status === 'weak_grounding' ? '弱引证' : '待核对' }}
+                          {{ cite.citation_status === 'excerpt_matched' || cite.citation_status === 'corpus_verified' ? '摘录与本地语料一致' : cite.citation_status === 'weak_grounding' ? '部分相似，须核原文' : '待核对' }}
                           <template v-if="cite.grounding_score"> · {{ Math.round(cite.grounding_score * 100) }}%</template>
                         </span>
                         <a :href="cite.url" target="_blank" rel="noopener" class="hit-link">溯源 ↗</a>
@@ -867,9 +921,9 @@ function openFullBrief(code: string) {
                           <span
                             v-if="hit.citation_status"
                             class="badge"
-                            :class="hit.citation_status === 'corpus_verified' ? 'ok' : 'warn'"
+                            :class="hit.citation_status === 'excerpt_matched' || hit.citation_status === 'corpus_verified' ? 'ok' : 'warn'"
                           >
-                            {{ hit.citation_status === 'corpus_verified' ? 'grounding 已验' : '待核对' }}
+                            {{ hit.citation_status === 'excerpt_matched' || hit.citation_status === 'corpus_verified' ? '摘录与本地语料一致' : '待核对' }}
                           </span>
                         </div>
                         <strong>{{ hit.title_zh || hit.title_pt }}</strong>
@@ -884,7 +938,8 @@ function openFullBrief(code: string) {
                       <button
                         type="button"
                         class="btn-secondary sm"
-                        :disabled="saving === item.code"
+                        :disabled="saving === item.code || !approvalBasisReady(item)"
+                        :title="!approvalBasisReady(item) ? '请先填写至少 20 字的覆盖依据、法源定位或外部律师意见' : ''"
                         @click="setDecision(item.code, 'approved')"
                       >
                         确认本条
@@ -904,14 +959,21 @@ function openFullBrief(code: string) {
                   </div>
                 </template>
                 <label class="comment-field">
-                  <span>批注</span>
+                  <span>{{ requiresApprovalBasis(item) ? '复核依据（必填，至少 20 字）' : '批注' }}</span>
                   <input
                     v-model="comments[item.code]"
                     :disabled="isLocked"
-                    placeholder="可选：补充复核意见"
+                    :placeholder="requiresApprovalBasis(item) ? '填写覆盖依据、法源定位或外部律师意见' : '可选：补充复核意见'"
                     @blur="saveComment(item.code)"
                   />
                 </label>
+                <p v-if="!isLocked && requiresApprovalBasis(item) && !approvalBasisReady(item)" class="muted external-flag">
+                  此条为 S3/硬阻断，确认前必须填写至少 20 字的人工覆盖依据。
+                </p>
+                <p v-if="item.reviewer_name && item.reviewed_at" class="muted external-flag">
+                  最近复核：{{ item.reviewer_name }} · {{ new Date(item.reviewed_at).toLocaleString() }}
+                  <span v-if="item.manual_override"> · 人工覆盖</span>
+                </p>
                 <label class="external-counsel-field" v-if="!isLocked">
                   <input
                     type="checkbox"

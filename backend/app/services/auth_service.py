@@ -3,12 +3,15 @@ from datetime import datetime, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.config import get_settings
+from app.core.config import get_settings, is_instance_organization_member
 from app.core.security import create_access_token, get_password_hash, verify_password
-from app.core.roles import ROLE_BUSINESS, ROLE_LEGAL
+from app.core.roles import ROLE_BUSINESS
 from app.models.user import User
 from app.schemas.auth import UserRegister
 from app.services.audit import write_audit_log
+
+
+_DUMMY_PASSWORD_HASH = get_password_hash("Vela-Dummy-Password-Only-For-Timing-2026!")
 
 
 def register_user(db: Session, payload: UserRegister) -> User:
@@ -16,7 +19,7 @@ def register_user(db: Session, payload: UserRegister) -> User:
     if not settings.allow_open_registration:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="当前环境已关闭开放注册，请使用 SSO 或联系管理员开通账户",
+            detail="当前环境已关闭开放注册，请联系部署管理员开通账户",
         )
     if not payload.accept_disclaimer:
         raise HTTPException(
@@ -29,13 +32,12 @@ def register_user(db: Session, payload: UserRegister) -> User:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="该邮箱已注册")
 
     now = datetime.now(timezone.utc)
-    role = ROLE_LEGAL if payload.role == "legal" else ROLE_BUSINESS
     user = User(
         email=payload.email.lower(),
         full_name=payload.full_name,
         organization=payload.organization,
         hashed_password=get_password_hash(payload.password),
-        role=role,
+        role=ROLE_BUSINESS,
         auth_provider="local",
         disclaimer_accepted=True,
         disclaimer_accepted_at=now,
@@ -48,7 +50,7 @@ def register_user(db: Session, payload: UserRegister) -> User:
         db,
         user=user,
         action="user.register",
-        detail=f"注册（{role}）并完成免责条款确认",
+        detail=f"开放注册（{ROLE_BUSINESS}）并完成免责条款确认",
     )
     return user
 
@@ -61,10 +63,20 @@ def authenticate_user(db: Session, email: str, password: str) -> User:
             detail="当前环境已启用 SSO，请使用企业单点登录",
         )
     user = db.query(User).filter(User.email == email.lower()).first()
-    if user is None or not user.hashed_password or not verify_password(password, user.hashed_password):
+    candidate_hash = user.hashed_password if user and user.hashed_password else _DUMMY_PASSWORD_HASH
+    try:
+        password_valid = verify_password(password, candidate_hash)
+    except (TypeError, ValueError):
+        password_valid = False
+    if user is None or not user.hashed_password or not password_valid:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="邮箱或密码错误")
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="账户已停用")
+    if not is_instance_organization_member(user.organization, settings):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="该账户不属于此受控试点实例",
+        )
     return user
 
 

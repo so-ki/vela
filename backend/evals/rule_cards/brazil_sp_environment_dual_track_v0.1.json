@@ -1,0 +1,1345 @@
+{
+  "schema_version": "1.0",
+  "experiment_id": "brazil_sp_environment_dual_track_rule_cards",
+  "version": "0.1.0",
+  "pack_id": "brazil_new_energy_greenfield",
+  "jurisdiction": {
+    "country": "BR",
+    "state": "SP"
+  },
+  "industry": "new_energy_manufacturing",
+  "action_type": "greenfield_plant",
+  "status": "evidence_only",
+  "certification_status": "provisional",
+  "runtime_integration": false,
+  "as_of": "2026-07-17",
+  "disclaimer": "本实验仅比较规则卡抽取方法，不构成巴西法律意见。后续核验已确认 Decreto nº 8.468/1976 法条轨未整合 2002、2017 与 2024 修订链，全部卡片仅作历史方法审计，已作废为现行法证据，不得进入检索或生产规则。任何重建条目仍须由巴西执业律师逐项复核后方可考虑进入生产。",
+  "methodology": {
+    "sample_size": 10,
+    "tracks": [
+      "statute_forward",
+      "form_reverse"
+    ],
+    "selection_rationale": "以圣保罗州工业绿地项目环境许可为窄范围样本，选择法规触发条件与 CETESB 官方申请页面可直接核验的操作字段进行双轨比较。",
+    "comparison_question": "从法规条文向事实拆解，与从官方申请流程反推材料字段，是否会暴露不同的事实缺口、分支逻辑与证据要求？",
+    "generalisability_notice": "这是 n=10、单州、单主题实验，不能证明对巴西其他州、其他行业或第二个能力包具有通用性；差异类型仍是 provisional taxonomy。",
+    "time_capture_method": "not_measured",
+    "time_capture_reason": "实验整理过程中未启动逐轨、逐卡的同期计时器；禁止用回忆或估算补填工时，因此所有分钟字段保持 null。"
+  },
+  "timing": {
+    "statute_forward_total_minutes": null,
+    "form_reverse_total_minutes": null,
+    "unavailable_reason": "未进行同期计时，无法可靠区分法条检索、表单核验、翻译和结构化录入耗时；不使用事后估算。"
+  },
+  "source_registry": [
+    {
+      "source_id": "alsp-lei-997-1976",
+      "authority": "Assembleia Legislativa do Estado de São Paulo",
+      "instrument_type": "state_law",
+      "title": "Lei nº 997, de 31 de maio de 1976 — controle da poluição do meio ambiente",
+      "official_url": "https://www.al.sp.gov.br/repositorio/legislacao/lei/1976/compilacao-lei-997-31.05.1976.html",
+      "official_host": "www.al.sp.gov.br",
+      "access_verified_at": "2026-07-17",
+      "access_status": "verified_official_html",
+      "usable_pinpoints": [
+        "Art. 5º, caput e §§ 1º-4º",
+        "Art. 6º"
+      ],
+      "review_status": "provisional"
+    },
+    {
+      "source_id": "alsp-decreto-8468-1976",
+      "authority": "Governo do Estado de São Paulo / Assembleia Legislativa do Estado de São Paulo",
+      "instrument_type": "state_decree",
+      "title": "Decreto nº 8.468, de 8 de setembro de 1976 — Regulamento da Lei nº 997/1976",
+      "official_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/1976/decreto-8468-08.09.1976.html",
+      "official_host": "www.al.sp.gov.br",
+      "access_verified_at": "2026-07-17",
+      "access_status": "verified_official_html",
+      "usable_pinpoints": [
+        "Art. 57, II",
+        "Art. 58, II-IV"
+      ],
+      "review_status": "provisional"
+    },
+    {
+      "source_id": "cetesb-pla-faq",
+      "authority": "Companhia Ambiental do Estado de São Paulo — CETESB",
+      "instrument_type": "official_application_guidance",
+      "title": "Dúvidas sobre o Portal de Licenciamento Ambiental — PLA",
+      "official_url": "https://cetesb.sp.gov.br/licenciamentoambiental/duvidas-sobre-o-portal-de-licenciamento-ambiental-pla/",
+      "official_host": "cetesb.sp.gov.br",
+      "access_verified_at": "2026-07-17",
+      "access_status": "verified_official_html",
+      "usable_pinpoints": [
+        "FAQ itens 1-2",
+        "FAQ item 6",
+        "FAQ itens 9 e 11",
+        "FAQ itens 13-16"
+      ],
+      "review_status": "provisional"
+    },
+    {
+      "source_id": "cetesb-e-portal",
+      "authority": "Companhia Ambiental do Estado de São Paulo — CETESB",
+      "instrument_type": "official_service_portal",
+      "title": "e-CETESB — Portal de Serviços / Sistema de Licenciamento Ambiental",
+      "official_url": "https://e.cetesb.sp.gov.br/portal-servicos-frontend/",
+      "official_host": "e.cetesb.sp.gov.br",
+      "access_verified_at": "2026-07-17",
+      "access_status": "verified_official_service",
+      "usable_pinpoints": [
+        "Portal de Serviços — Sistema de Licenciamento Ambiental"
+      ],
+      "review_status": "provisional"
+    }
+  ],
+  "excluded_sources": [
+    {
+      "url": "https://www.cetesb.sp.gov.br/licenciamento/pdf/Industrias_LI.pdf",
+      "reason": "该历史官方 PDF 在 2026-07-17 直接访问时重定向至 CETESB 首页；搜索索引摘要不足以证明当前通用工业清单，故不用于规则主张。",
+      "decision": "not_used_for_rule_claims"
+    },
+    {
+      "url": "https://licenciamento.cetesb.sp.gov.br/cogeracao_energia_texto.asp",
+      "reason": "该页面是热电联产活动的专项清单，不能无依据外推到全部新能源制造绿地工厂。",
+      "decision": "not_used_for_rule_claims"
+    }
+  ],
+  "cards": [
+    {
+      "rule_id": "BR-SP-ENV-RC-001",
+      "pack_id": "brazil_new_energy_greenfield",
+      "version": "0.1.0",
+      "title": "工业活动作为污染源的初步分类",
+      "certification_status": "provisional",
+      "production_ready": false,
+      "non_legal_opinion": true,
+      "citations": [
+        {
+          "source_id": "alsp-decreto-8468-1976",
+          "official_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/1976/decreto-8468-08.09.1976.html",
+          "pinpoint": "Art. 57, II",
+          "claim_scope": "条文将工业活动列入为取得安装和运行许可而考虑的污染源类别。",
+          "access_verified_at": "2026-07-17"
+        },
+        {
+          "source_id": "cetesb-pla-faq",
+          "official_url": "https://cetesb.sp.gov.br/licenciamentoambiental/duvidas-sobre-o-portal-de-licenciamento-ambiental-pla/",
+          "pinpoint": "FAQ item 14 — MCE import",
+          "claim_scope": "官方申请流程使用 Memorial de Caracterização do Empreendimento（MCE），且对必填值进行校验。",
+          "access_verified_at": "2026-07-17"
+        }
+      ],
+      "elements": [
+        {
+          "element_id": "activity_is_industrial",
+          "statement": "拟议活动属于工业活动，进入污染源许可适用性判断。",
+          "source_track": "statute_forward"
+        },
+        {
+          "element_id": "mce_is_application_artifact",
+          "statement": "申请流程要求使用与项目特征相关的 MCE 文件，具体字段需以当次门户为准。",
+          "source_track": "form_reverse"
+        }
+      ],
+      "fact_fields": [
+        {
+          "field_id": "industrial_activity_description",
+          "label": "工业活动与工艺描述",
+          "value_type": "string",
+          "introduced_by": "statute_forward",
+          "required_state": "required",
+          "evidence_hint": "项目工艺说明；是否属于 art. 57, II 仍待律师复核"
+        },
+        {
+          "field_id": "mce_file",
+          "label": "本次申请生成或填写的 MCE",
+          "value_type": "document",
+          "introduced_by": "form_reverse",
+          "required_state": "conditional",
+          "evidence_hint": "仅接受 e-CETESB 当前流程生成或接受的文件"
+        },
+        {
+          "field_id": "mce_required_fields_complete",
+          "label": "MCE 必填值是否通过门户校验",
+          "value_type": "boolean",
+          "introduced_by": "form_reverse",
+          "required_state": "conditional",
+          "evidence_hint": "门户校验结果；FAQ 未枚举全部字段"
+        }
+      ],
+      "exceptions": [],
+      "exception_review_note": "所引 pinpoint 未提供可安全自动化的工业类别例外；不得据此认定所有制造活动必然采用同一路径。",
+      "consequence": "命中后仅进入 CETESB 许可适用性和 MCE 材料核验队列，不自动作出应许可或可运营结论。",
+      "red_flag": {
+        "severity": "high",
+        "condition": "项目属于工业制造但无法提供工艺描述，或试图复用未通过当前门户校验的旧 MCE。",
+        "response": "阻止自动清场，要求补充工艺事实并由巴西律师确认许可路径。"
+      },
+      "difference_type": "scope_to_form_fields",
+      "difference_summary": "法条轨给出工业活动这一适用类别；表单轨暴露 MCE 这一操作性材料，但当前 FAQ 不足以枚举其全部字段。",
+      "production_tracks": {
+        "statute_forward": {
+          "status": "completed_provisional",
+          "source_ids": [
+            "alsp-decreto-8468-1976"
+          ],
+          "required_facts": [
+            "industrial_activity_description"
+          ],
+          "derived_output": "生成“是否属于 art. 57, II 工业活动”的律师复核问题。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡法条轨进行同期计时，禁止事后估算。"
+        },
+        "form_reverse": {
+          "status": "partial_provisional",
+          "source_ids": [
+            "cetesb-pla-faq"
+          ],
+          "required_facts": [
+            "mce_file",
+            "mce_required_fields_complete"
+          ],
+          "derived_output": "生成 MCE 文件和门户必填校验的材料缺口，不推断未公开字段。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡表单轨进行同期计时，禁止事后估算。"
+        }
+      },
+      "open_questions": [
+        "新能源电池或储能制造在当前 CETESB 分类中对应哪些具体 MCE 分支和字段？"
+      ]
+    },
+    {
+      "rule_id": "BR-SP-ENV-RC-002",
+      "pack_id": "brazil_new_energy_greenfield",
+      "version": "0.1.0",
+      "title": "新建、重建或改造工业建筑的安装许可触发事实",
+      "certification_status": "provisional",
+      "production_ready": false,
+      "non_legal_opinion": true,
+      "citations": [
+        {
+          "source_id": "alsp-decreto-8468-1976",
+          "official_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/1976/decreto-8468-08.09.1976.html",
+          "pinpoint": "Art. 58, II",
+          "claim_scope": "条文涵盖为安装污染源而新建、重建或改造建筑的情形。",
+          "access_verified_at": "2026-07-17"
+        },
+        {
+          "source_id": "cetesb-pla-faq",
+          "official_url": "https://cetesb.sp.gov.br/licenciamentoambiental/duvidas-sobre-o-portal-de-licenciamento-ambiental-pla/",
+          "pinpoint": "FAQ item 16 — property address and geographic positioning",
+          "claim_scope": "申请流程要求登记项目所在地与按申请类型变化的地理定位事实。",
+          "access_verified_at": "2026-07-17"
+        }
+      ],
+      "elements": [
+        {
+          "element_id": "building_work_for_pollution_source",
+          "statement": "存在新建、重建或改造拟用于污染源安装的建筑工程。",
+          "source_track": "statute_forward"
+        },
+        {
+          "element_id": "property_location_recorded",
+          "statement": "申请需关联具体物业地址，并在门户要求时提供地理定位。",
+          "source_track": "form_reverse"
+        }
+      ],
+      "fact_fields": [
+        {
+          "field_id": "building_work_type",
+          "label": "建筑工程类型",
+          "value_type": "enum",
+          "introduced_by": "statute_forward",
+          "required_state": "required",
+          "evidence_hint": "new_build / reconstruction / reform / none"
+        },
+        {
+          "field_id": "building_intended_use",
+          "label": "建筑拟承载的污染源或生产用途",
+          "value_type": "string",
+          "introduced_by": "statute_forward",
+          "required_state": "required",
+          "evidence_hint": "建设与工艺设计文件"
+        },
+        {
+          "field_id": "property_address",
+          "label": "物业地址",
+          "value_type": "string",
+          "introduced_by": "form_reverse",
+          "required_state": "required",
+          "evidence_hint": "与物业登记和门户申请一致"
+        },
+        {
+          "field_id": "property_geographic_position",
+          "label": "物业地理定位",
+          "value_type": "string",
+          "introduced_by": "form_reverse",
+          "required_state": "conditional",
+          "evidence_hint": "UTM-N、UTM-E、Fuso、Datum、Altitude；具体必填性随申请类型变化"
+        }
+      ],
+      "exceptions": [
+        {
+          "exception_id": "public_location_form_relief",
+          "condition": "申请地点属于 FAQ item 16 所列公共地点或线性工程场景。",
+          "effect": "部分登记、占有和地址字段可不强制，但参考点仍需填写；本例外不当然适用于工厂绿地项目。",
+          "review_status": "provisional"
+        }
+      ],
+      "exception_review_note": "表单例外仅按 FAQ 记录，不解释其法律效力或是否适用于本能力包的典型工厂。",
+      "consequence": "收集工程类型、建筑用途和物业定位后提交律师确认是否进入安装许可路径。",
+      "red_flag": {
+        "severity": "high",
+        "condition": "已计划施工但建筑用途或具体地块尚未确定。",
+        "response": "不得输出许可可行结论，先补齐建设和地点事实。"
+      },
+      "difference_type": "scope_to_form_fields",
+      "difference_summary": "法条轨定义触发工程类型；表单轨把地点、地址和条件性坐标变成可核对字段，并出现公共地点的操作例外。",
+      "production_tracks": {
+        "statute_forward": {
+          "status": "completed_provisional",
+          "source_ids": [
+            "alsp-decreto-8468-1976"
+          ],
+          "required_facts": [
+            "building_work_type",
+            "building_intended_use"
+          ],
+          "derived_output": "生成 art. 58, II 建筑工程触发问题。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡法条轨进行同期计时，禁止事后估算。"
+        },
+        "form_reverse": {
+          "status": "completed_provisional",
+          "source_ids": [
+            "cetesb-pla-faq"
+          ],
+          "required_facts": [
+            "property_address",
+            "property_geographic_position"
+          ],
+          "derived_output": "生成物业地址和条件性地理定位材料检查。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡表单轨进行同期计时，禁止事后估算。"
+        }
+      },
+      "open_questions": [
+        "本项目在当前 PLA 分支下是否强制提供全部 UTM 定位字段？"
+      ]
+    },
+    {
+      "rule_id": "BR-SP-ENV-RC-003",
+      "pack_id": "brazil_new_energy_greenfield",
+      "version": "0.1.0",
+      "title": "在既有建筑内安装污染源",
+      "certification_status": "provisional",
+      "production_ready": false,
+      "non_legal_opinion": true,
+      "citations": [
+        {
+          "source_id": "alsp-decreto-8468-1976",
+          "official_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/1976/decreto-8468-08.09.1976.html",
+          "pinpoint": "Art. 58, III",
+          "claim_scope": "条文涵盖在已经建成的建筑内安装污染源。",
+          "access_verified_at": "2026-07-17"
+        },
+        {
+          "source_id": "cetesb-pla-faq",
+          "official_url": "https://cetesb.sp.gov.br/licenciamentoambiental/duvidas-sobre-o-portal-de-licenciamento-ambiental-pla/",
+          "pinpoint": "FAQ items 13 and 16",
+          "claim_scope": "门户以企业 CNPJ 和物业登记识别申请对象。",
+          "access_verified_at": "2026-07-17"
+        }
+      ],
+      "elements": [
+        {
+          "element_id": "building_already_constructed",
+          "statement": "污染源拟安装在已经建成的建筑中。",
+          "source_track": "statute_forward"
+        },
+        {
+          "element_id": "enterprise_and_property_identified",
+          "statement": "申请对象须关联企业 CNPJ 与门户中的具体物业。",
+          "source_track": "form_reverse"
+        }
+      ],
+      "fact_fields": [
+        {
+          "field_id": "building_already_constructed",
+          "label": "建筑是否已建成",
+          "value_type": "boolean",
+          "introduced_by": "statute_forward",
+          "required_state": "required",
+          "evidence_hint": "竣工或现状材料"
+        },
+        {
+          "field_id": "source_installation_description",
+          "label": "拟安装污染源或产线描述",
+          "value_type": "string",
+          "introduced_by": "statute_forward",
+          "required_state": "required",
+          "evidence_hint": "设备和工艺说明"
+        },
+        {
+          "field_id": "enterprise_cnpj",
+          "label": "申请企业 CNPJ",
+          "value_type": "identifier",
+          "introduced_by": "form_reverse",
+          "required_state": "required",
+          "evidence_hint": "与门户企业记录一致"
+        },
+        {
+          "field_id": "property_portal_identifier",
+          "label": "门户物业记录标识",
+          "value_type": "identifier",
+          "introduced_by": "form_reverse",
+          "required_state": "conditional",
+          "evidence_hint": "现有 PLA 物业登记"
+        }
+      ],
+      "exceptions": [],
+      "exception_review_note": "未从所引条文和 FAQ 提炼任何可自动放行的既有建筑例外。",
+      "consequence": "既有建筑不应被当作无需许可的充分理由；转入设备、工艺、企业和物业事实复核。",
+      "red_flag": {
+        "severity": "high",
+        "condition": "团队以“建筑已存在”为由跳过对新增产线或设备的许可评估。",
+        "response": "标记高风险并要求巴西律师核对 art. 58, III 的当前适用。"
+      },
+      "difference_type": "scope_to_form_fields",
+      "difference_summary": "法条轨关注既有建筑中的安装行为；表单轨补充企业身份和物业记录，避免只凭建筑状态判断。",
+      "production_tracks": {
+        "statute_forward": {
+          "status": "completed_provisional",
+          "source_ids": [
+            "alsp-decreto-8468-1976"
+          ],
+          "required_facts": [
+            "building_already_constructed",
+            "source_installation_description"
+          ],
+          "derived_output": "生成 art. 58, III 既有建筑安装触发问题。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡法条轨进行同期计时，禁止事后估算。"
+        },
+        "form_reverse": {
+          "status": "completed_provisional",
+          "source_ids": [
+            "cetesb-pla-faq"
+          ],
+          "required_facts": [
+            "enterprise_cnpj",
+            "property_portal_identifier"
+          ],
+          "derived_output": "生成企业身份、CNPJ 与物业绑定关系的核对项。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡表单轨进行同期计时，禁止事后估算。"
+        }
+      },
+      "open_questions": [
+        "既有建筑此前许可证覆盖范围是否包含拟新增的新能源制造设备和工艺？"
+      ]
+    },
+    {
+      "rule_id": "BR-SP-ENV-RC-004",
+      "pack_id": "brazil_new_energy_greenfield",
+      "version": "0.1.0",
+      "title": "污染源扩建或变更与简化续证分支",
+      "certification_status": "provisional",
+      "production_ready": false,
+      "non_legal_opinion": true,
+      "citations": [
+        {
+          "source_id": "alsp-decreto-8468-1976",
+          "official_url": "https://www.al.sp.gov.br/repositorio/legislacao/decreto/1976/decreto-8468-08.09.1976.html",
+          "pinpoint": "Art. 58, IV",
+          "claim_scope": "条文涵盖污染源的安装、扩建或变更。",
+          "access_verified_at": "2026-07-17"
+        },
+        {
+          "source_id": "cetesb-pla-faq",
+          "official_url": "https://cetesb.sp.gov.br/licenciamentoambiental/duvidas-sobre-o-portal-de-licenciamento-ambiental-pla/",
+          "pinpoint": "FAQ item 11",
+          "claim_scope": "FAQ 明示扩建、活动变化或生产工艺变化可能使项目不能继续使用简化续证路径。",
+          "access_verified_at": "2026-07-17"
+        }
+      ],
+      "elements": [
+        {
+          "element_id": "installation_expansion_or_change",
+          "statement": "拟议事项包含安装、扩建或污染源变更。",
+          "source_track": "statute_forward"
+        },
+        {
+          "element_id": "simplified_route_requalification",
+          "statement": "若存在扩建、活动或工艺变化，门户简化续证资格需重新判断。",
+          "source_track": "form_reverse"
+        }
+      ],
+      "fact_fields": [
+        {
+          "field_id": "change_type",
+          "label": "变化类型",
+          "value_type": "enum",
+          "introduced_by": "both",
+          "required_state": "required",
+          "evidence_hint": "installation / expansion / activity_change / process_change"
+        },
+        {
+          "field_id": "process_change_description",
+          "label": "活动或生产工艺变化说明",
+          "value_type": "string",
+          "introduced_by": "both",
+          "required_state": "conditional",
+          "evidence_hint": "变更前后对比"
+        },
+        {
+          "field_id": "existing_license_type",
+          "label": "现有许可证类型",
+          "value_type": "enum",
+          "introduced_by": "form_reverse",
+          "required_state": "conditional",
+          "evidence_hint": "LI / LO / LPIO / LORS / other"
+        },
+        {
+          "field_id": "existing_license_number",
+          "label": "现有许可证编号",
+          "value_type": "identifier",
+          "introduced_by": "form_reverse",
+          "required_state": "conditional",
+          "evidence_hint": "官方许可证文件"
+        },
+        {
+          "field_id": "simplified_route_currently_used",
+          "label": "当前是否使用简化续证路径",
+          "value_type": "boolean",
+          "introduced_by": "form_reverse",
+          "required_state": "conditional",
+          "evidence_hint": "e-CETESB 当前流程选择"
+        }
+      ],
+      "exceptions": [],
+      "exception_review_note": "FAQ 只说明门户分支，不能替代对 SILIS/MCE 资格和现行法的律师判断。",
+      "consequence": "存在扩建或工艺变化时，不沿用原简化路径假设，要求重新确认申请分支。",
+      "red_flag": {
+        "severity": "high",
+        "condition": "项目发生扩建或工艺变化，但仍计划无复核地续用简化许可证流程。",
+        "response": "阻断自动续证建议，收集现有许可和变更事实。"
+      },
+      "difference_type": "form_adds_branching_logic",
+      "difference_summary": "法条轨识别扩建或变更触发；表单轨进一步揭示简化续证资格会因变化而改变。",
+      "production_tracks": {
+        "statute_forward": {
+          "status": "completed_provisional",
+          "source_ids": [
+            "alsp-decreto-8468-1976"
+          ],
+          "required_facts": [
+            "change_type",
+            "process_change_description"
+          ],
+          "derived_output": "生成 art. 58, IV 扩建或变更触发问题。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡法条轨进行同期计时，禁止事后估算。"
+        },
+        "form_reverse": {
+          "status": "completed_provisional",
+          "source_ids": [
+            "cetesb-pla-faq"
+          ],
+          "required_facts": [
+            "change_type",
+            "process_change_description",
+            "existing_license_type",
+            "existing_license_number",
+            "simplified_route_currently_used"
+          ],
+          "derived_output": "生成简化续证资格重判和既有许可证核对项。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡表单轨进行同期计时，禁止事后估算。"
+        }
+      },
+      "open_questions": [
+        "本能力包的绿地项目何时可能进入 SILIS，哪些变化会在当前规则下导致退出？"
+      ]
+    },
+    {
+      "rule_id": "BR-SP-ENV-RC-005",
+      "pack_id": "brazil_new_energy_greenfield",
+      "version": "0.1.0",
+      "title": "许可阶段与既有许可证类型选择",
+      "certification_status": "provisional",
+      "production_ready": false,
+      "non_legal_opinion": true,
+      "citations": [
+        {
+          "source_id": "alsp-lei-997-1976",
+          "official_url": "https://www.al.sp.gov.br/repositorio/legislacao/lei/1976/compilacao-lei-997-31.05.1976.html",
+          "pinpoint": "Art. 5º, caput e §§ 2º-4º",
+          "claim_scope": "州法区分前期、安装和运营许可的功能。",
+          "access_verified_at": "2026-07-17"
+        },
+        {
+          "source_id": "cetesb-pla-faq",
+          "official_url": "https://cetesb.sp.gov.br/licenciamentoambiental/duvidas-sobre-o-portal-de-licenciamento-ambiental-pla/",
+          "pinpoint": "FAQ items 9 and 11",
+          "claim_scope": "门户要求按既有 LI、LPLI、LPIO、LORS 或其他来源选择正确流程和编号。",
+          "access_verified_at": "2026-07-17"
+        },
+        {
+          "source_id": "cetesb-e-portal",
+          "official_url": "https://e.cetesb.sp.gov.br/portal-servicos-frontend/",
+          "pinpoint": "Sistema de Licenciamento Ambiental",
+          "claim_scope": "CETESB 当前提供在线许可服务入口。",
+          "access_verified_at": "2026-07-17"
+        }
+      ],
+      "elements": [
+        {
+          "element_id": "licence_phase_matches_project_stage",
+          "statement": "许可阶段应与项目规划、安装或运营阶段相匹配。",
+          "source_track": "statute_forward"
+        },
+        {
+          "element_id": "previous_licence_type_drives_portal_branch",
+          "statement": "既有许可证类型和编号影响门户后续申请分支。",
+          "source_track": "form_reverse"
+        }
+      ],
+      "fact_fields": [
+        {
+          "field_id": "project_stage",
+          "label": "项目当前阶段",
+          "value_type": "enum",
+          "introduced_by": "statute_forward",
+          "required_state": "required",
+          "evidence_hint": "planning / installation / operation"
+        },
+        {
+          "field_id": "requested_license_phase",
+          "label": "拟申请许可阶段",
+          "value_type": "enum",
+          "introduced_by": "both",
+          "required_state": "required",
+          "evidence_hint": "LP/LAP / LI/LAI / LO/LAO / combined route；术语映射待律师确认"
+        },
+        {
+          "field_id": "previous_license_type",
+          "label": "既有许可证类型",
+          "value_type": "enum",
+          "introduced_by": "form_reverse",
+          "required_state": "conditional",
+          "evidence_hint": "LI / LPLI / LPIO / LORS / municipal LO / other"
+        },
+        {
+          "field_id": "previous_license_number",
+          "label": "既有许可证编号",
+          "value_type": "identifier",
+          "introduced_by": "form_reverse",
+          "required_state": "conditional",
+          "evidence_hint": "许可证原件或官方系统记录"
+        }
+      ],
+      "exceptions": [
+        {
+          "exception_id": "simplified_route_uses_separate_menu",
+          "condition": "既有许可证为 FAQ item 11 所述 LPIO 或 LORS 简化许可。",
+          "effect": "应使用门户中的简化许可与续证菜单；是否符合资格仍需单独核验。",
+          "review_status": "provisional"
+        }
+      ],
+      "exception_review_note": "不把 FAQ 中加油站 LP/LPLI 的专项分支外推到新能源制造；本卡仅记录一般许可证类型选择事实。",
+      "consequence": "先核对项目阶段及既有许可证，再由律师确认正确申请阶段和门户分支。",
+      "red_flag": {
+        "severity": "high",
+        "condition": "未核实现有许可证类型和编号即选择 LO、续证或组合申请。",
+        "response": "停止自动路径推荐，要求上传许可证并复核。"
+      },
+      "difference_type": "form_adds_branching_logic",
+      "difference_summary": "法条轨解释各许可阶段的功能；表单轨显示历史许可证类型和编号会决定具体在线分支。",
+      "production_tracks": {
+        "statute_forward": {
+          "status": "completed_provisional",
+          "source_ids": [
+            "alsp-lei-997-1976"
+          ],
+          "required_facts": [
+            "project_stage",
+            "requested_license_phase"
+          ],
+          "derived_output": "生成项目阶段与许可阶段匹配问题。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡法条轨进行同期计时，禁止事后估算。"
+        },
+        "form_reverse": {
+          "status": "completed_provisional",
+          "source_ids": [
+            "cetesb-pla-faq",
+            "cetesb-e-portal"
+          ],
+          "required_facts": [
+            "requested_license_phase",
+            "previous_license_type",
+            "previous_license_number"
+          ],
+          "derived_output": "生成在线申请分支与既有许可证核对项。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡表单轨进行同期计时，禁止事后估算。"
+        }
+      },
+      "open_questions": [
+        "Lei 997 的 LAP/LAI/LAO 术语与当前 CETESB 门户 LP/LI/LO 选项如何精确映射？"
+      ]
+    },
+    {
+      "rule_id": "BR-SP-ENV-RC-006",
+      "pack_id": "brazil_new_energy_greenfield",
+      "version": "0.1.0",
+      "title": "门户提交人身份与联系方式分离",
+      "certification_status": "provisional",
+      "production_ready": false,
+      "non_legal_opinion": true,
+      "citations": [
+        {
+          "source_id": "alsp-lei-997-1976",
+          "official_url": "https://www.al.sp.gov.br/repositorio/legislacao/lei/1976/compilacao-lei-997-31.05.1976.html",
+          "pinpoint": "Art. 5º",
+          "claim_scope": "许可由污染源相关主体申请，但条文未展开门户用户身份字段。",
+          "access_verified_at": "2026-07-17"
+        },
+        {
+          "source_id": "cetesb-pla-faq",
+          "official_url": "https://cetesb.sp.gov.br/licenciamentoambiental/duvidas-sobre-o-portal-de-licenciamento-ambiental-pla/",
+          "pinpoint": "FAQ items 1-2 and 15",
+          "claim_scope": "门户登录以实际填报自然人的 CPF、邮箱、地址和电话建档，且填报人不得用自己的联系方式替代 interested party 的资料。",
+          "access_verified_at": "2026-07-17"
+        },
+        {
+          "source_id": "cetesb-e-portal",
+          "official_url": "https://e.cetesb.sp.gov.br/portal-servicos-frontend/",
+          "pinpoint": "Portal de Serviços",
+          "claim_scope": "当前在线服务入口存在。",
+          "access_verified_at": "2026-07-17"
+        }
+      ],
+      "elements": [
+        {
+          "element_id": "physical_submitter_identified",
+          "statement": "实际填报自然人使用自己的身份和联系方式建立门户登录。",
+          "source_track": "form_reverse"
+        },
+        {
+          "element_id": "interested_party_contact_separate",
+          "statement": "企业或权利人的联系方式不得被代理人或顾问的资料替代。",
+          "source_track": "form_reverse"
+        }
+      ],
+      "fact_fields": [
+        {
+          "field_id": "portal_user_cpf",
+          "label": "门户填报人 CPF",
+          "value_type": "identifier",
+          "introduced_by": "form_reverse",
+          "required_state": "required",
+          "evidence_hint": "实际填报自然人"
+        },
+        {
+          "field_id": "portal_user_email",
+          "label": "门户填报人唯一邮箱",
+          "value_type": "string",
+          "introduced_by": "form_reverse",
+          "required_state": "required",
+          "evidence_hint": "不得与其他 CPF 账户共用"
+        },
+        {
+          "field_id": "portal_user_address",
+          "label": "门户填报人地址",
+          "value_type": "string",
+          "introduced_by": "form_reverse",
+          "required_state": "required",
+          "evidence_hint": "以当前门户字段为准"
+        },
+        {
+          "field_id": "portal_user_phone",
+          "label": "门户填报人电话",
+          "value_type": "string",
+          "introduced_by": "form_reverse",
+          "required_state": "required",
+          "evidence_hint": "以当前门户字段为准"
+        },
+        {
+          "field_id": "interested_party_contact",
+          "label": "申请主体或权利人联系方式",
+          "value_type": "string",
+          "introduced_by": "form_reverse",
+          "required_state": "required",
+          "evidence_hint": "不得以代理人资料代填"
+        },
+        {
+          "field_id": "submitter_role",
+          "label": "填报人与申请主体关系",
+          "value_type": "enum",
+          "introduced_by": "form_reverse",
+          "required_state": "required",
+          "evidence_hint": "employee / representative / consultant / other"
+        }
+      ],
+      "exceptions": [],
+      "exception_review_note": "本卡记录门户数据一致性，不推断代理权限或授权文件要求。",
+      "consequence": "提交前分离并核对填报人和申请主体资料，避免账号、通知和审计链混淆。",
+      "red_flag": {
+        "severity": "medium",
+        "condition": "顾问使用自己的邮箱或电话代替申请企业、权利人或实际填报人的资料。",
+        "response": "退回资料并按 CETESB FAQ 重新区分账号人与 interested party。"
+      },
+      "difference_type": "form_adds_identity_control",
+      "difference_summary": "法条轨没有门户账号结构；表单轨新增实际填报自然人、唯一邮箱和 interested party 联系方式分离要求。",
+      "production_tracks": {
+        "statute_forward": {
+          "status": "partial_provisional",
+          "source_ids": [
+            "alsp-lei-997-1976"
+          ],
+          "required_facts": [
+            "submitter_role"
+          ],
+          "derived_output": "只能提出申请主体和实际提交人关系问题，无法从 art. 5º 推导门户字段。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡法条轨进行同期计时，禁止事后估算。"
+        },
+        "form_reverse": {
+          "status": "completed_provisional",
+          "source_ids": [
+            "cetesb-pla-faq",
+            "cetesb-e-portal"
+          ],
+          "required_facts": [
+            "portal_user_cpf",
+            "portal_user_email",
+            "portal_user_address",
+            "portal_user_phone",
+            "interested_party_contact",
+            "submitter_role"
+          ],
+          "derived_output": "生成门户账号、实际填报人与申请主体联系方式一致性检查。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡表单轨进行同期计时，禁止事后估算。"
+        }
+      },
+      "open_questions": [
+        "代理或顾问在本项目中需要何种授权文件，当前门户会在哪一分支要求上传？"
+      ]
+    },
+    {
+      "rule_id": "BR-SP-ENV-RC-007",
+      "pack_id": "brazil_new_energy_greenfield",
+      "version": "0.1.0",
+      "title": "企业 CNPJ 与门户企业记录唯一性",
+      "certification_status": "provisional",
+      "production_ready": false,
+      "non_legal_opinion": true,
+      "citations": [
+        {
+          "source_id": "alsp-lei-997-1976",
+          "official_url": "https://www.al.sp.gov.br/repositorio/legislacao/lei/1976/compilacao-lei-997-31.05.1976.html",
+          "pinpoint": "Art. 5º",
+          "claim_scope": "条文建立污染源许可义务，但没有门户企业主数据规则。",
+          "access_verified_at": "2026-07-17"
+        },
+        {
+          "source_id": "cetesb-pla-faq",
+          "official_url": "https://cetesb.sp.gov.br/licenciamentoambiental/duvidas-sobre-o-portal-de-licenciamento-ambiental-pla/",
+          "pinpoint": "FAQ item 13",
+          "claim_scope": "门户不允许两个企业使用同一 CNPJ，分支机构应有自己的 CNPJ，已占用记录需联系环境机构整理。",
+          "access_verified_at": "2026-07-17"
+        },
+        {
+          "source_id": "cetesb-e-portal",
+          "official_url": "https://e.cetesb.sp.gov.br/portal-servicos-frontend/",
+          "pinpoint": "Sistema de Licenciamento Ambiental",
+          "claim_scope": "当前在线服务入口存在。",
+          "access_verified_at": "2026-07-17"
+        }
+      ],
+      "elements": [
+        {
+          "element_id": "cnpj_unique_per_portal_enterprise",
+          "statement": "门户中的每个企业记录使用独立 CNPJ。",
+          "source_track": "form_reverse"
+        },
+        {
+          "element_id": "branch_has_own_cnpj",
+          "statement": "分支机构不能直接复用总部 CNPJ 作为另一企业记录。",
+          "source_track": "form_reverse"
+        }
+      ],
+      "fact_fields": [
+        {
+          "field_id": "enterprise_cnpj",
+          "label": "申请企业 CNPJ",
+          "value_type": "identifier",
+          "introduced_by": "form_reverse",
+          "required_state": "required",
+          "evidence_hint": "企业官方登记"
+        },
+        {
+          "field_id": "enterprise_role",
+          "label": "企业角色",
+          "value_type": "enum",
+          "introduced_by": "form_reverse",
+          "required_state": "required",
+          "evidence_hint": "head_office / branch / project_company"
+        },
+        {
+          "field_id": "branch_cnpj",
+          "label": "分支机构独立 CNPJ",
+          "value_type": "identifier",
+          "introduced_by": "form_reverse",
+          "required_state": "conditional",
+          "evidence_hint": "仅分支机构场景"
+        },
+        {
+          "field_id": "existing_portal_enterprise_record",
+          "label": "既有门户企业记录",
+          "value_type": "identifier",
+          "introduced_by": "form_reverse",
+          "required_state": "conditional",
+          "evidence_hint": "如 CNPJ 已被门户占用"
+        }
+      ],
+      "exceptions": [],
+      "exception_review_note": "不把门户 CNPJ 唯一性解释为公司法结论；它仅是申请系统主数据约束。",
+      "consequence": "提交前核对项目公司、总部和分支机构的 CNPJ 及既有门户记录。",
+      "red_flag": {
+        "severity": "medium",
+        "condition": "拟用同一 CNPJ 创建两个门户企业记录，或分支机构没有独立 CNPJ。",
+        "response": "暂停创建新记录，联系对应 CETESB 机构核对既有数据。"
+      },
+      "difference_type": "form_adds_identity_control",
+      "difference_summary": "法条轨不会暴露系统主数据约束；表单轨新增 CNPJ 唯一性、总部与分支识别字段。",
+      "production_tracks": {
+        "statute_forward": {
+          "status": "partial_provisional",
+          "source_ids": [
+            "alsp-lei-997-1976"
+          ],
+          "required_facts": [
+            "enterprise_role"
+          ],
+          "derived_output": "仅能提出谁是许可申请主体，不能推导 CNPJ 门户约束。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡法条轨进行同期计时，禁止事后估算。"
+        },
+        "form_reverse": {
+          "status": "completed_provisional",
+          "source_ids": [
+            "cetesb-pla-faq",
+            "cetesb-e-portal"
+          ],
+          "required_facts": [
+            "enterprise_cnpj",
+            "enterprise_role",
+            "branch_cnpj",
+            "existing_portal_enterprise_record"
+          ],
+          "derived_output": "生成 CNPJ 唯一性和既有门户企业记录检查。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡表单轨进行同期计时，禁止事后估算。"
+        }
+      },
+      "open_questions": [
+        "项目公司尚未设立时，许可前期由何主体在门户建档最为合适？"
+      ]
+    },
+    {
+      "rule_id": "BR-SP-ENV-RC-008",
+      "pack_id": "brazil_new_energy_greenfield",
+      "version": "0.1.0",
+      "title": "物业城乡属性与农村 CCIR",
+      "certification_status": "provisional",
+      "production_ready": false,
+      "non_legal_opinion": true,
+      "citations": [
+        {
+          "source_id": "alsp-lei-997-1976",
+          "official_url": "https://www.al.sp.gov.br/repositorio/legislacao/lei/1976/compilacao-lei-997-31.05.1976.html",
+          "pinpoint": "Art. 5º",
+          "claim_scope": "许可关联具体污染源和项目地点，但条文未列门户物业字段。",
+          "access_verified_at": "2026-07-17"
+        },
+        {
+          "source_id": "cetesb-pla-faq",
+          "official_url": "https://cetesb.sp.gov.br/licenciamentoambiental/duvidas-sobre-o-portal-de-licenciamento-ambiental-pla/",
+          "pinpoint": "FAQ items 6 and 16 — urban/rural and CCIR",
+          "claim_scope": "门户根据产权、占有或税务资料记录城乡属性；农村物业需填写 CCIR，且 CCIR 与物业记录关联。",
+          "access_verified_at": "2026-07-17"
+        }
+      ],
+      "elements": [
+        {
+          "element_id": "property_classified_urban_or_rural",
+          "statement": "物业须按最新可用产权、占有或税务资料标记为城市或农村。",
+          "source_track": "form_reverse"
+        },
+        {
+          "element_id": "rural_property_has_ccir",
+          "statement": "农村物业在门户中需要 CCIR，并应与 INCRA 记录一致。",
+          "source_track": "form_reverse"
+        }
+      ],
+      "fact_fields": [
+        {
+          "field_id": "property_area_classification",
+          "label": "物业城乡属性",
+          "value_type": "enum",
+          "introduced_by": "form_reverse",
+          "required_state": "required",
+          "evidence_hint": "urban / rural；按最新资料"
+        },
+        {
+          "field_id": "property_classification_evidence",
+          "label": "城乡属性依据",
+          "value_type": "document",
+          "introduced_by": "form_reverse",
+          "required_state": "required",
+          "evidence_hint": "matrícula/transcrição/possession document/IPTU/ITR"
+        },
+        {
+          "field_id": "ccir_number",
+          "label": "农村物业 CCIR",
+          "value_type": "identifier",
+          "introduced_by": "form_reverse",
+          "required_state": "conditional",
+          "evidence_hint": "农村物业的 INCRA CCIR 卡"
+        },
+        {
+          "field_id": "property_total_area",
+          "label": "物业总面积与单位",
+          "value_type": "string",
+          "introduced_by": "form_reverse",
+          "required_state": "required",
+          "evidence_hint": "m² 或 ha"
+        }
+      ],
+      "exceptions": [
+        {
+          "exception_id": "newly_declared_urban_expansion_area",
+          "condition": "属于 FAQ item 16 所述新近宣布的城市或城市扩展区域，并用于 GRAPROHAB 土地分割。",
+          "effect": "门户操作上选择 urban，即使 matrícula 仍显示 rural；不得外推到其他场景。",
+          "review_status": "provisional"
+        }
+      ],
+      "exception_review_note": "城乡冲突处理仅记录 FAQ 操作指引，土地性质和项目法律后果仍需专项复核。",
+      "consequence": "在选择地块后核对城乡属性、依据文件、面积和条件性 CCIR。",
+      "red_flag": {
+        "severity": "high",
+        "condition": "物业资料对城乡属性互相冲突，或农村地块缺少可核对的 CCIR。",
+        "response": "停止完成门户物业登记，先由本地顾问核实最新资料。"
+      },
+      "difference_type": "form_adds_property_evidence",
+      "difference_summary": "法条轨只指向项目地点；表单轨具体要求城乡属性、证据来源、面积与农村 CCIR。",
+      "production_tracks": {
+        "statute_forward": {
+          "status": "partial_provisional",
+          "source_ids": [
+            "alsp-lei-997-1976"
+          ],
+          "required_facts": [
+            "property_area_classification"
+          ],
+          "derived_output": "只能提出污染源所在地问题，无法从 art. 5º 推导 CCIR 字段。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡法条轨进行同期计时，禁止事后估算。"
+        },
+        "form_reverse": {
+          "status": "completed_provisional",
+          "source_ids": [
+            "cetesb-pla-faq"
+          ],
+          "required_facts": [
+            "property_area_classification",
+            "property_classification_evidence",
+            "ccir_number",
+            "property_total_area"
+          ],
+          "derived_output": "生成城乡属性、证据、面积与农村 CCIR 条件检查。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡表单轨进行同期计时，禁止事后估算。"
+        }
+      },
+      "open_questions": [
+        "Campinas 候选地块的最新城乡属性与 CCIR 状态是什么？"
+      ]
+    },
+    {
+      "rule_id": "BR-SP-ENV-RC-009",
+      "pack_id": "brazil_new_energy_greenfield",
+      "version": "0.1.0",
+      "title": "多份 matrícula/transcrição 的逐项登记",
+      "certification_status": "provisional",
+      "production_ready": false,
+      "non_legal_opinion": true,
+      "citations": [
+        {
+          "source_id": "alsp-lei-997-1976",
+          "official_url": "https://www.al.sp.gov.br/repositorio/legislacao/lei/1976/compilacao-lei-997-31.05.1976.html",
+          "pinpoint": "Art. 5º",
+          "claim_scope": "污染源许可与具体项目地点相关，但条文未规定门户不动产录入粒度。",
+          "access_verified_at": "2026-07-17"
+        },
+        {
+          "source_id": "cetesb-pla-faq",
+          "official_url": "https://cetesb.sp.gov.br/licenciamentoambiental/duvidas-sobre-o-portal-de-licenciamento-ambiental-pla/",
+          "pinpoint": "FAQ items 6 and 16 — matrícula/transcrição",
+          "claim_scope": "一个 CCIR 可对应多份 matrícula，项目区域涉及同一所有人的多份登记时应逐项添加。",
+          "access_verified_at": "2026-07-17"
+        }
+      ],
+      "elements": [
+        {
+          "element_id": "all_property_records_captured",
+          "statement": "项目区域涉及的每份 matrícula/transcrição 均单独登记。",
+          "source_track": "form_reverse"
+        },
+        {
+          "element_id": "ccir_may_cover_multiple_records",
+          "statement": "单一 CCIR 可能覆盖多份 matrícula，不能据此只录入一份。",
+          "source_track": "form_reverse"
+        }
+      ],
+      "fact_fields": [
+        {
+          "field_id": "property_record_count",
+          "label": "涉及的登记记录数量",
+          "value_type": "string",
+          "introduced_by": "form_reverse",
+          "required_state": "required",
+          "evidence_hint": "覆盖整个项目边界"
+        },
+        {
+          "field_id": "registry_municipality",
+          "label": "登记机关所在市",
+          "value_type": "string",
+          "introduced_by": "form_reverse",
+          "required_state": "required",
+          "evidence_hint": "每份记录逐项填写"
+        },
+        {
+          "field_id": "registry_office_number",
+          "label": "登记处编号",
+          "value_type": "identifier",
+          "introduced_by": "form_reverse",
+          "required_state": "required",
+          "evidence_hint": "无编号的单一登记处按 FAQ 填 1"
+        },
+        {
+          "field_id": "matricula_transcricao_numbers",
+          "label": "全部 matrícula/transcrição 编号",
+          "value_type": "string_list",
+          "introduced_by": "form_reverse",
+          "required_state": "required",
+          "evidence_hint": "逐项与物业边界核对"
+        },
+        {
+          "field_id": "recorded_owner",
+          "label": "登记所有人",
+          "value_type": "string",
+          "introduced_by": "form_reverse",
+          "required_state": "required",
+          "evidence_hint": "各记录所有人及一致性"
+        }
+      ],
+      "exceptions": [
+        {
+          "exception_id": "single_registry_office_without_number",
+          "condition": "该市只有或曾只有一个登记处，matrícula 上没有登记处编号。",
+          "effect": "FAQ 指示门户中的登记处编号填写 1。",
+          "review_status": "provisional"
+        }
+      ],
+      "exception_review_note": "本操作规则不验证产权完整性、负担或边界重合，仅防止门户漏录。",
+      "consequence": "在门户提交前，将项目范围内所有登记记录逐项与边界和所有人核对。",
+      "red_flag": {
+        "severity": "high",
+        "condition": "项目边界跨越多份 matrícula，但材料或门户仅记录其中一份。",
+        "response": "阻止提交并补齐全部登记记录。"
+      },
+      "difference_type": "form_adds_property_evidence",
+      "difference_summary": "法条轨不提供不动产录入粒度；表单轨明确多份 matrícula 逐项添加及无编号登记处的录入方法。",
+      "production_tracks": {
+        "statute_forward": {
+          "status": "partial_provisional",
+          "source_ids": [
+            "alsp-lei-997-1976"
+          ],
+          "required_facts": [
+            "property_record_count"
+          ],
+          "derived_output": "只能提出项目地点范围是否确定，无法推导逐份登记要求。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡法条轨进行同期计时，禁止事后估算。"
+        },
+        "form_reverse": {
+          "status": "completed_provisional",
+          "source_ids": [
+            "cetesb-pla-faq"
+          ],
+          "required_facts": [
+            "property_record_count",
+            "registry_municipality",
+            "registry_office_number",
+            "matricula_transcricao_numbers",
+            "recorded_owner"
+          ],
+          "derived_output": "生成多登记记录完整性与逐项录入检查。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡表单轨进行同期计时，禁止事后估算。"
+        }
+      },
+      "open_questions": [
+        "候选工厂边界是否跨越不同所有人或不同登记处的地块？"
+      ]
+    },
+    {
+      "rule_id": "BR-SP-ENV-RC-010",
+      "pack_id": "brazil_new_energy_greenfield",
+      "version": "0.1.0",
+      "title": "无 matrícula/transcrição 时的占有文件分支",
+      "certification_status": "provisional",
+      "production_ready": false,
+      "non_legal_opinion": true,
+      "citations": [
+        {
+          "source_id": "alsp-lei-997-1976",
+          "official_url": "https://www.al.sp.gov.br/repositorio/legislacao/lei/1976/compilacao-lei-997-31.05.1976.html",
+          "pinpoint": "Art. 5º",
+          "claim_scope": "污染源许可关联项目地点，但条文未列占有证明文件。",
+          "access_verified_at": "2026-07-17"
+        },
+        {
+          "source_id": "cetesb-pla-faq",
+          "official_url": "https://cetesb.sp.gov.br/licenciamentoambiental/duvidas-sobre-o-portal-de-licenciamento-ambiental-pla/",
+          "pinpoint": "FAQ item 16 — Posse",
+          "claim_scope": "没有 matrícula/transcrição 时，门户允许记录特定占有文件类型，并要求仅在无登记资料时填写该分支。",
+          "access_verified_at": "2026-07-17"
+        }
+      ],
+      "elements": [
+        {
+          "element_id": "no_matricula_or_transcricao",
+          "statement": "物业没有可填的 matrícula 或 transcrição。",
+          "source_track": "form_reverse"
+        },
+        {
+          "element_id": "accepted_possession_document_identified",
+          "statement": "申请人从 FAQ 列示的占有文件类型中记录实际持有文件。",
+          "source_track": "form_reverse"
+        }
+      ],
+      "fact_fields": [
+        {
+          "field_id": "has_matricula_or_transcricao",
+          "label": "是否有 matrícula/transcrição",
+          "value_type": "boolean",
+          "introduced_by": "form_reverse",
+          "required_state": "required",
+          "evidence_hint": "先判断登记分支"
+        },
+        {
+          "field_id": "possession_document_type",
+          "label": "占有文件类型",
+          "value_type": "enum",
+          "introduced_by": "form_reverse",
+          "required_state": "conditional",
+          "evidence_hint": "escritura de posse / contrato particular de compra e venda / cessão de direitos / certidão de usucapião / decreto de utilidade pública"
+        },
+        {
+          "field_id": "possession_document_reference",
+          "label": "占有文件编号或引用",
+          "value_type": "identifier",
+          "introduced_by": "form_reverse",
+          "required_state": "conditional",
+          "evidence_hint": "对应文件原件或可核验副本"
+        },
+        {
+          "field_id": "possession_document",
+          "label": "占有证明文件",
+          "value_type": "document",
+          "introduced_by": "form_reverse",
+          "required_state": "conditional",
+          "evidence_hint": "仅记录真实持有文件，不自行生成"
+        }
+      ],
+      "exceptions": [
+        {
+          "exception_id": "possession_only_without_registry_data",
+          "condition": "存在可填写的 matrícula 或 transcrição。",
+          "effect": "根据 FAQ，不应填写 Posse 分支；应优先使用登记资料。",
+          "review_status": "provisional"
+        }
+      ],
+      "exception_review_note": "FAQ 的文件列表只证明门户接受的输入类型，不证明占有权有效、无争议或足以支持投资。",
+      "consequence": "若无登记资料，仅把真实占有文件作为门户材料分支，并另行触发土地权利尽调。",
+      "red_flag": {
+        "severity": "high",
+        "condition": "没有 matrícula/transcrição，且无法提供 FAQ 列示的任何占有文件，或团队把占有文件等同于无瑕疵产权。",
+        "response": "停止许可材料完备结论，升级土地权利和许可双重尽调。"
+      },
+      "difference_type": "form_adds_property_evidence",
+      "difference_summary": "法条轨没有占有材料清单；表单轨提供条件性文件分支，但不能替代对权利有效性的法律尽调。",
+      "production_tracks": {
+        "statute_forward": {
+          "status": "partial_provisional",
+          "source_ids": [
+            "alsp-lei-997-1976"
+          ],
+          "required_facts": [
+            "has_matricula_or_transcricao"
+          ],
+          "derived_output": "只能提出项目地点权利基础是否明确，无法推导门户接受的占有文件类型。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡法条轨进行同期计时，禁止事后估算。"
+        },
+        "form_reverse": {
+          "status": "completed_provisional",
+          "source_ids": [
+            "cetesb-pla-faq"
+          ],
+          "required_facts": [
+            "has_matricula_or_transcricao",
+            "possession_document_type",
+            "possession_document_reference",
+            "possession_document"
+          ],
+          "derived_output": "生成无登记资料时的占有文件条件清单和土地尽调升级信号。",
+          "effort_minutes": null,
+          "effort_unavailable_reason": "未对本卡表单轨进行同期计时，禁止事后估算。"
+        }
+      },
+      "open_questions": [
+        "项目地块若依赖占有文件，其可执行性、争议和登记转化路径分别是什么？"
+      ]
+    }
+  ],
+  "summary": {
+    "card_count": 10,
+    "difference_type_counts": {
+      "scope_to_form_fields": 3,
+      "form_adds_branching_logic": 2,
+      "form_adds_identity_control": 2,
+      "form_adds_property_evidence": 3
+    },
+    "measured_statute_forward_minutes": null,
+    "measured_form_reverse_minutes": null,
+    "result": "在该窄样本中，法条轨更擅长识别许可触发和阶段，表单轨额外暴露身份、既有许可分支与物业证据字段；该结果仅支持继续实验，不支持宣称通用规则模型已经验证。"
+  },
+  "limitations": [
+    "后续时点核验确认 Decreto nº 8.468/1976 arts. 57-58 的实验摘要未整合 Decreto 47.397/2002、62.973/2017、63.119/2017 与 69.120/2024；相关法条轨已作废为现行法证据。",
+    "全部规则卡均为 provisional，尚未经过巴西执业律师逐项确认。",
+    "没有同期工时记录，因此不能比较两条生产轨的效率或成本。",
+    "CETESB 门户会随申请类型动态变化，本实验只记录官方 FAQ 可直接核验的字段与分支。",
+    "未使用当前无法稳定直达的历史工业许可 PDF，也未把热电联产专项清单外推到一般新能源制造。",
+    "本证据文件不进入现有 runtime 规则制品，不改变正式调查输出。"
+  ]
+}

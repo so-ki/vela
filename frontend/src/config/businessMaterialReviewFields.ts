@@ -237,7 +237,7 @@ export function shouldShowReviewField(
   const requiredKeys = new Set(submitAlwaysRequiredKeys(catalog))
   const includeEmptyRequired = options?.includeEmptyRequired ?? true
   if (includeEmptyRequired && requiredKeys.has(field.key)) return true
-  return !isReviewFieldEmpty(field.key, form[field.key as ReviewFieldKey], field)
+  return !isReviewFieldEmpty(form[field.key as ReviewFieldKey], field)
 }
 
 /** 仅展示有抽取/填写内容的字段；必填项始终保留 */
@@ -432,7 +432,7 @@ export function reviewFieldsForDimensions(
   return allFields.filter((field) => keys.has(field.key))
 }
 
-export function isReviewFieldEmpty(key: string, value: unknown, field?: ReviewFieldDef): boolean {
+export function isReviewFieldEmpty(value: unknown, field?: ReviewFieldDef): boolean {
   if (value === null || value === undefined) return true
   if (typeof value === 'string') {
     const trimmed = value.trim()
@@ -452,7 +452,7 @@ export function collectMissingSubmitRequiredFields(
   const missing: string[] = []
   for (const field of fields) {
     if (!requiredKeys.has(field.key)) continue
-    if (isReviewFieldEmpty(field.key, form[field.key], field)) {
+    if (isReviewFieldEmpty(form[field.key], field)) {
       missing.push(field.key)
     }
   }

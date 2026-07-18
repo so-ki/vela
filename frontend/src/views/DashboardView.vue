@@ -3,7 +3,6 @@ import { ref, onMounted, computed, watch } from 'vue'
 import { RouterLink, useRouter } from 'vue-router'
 import {
   archiveScenario,
-  createFullSample,
   deleteScenario,
   fetchLegalMonitor,
   fetchLegalStatus,
@@ -22,7 +21,7 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import LlmSettingsPanel from '@/components/LlmSettingsPanel.vue'
 import type { ScenarioSummary, RulesCatalog } from '@/types/scenario'
-import type { SystemStatus } from '@/types'
+import type { OnboardingStatus, SystemStatus } from '@/types'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -88,8 +87,9 @@ const scenarios = ref<ScenarioSummary[]>([])
 const rulesCatalog = ref<RulesCatalog | null>(null)
 const onboardingComplete = ref(true)
 const onboardingChecked = ref(false)
+const onboardingError = ref<string | null>(null)
+const dashboardLoadError = ref<string | null>(null)
 const loading = ref(true)
-const creatingSample = ref(false)
 const sampleError = ref<string | null>(null)
 const archivingId = ref<number | null>(null)
 const deletingId = ref<number | null>(null)
@@ -352,9 +352,17 @@ async function loadScenarios() {
   scenarios.value = await fetchScenarios(true, true)
 }
 
-onMounted(async () => {
+async function loadDashboard() {
+  loading.value = true
+  onboardingChecked.value = false
+  onboardingComplete.value = !auth.isLegal
+  onboardingError.value = null
+  dashboardLoadError.value = null
   try {
-    const tasks: Promise<unknown>[] = [fetchSystemStatus(), loadScenarios(), fetchOnboardingStatus().catch(() => ({ completed: true }))]
+    const onboardingTask = auth.isLegal
+      ? fetchOnboardingStatus().catch(() => null)
+      : Promise.resolve<OnboardingStatus>({ completed: true, required: false, role: 'business' })
+    const tasks: Promise<unknown>[] = [fetchSystemStatus(), loadScenarios(), onboardingTask]
     if (auth.isLegal) {
       tasks.push(
         fetchLegalStatus().catch(() => null),
@@ -366,9 +374,14 @@ onMounted(async () => {
     }
     const results = await Promise.all(tasks)
     status.value = results[0] as SystemStatus
-    const onboardingStatus = results[2] as { completed?: boolean }
-    onboardingComplete.value = onboardingStatus?.completed !== false
+    const onboardingStatus = results[2] as OnboardingStatus | null
     onboardingChecked.value = true
+    if (!onboardingStatus) {
+      onboardingComplete.value = false
+      onboardingError.value = '无法确认 Legal Playbook 配置状态。请检查连接后重试。'
+      return
+    }
+    onboardingComplete.value = onboardingStatus.completed
     if (!onboardingComplete.value) {
       await router.replace({ name: 'cold-start' })
       return
@@ -380,23 +393,18 @@ onMounted(async () => {
       rulesCatalog.value = (results[6] as RulesCatalog | null) ?? null
       playbookDeviations.value = (results[7] as typeof playbookDeviations.value) ?? null
     }
+  } catch {
+    onboardingChecked.value = true
+    onboardingComplete.value = false
+    dashboardLoadError.value = '工作台数据加载失败，请检查连接后重试。'
   } finally {
     loading.value = false
   }
-})
-
-async function runCreateSample() {
-  creatingSample.value = true
-  sampleError.value = null
-  try {
-    const scenario = await createFullSample()
-    await router.push({ name: 'project-hub', params: { id: scenario.id } })
-  } catch {
-    sampleError.value = '生成样本失败，请确认后端已启动'
-  } finally {
-    creatingSample.value = false
-  }
 }
+
+onMounted(() => {
+  void loadDashboard()
+})
 
 async function runLegalScan() {
   scanningLegal.value = true
@@ -412,7 +420,9 @@ async function runLegalScan() {
 async function runCorpusAgent() {
   runningCorpusAgent.value = true
   try {
-    await runCorpusMaintenanceAgent(true, true)
+    // The agent may scan and enqueue LexML candidates, but publishing/reindexing
+    // remains an explicit, human-reviewed release action.
+    await runCorpusMaintenanceAgent(true, false)
     corpusAgent.value = await fetchCorpusAgentStatus()
     legalMonitor.value = await fetchLegalMonitor()
     legalStatus.value = await fetchLegalStatus()
@@ -535,7 +545,15 @@ async function removeLegalScenario(s: ScenarioSummary) {
 
 <template>
   <div class="dashboard page-stack" :class="{ 'legal-workbench-order': auth.isLegal, 'business-workbench': auth.isBusiness }">
-    <div v-if="!onboardingChecked || !onboardingComplete" class="muted">加载中…</div>
+    <div v-if="dashboardLoadError" class="panel state-card">
+      <p class="error banner-error">{{ dashboardLoadError }}</p>
+      <button type="button" class="btn primary" @click="loadDashboard">重新加载工作台</button>
+    </div>
+    <div v-else-if="onboardingError" class="panel state-card">
+      <p class="error banner-error">{{ onboardingError }}</p>
+      <button type="button" class="btn primary" @click="loadDashboard">重试</button>
+    </div>
+    <div v-else-if="!onboardingChecked || !onboardingComplete" class="muted">加载中…</div>
     <template v-else>
     <section class="hero-card">
       <div>
@@ -784,17 +802,12 @@ async function removeLegalScenario(s: ScenarioSummary) {
           </div>
         </button>
         <div v-show="demoPanelOpen" class="workbench-panel-body">
-        <p class="muted">内部演示用一键样本，跳过业务提交环节，直接进入复核页。</p>
+        <p class="muted">演示记录已与正式项目隔离，不进入法务复核、导出或统计。</p>
         <ul class="panel-hints">
           <li>基于 BYD 坎皮纳斯预设场景，约 24 条核查项</li>
           <li>适合首次了解交付物结构与复核流程</li>
         </ul>
         <p class="error" v-if="sampleError">{{ sampleError }}</p>
-        <div class="action-row stack-actions">
-          <button type="button" class="btn-secondary full" :disabled="creatingSample" @click="runCreateSample">
-            {{ creatingSample ? '生成中…' : '一键生成完整样本' }}
-          </button>
-        </div>
         <p class="muted panel-footnote">演示样本不代表贵司真实项目；正式协查请等待业务提交。</p>
         </div>
       </section>

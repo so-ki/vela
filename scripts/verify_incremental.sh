@@ -12,12 +12,16 @@ login() {
 BIZ=$(login biz@demo.vela)
 LEGAL=$(login legal@demo.vela)
 
-SUB=$(curl -sf -X POST "$API/scenarios/demo/submit-materials" -H "Authorization: Bearer $BIZ")
+SUB=$(curl -sf -X POST "$API/scenarios/submit-materials" -H "Authorization: Bearer $BIZ" \
+  -F 'payload={"project_name":"增量协查测试工厂","description":"计划在巴西圣保罗州绿地设厂，新建新能源制造工厂并分期雇佣当地员工。","scope_acknowledged":true,"scope_notice_version":"scope-notice-v2"}' \
+  -F 'files=@scripts/fixtures/sample_storage_project.txt')
 SID=$(echo "$SUB" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+PROPOSAL_HASH=$(echo "$SUB" | python3 -c "import sys,json; print(json.load(sys.stdin)['scenario_scope']['proposed']['proposal_hash'])")
 
-curl -sf -X POST "$API/scenarios/$SID/generate-investigation" \
+FIRST=$(curl -sf -X POST "$API/scenarios/$SID/confirm-scope" \
   -H "Authorization: Bearer $LEGAL" -H 'Content-Type: application/json' \
-  -d '{"compliance_dimensions":["labor","foreign_investment","tax","environment","industry_access"],"polish":false}' >/dev/null
+  -d "{\"compliance_dimensions\":[\"labor\",\"foreign_investment\",\"tax\",\"environment\",\"industry_access\"],\"expected_proposal_hash\":\"$PROPOSAL_HASH\",\"fit_decision\":\"accept_warning\",\"polish\":false}")
+FIRST_PACK=$(echo "$FIRST" | python3 -c "import sys,json; s=json.load(sys.stdin)['scenario_scope']['snapshot']; print('|'.join([s['capability_pack_id'],s['capability_pack_version'],s['capability_pack_hash'],s['rules_artifact_hash'],s['corpus_artifact_hash']]))")
 
 curl -sf -X POST "$API/scenarios/$SID/review/init" -H "Authorization: Bearer $LEGAL" >/dev/null
 curl -sf -X PATCH "$API/scenarios/$SID/review/items/FOR-001" \
@@ -46,20 +50,24 @@ curl -sf -X POST "$API/scenarios/$SID/revise-and-resubmit" \
   -H "Authorization: Bearer $BIZ" -H 'Content-Type: application/json' \
   -d "$REV_PAYLOAD" >/dev/null
 
-INC=$(curl -sf -X POST "$API/scenarios/$SID/generate-investigation" \
+INC=$(curl -sf -X POST "$API/scenarios/$SID/confirm-scope" \
   -H "Authorization: Bearer $LEGAL" -H 'Content-Type: application/json' \
-  -d '{"compliance_dimensions":["labor","foreign_investment","tax","environment","industry_access"],"polish":false}')
+  -d "{\"compliance_dimensions\":[\"labor\",\"foreign_investment\",\"tax\",\"environment\",\"industry_access\"],\"expected_proposal_hash\":\"$PROPOSAL_HASH\",\"fit_decision\":\"accept_warning\",\"polish\":false}")
 
 echo "$INC" | python3 -c "
 import sys, json
 d=json.load(sys.stdin)
+expected=sys.argv[1].split('|')
+snapshot=d['scenario_scope']['snapshot']
+actual=[snapshot['capability_pack_id'],snapshot['capability_pack_version'],snapshot['capability_pack_hash'],snapshot['rules_artifact_hash'],snapshot['corpus_artifact_hash']]
+assert actual==expected, (actual, expected)
 inc=d.get('incremental_regen') or {}
 assert inc.get('mode')=='incremental', inc
 assert 'lab_workforce' in (inc.get('target_elements') or []), inc
 assert len(inc.get('target_codes') or [])>=1, inc
 assert len(inc.get('frozen_codes') or [])>=1, inc
 print('incremental ok:', 'target', len(inc['target_codes']), 'frozen', len(inc['frozen_codes']), 'changed', inc.get('changed_fields'))
-"
+" "$FIRST_PACK"
 
 REV=$(curl -sf "$API/scenarios/$SID/review" -H "Authorization: Bearer $LEGAL")
 echo "$REV" | python3 -c "

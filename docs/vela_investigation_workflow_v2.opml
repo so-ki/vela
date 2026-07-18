@@ -4,33 +4,36 @@
     <title>Vela 协查流程 v2</title>
   </head>
   <body>
-    <outline text="Vela 协查流程（一遍生成 + 统一复核）">
-      <outline text="0 · 业务提交材料">
-        <outline text="上传方案 + 填写核对表"/>
+    <outline text="Vela 正式协查流程（显式确认 + 冻结快照）">
+      <outline text="1 · 业务：提交事实与知情确认">
+        <outline text="上传方案 + 核对项目事实"/>
+        <outline text="查看 brazil_new_energy_greenfield Capability Pack"/>
+        <outline text="勾选当前支持边界知情确认"/>
+      </outline>
+      <outline text="2 · 后端：proposed scope">
         <outline text="状态 pending_scope"/>
+        <outline text="proposed scope + fit assessment"/>
+        <outline text="尚无 snapshot；不得生成"/>
       </outline>
-      <outline text="1 · 法务：选定范围（生成前）">
-        <outline text="勾选 5 大合规维度"/>
-        <outline text="材料预检（可选，不阻断）"/>
-        <outline text="【生成协查包】一次点击"/>
+      <outline text="3 · 法务：确认范围并生成">
+        <outline text="查看场景卡与材料卡"/>
+        <outline text="选择法律维度与必要议题"/>
+        <outline text="POST /scenarios/{id}/confirm-scope"/>
+        <outline text="原子冻结 pack / rules / corpus / generation config snapshot"/>
       </outline>
-      <outline text="2–5 · 系统：一次生成">
-        <outline text="② 核查项定位"/>
-        <outline text="③ 核查清单 + 多源 RAG"/>
-        <outline text="④ 跨语种 + 匹配度（阈值70）"/>
-        <outline text="⑤ 双语简报草稿"/>
+      <outline text="4 · 系统：唯一 generation attempt">
+        <outline text="清单 + RAG + Grounding + 70 分门控"/>
+        <outline text="持久化中葡双语简报"/>
+        <outline text="失败重试严格沿用原 snapshot"/>
       </outline>
-      <outline text="Gate A · 构成要件（生成后聚合）">
-        <outline text="条目 RAG + 匹配度 + 材料预检 同源"/>
-        <outline text="已覆盖 / 待核实 / 缺项"/>
-        <outline text="未定稿前随时打回补充材料"/>
-      </outline>
-      <outline text="6 · 法务：统一复核">
-        <outline text="清单逐条确认 / 驳回"/>
+      <outline text="5 · 法务：统一复核">
+        <outline text="review/init 只读取已有成功结果"/>
+        <outline text="逐条确认 / 驳回 / 批注"/>
         <outline text="定稿"/>
       </outline>
-      <outline text="7 · 导出归档">
+      <outline text="6 · 导出归档">
         <outline text="Word / PDF 协查底稿"/>
+        <outline text="须法务复核；不构成正式法律意见"/>
       </outline>
     </outline>
   </body>

@@ -1,7 +1,7 @@
 ---
 name: legal-article-retrieval
 description: 核查项级法条检索（关键词优先 + 可选 Chroma）；LexML 溯源，禁止编造
-compatibility: Vela D1 · RAG · retrieve agent_step · brazil_legal_corpus 70+ 条
+compatibility: Vela D1 · RAG · retrieve agent_step · brazil_legal_corpus 1.13（11 条可检索 / 71 条审计隔离）
 ---
 
 # 法条检索（Legal Article Retrieval）

@@ -5,12 +5,16 @@ from __future__ import annotations
 import json
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any, Optional
 
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.core.secure_json_store import (
+    JSON_STORE_LOCK,
+    atomic_write_json,
+    synchronized_json_store,
+)
 from app.models.scenario import InvestigationScenario
 from app.services.legal_corpus_service import rebuild_corpus_index
 from app.services.legal_ingest import load_corpus
@@ -25,24 +29,27 @@ from app.services.reg_feed_service import scan_reg_feed
 
 AGENT_INTERVAL_HOURS = 6
 MAX_LEXML_SYNC_PER_RUN = 12
-PENDING_REVIEW_PATH = Path(__file__).resolve().parents[1] / "data" / "corpus_pending_review.json"
+
+
+def _pending_review_path():
+    return get_settings().data_dir / "corpus_pending_review.json"
 
 
 def _load_pending_review() -> list[dict[str, Any]]:
-    if not PENDING_REVIEW_PATH.exists():
+    path = _pending_review_path()
+    if not path.exists():
         return []
-    with open(PENDING_REVIEW_PATH, encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         data = json.load(f)
     return list(data) if isinstance(data, list) else []
 
 
 def _save_pending_review(items: list[dict[str, Any]]) -> None:
-    PENDING_REVIEW_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(PENDING_REVIEW_PATH, "w", encoding="utf-8") as f:
-        json.dump(items[:200], f, ensure_ascii=False, indent=2)
-        f.write("\n")
+    path = _pending_review_path()
+    atomic_write_json(path, items[:200])
 
 
+@synchronized_json_store
 def enqueue_pending_corpus_review(entries: list[dict[str, Any]]) -> int:
     """Append reg-feed / diff hints to human review queue — never auto-merge corpus."""
     if not entries:
@@ -109,7 +116,10 @@ def _impact_analysis(
 
     scenarios = (
         db.query(InvestigationScenario)
-        .filter(InvestigationScenario.legal_deleted_at.is_(None))
+        .filter(
+            InvestigationScenario.legal_deleted_at.is_(None),
+            InvestigationScenario.is_demo.is_(False),
+        )
         .order_by(InvestigationScenario.updated_at.desc())
         .limit(80)
         .all()
@@ -217,7 +227,7 @@ def _batch_lexml_sync(*, limit: int = MAX_LEXML_SYNC_PER_RUN) -> list[dict[str, 
         if doc.get("source") not in ("lexml", "stf", "stj") or not (doc.get("urn") or "").strip():
             continue
         prev_len = len(doc.get("text_pt") or "")
-        outcome = enrich_corpus_document_from_lexml(str(doc["id"]), persist=True)
+        outcome = enrich_corpus_document_from_lexml(str(doc["id"]), persist=False)
         if outcome.get("status") == "ok":
             synced += 1
             new_len = int(outcome.get("new_length") or 0)
@@ -230,6 +240,8 @@ def _batch_lexml_sync(*, limit: int = MAX_LEXML_SYNC_PER_RUN) -> list[dict[str, 
                         "previous_length": prev_len,
                         "new_length": new_len,
                         "checklist_codes": list(doc.get("checklist_codes") or []),
+                        "candidate": outcome.get("candidate"),
+                        "reason": "lexml_candidate",
                     }
                 )
     return results
@@ -239,8 +251,8 @@ def run_corpus_maintenance_agent(
     db: Optional[Session] = None,
     *,
     scheduled: bool = False,
-    sync_lexml: bool = True,
-    auto_reindex: bool = True,
+    sync_lexml: bool = False,
+    auto_reindex: bool = False,
 ) -> dict[str, Any]:
     """Scan feeds, sync LexML-backed corpus, notify legal of impacted projects."""
     run_id = f"agent-{uuid.uuid4().hex[:10]}"
@@ -278,6 +290,7 @@ def run_corpus_maintenance_agent(
     lexml_updates: list[dict[str, Any]] = []
     if sync_lexml:
         lexml_updates = _batch_lexml_sync()
+        queued += enqueue_pending_corpus_review(lexml_updates)
 
     diff = compute_corpus_diff(prev_snapshot=prev_snapshot if prev_snapshot else None)
     for item in lexml_updates:
@@ -305,13 +318,12 @@ def run_corpus_maintenance_agent(
             affected_codes=affected_codes,
         )
 
-    notifications: list[dict[str, Any]] = list(state.get("agent_notifications") or [])
     new_notifications: list[dict[str, Any]] = []
 
     if lexml_updates or diff.get("has_changes") or impacts:
         summary_parts: list[str] = []
         if lexml_updates:
-            summary_parts.append(f"已从 LexML 同步 {len(lexml_updates)} 条语料")
+            summary_parts.append(f"已从 LexML 抓取 {len(lexml_updates)} 条候选文本（待复核）")
         if diff.get("changed_documents"):
             summary_parts.append(f"语料变更 {len(diff.get('changed_documents') or [])} 条")
         if impacts:
@@ -341,21 +353,36 @@ def run_corpus_maintenance_agent(
             "acknowledged": False,
         }
         new_notifications.append(notif)
-        notifications = (new_notifications + notifications)[:40]
 
-    agent_runs = [{"run_id": run_id, "started_at": started, "finished_at": _utcnow_iso(), "scheduled": scheduled}]
-    agent_runs = (agent_runs + list(state.get("agent_runs") or []))[:20]
+    # scan_regulatory_updates may have updated this same state file while the
+    # agent was working. Merge into the latest snapshot under one lock instead
+    # of saving the stale snapshot loaded at the beginning of the run.
+    with JSON_STORE_LOCK:
+        latest_state = _load_state()
+        notifications = (
+            new_notifications + list(latest_state.get("agent_notifications") or [])
+        )[:40]
+        agent_runs = [
+            {
+                "run_id": run_id,
+                "started_at": started,
+                "finished_at": _utcnow_iso(),
+                "scheduled": scheduled,
+            }
+        ]
+        agent_runs = (agent_runs + list(latest_state.get("agent_runs") or []))[:20]
 
-    state["agent_notifications"] = notifications
-    state["agent_runs"] = agent_runs
-    state["last_agent_run_at"] = _utcnow_iso()
-    _save_state(state)
+        latest_state["agent_notifications"] = notifications
+        latest_state["agent_runs"] = agent_runs
+        latest_state["last_agent_run_at"] = _utcnow_iso()
+        _save_state(latest_state)
 
     return {
         "run_id": run_id,
         "started_at": started,
         "scheduled": scheduled,
-        "lexml_synced": len(lexml_updates),
+        "lexml_synced": 0,
+        "lexml_candidates_fetched": len(lexml_updates),
         "diff": diff,
         "impacted_project_count": len(impacts),
         "impacted_projects": impacts,
@@ -373,7 +400,7 @@ def get_agent_status() -> dict[str, Any]:
     notifications = list(state.get("agent_notifications") or [])
     unread = [n for n in notifications if not n.get("acknowledged")]
     return {
-        "enabled": True,
+        "enabled": settings.corpus_agent_enabled,
         "interval_hours": AGENT_INTERVAL_HOURS,
         "last_run_at": state.get("last_agent_run_at"),
         "recent_runs": (state.get("agent_runs") or [])[:5],
@@ -381,13 +408,14 @@ def get_agent_status() -> dict[str, Any]:
         "unread_count": len(unread),
         "notifications": notifications[:15],
         "note": (
-            "后台 Agent：定期扫描 Reg Feed、从 LexML 回溯更新语料、"
-            "分析协查/合同/尽调受影响范围并推送法务通知；不自动改写已定稿。"
+            "后台 Agent 默认关闭；启用时只扫描 Reg Feed 和抓取 LexML 候选文本，"
+            "候选进入人工复核队列，不会改写 active corpus 或已定稿底稿。"
         ),
         "retrieval_top_k_default": settings.retrieval_top_k_default,
     }
 
 
+@synchronized_json_store
 def acknowledge_notification(notification_id: str) -> dict[str, Any]:
     state = _load_state()
     notifications = list(state.get("agent_notifications") or [])

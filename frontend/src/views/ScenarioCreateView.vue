@@ -2,14 +2,15 @@
 import { ref, onMounted, computed, nextTick } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import BusinessReviewModal from '@/components/BusinessReviewModal.vue'
+import CapabilityPackCard from '@/components/CapabilityPackCard.vue'
 import MaterialFieldSections from '@/components/MaterialFieldSections.vue'
 import { REVIEW_FIELD_LABELS, allReviewFieldsFromCatalog, collectMissingSubmitRequiredFields, reviewFieldsForDimensions, type CustomReviewField } from '@/config/businessMaterialReviewFields'
 import {
-  applySceneDefaults,
-  countryLabelForCatalog,
+  capabilityPackFromCatalog,
+  isUsableCapabilityCatalog,
   sceneDefaultsFromCatalog,
 } from '@/config/sceneClassification'
-import { createDemoScenario, createScenario, extractDocumentsFromFiles, fetchDemoTemplate, fetchRulesCatalog, fetchScenario, reviseAndResubmitScenario, submitMaterialsScenario } from '@/api/client'
+import { extractDocumentsFromFiles, fetchRulesCatalog, fetchScenario, reviseAndResubmitScenario, submitMaterialsScenario } from '@/api/client'
 import type { DocumentExtractBatchResult, DocumentExtractResult } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { useMaterialReviewDraftStore } from '@/stores/materialReviewDraft'
@@ -25,6 +26,7 @@ const catalog = ref<RulesCatalog | null>(null)
 const loading = ref(false)
 const submitting = ref(false)
 const extracting = ref(false)
+const llmConsentForUpload = ref(false)
 const error = ref<string | null>(null)
 const extractBatch = ref<DocumentExtractBatchResult | null>(null)
 const pendingFiles = ref<File[]>([])
@@ -41,6 +43,10 @@ const reviewCustomFields = ref<CustomReviewField[]>([])
 const reviewRowOrder = ref<string[]>([])
 
 const FIELD_LABELS: Record<string, string> = REVIEW_FIELD_LABELS
+const MAX_UPLOAD_FILE_BYTES = 25 * 1024 * 1024
+const MAX_UPLOAD_BATCH_BYTES = 100 * 1024 * 1024
+const MAX_UPLOAD_FILES = 10
+const ALLOWED_UPLOAD_SUFFIXES = ['.txt', '.md', '.docx', '.pdf']
 
 const LEGAL_FIELD_PLACEHOLDERS: Record<string, string> = {
   project_name: 'BYD 坎皮纳斯新能源工厂',
@@ -165,17 +171,19 @@ function createEmptyBusinessForm(): ScenarioFormData {
   }
 }
 
-function applyBusinessSubmitDefaults<T extends Record<string, unknown>>(payload: T): T {
-  return applySceneDefaults(payload, catalog.value)
-}
-
-const activeCountryLabel = computed(() => countryLabelForCatalog(catalog.value))
+const supportedPack = computed(() => capabilityPackFromCatalog(catalog.value))
+const catalogReady = computed(() => isUsableCapabilityCatalog(catalog.value))
 
 onMounted(async () => {
   loading.value = true
   error.value = null
   try {
-    catalog.value = await fetchRulesCatalog()
+    const loadedCatalog = await fetchRulesCatalog()
+    catalog.value = isUsableCapabilityCatalog(loadedCatalog) ? loadedCatalog : null
+    if (!catalog.value) {
+      error.value = '无法验证当前受控试点能力包，已禁止确认与提交，请刷新重试'
+      return
+    }
     if (!auth.isBusiness && !editMode.value) {
       const defaults = sceneDefaultsFromCatalog(catalog.value)
       form.value = {
@@ -229,31 +237,12 @@ onMounted(async () => {
     if (!auth.isBusiness && form.value.compliance_dimensions.length === 0 && catalog.value) {
       form.value.compliance_dimensions = catalog.value.dimensions.map((d: DimensionInfo) => d.id)
     }
-    if (!auth.isBusiness && !form.value.project_name.trim() && !form.value.description.trim()) {
-      await loadDemo()
-    }
   } catch (e: unknown) {
     error.value = extractApiError(e)
   } finally {
     loading.value = false
   }
 })
-
-async function loadDemo() {
-  error.value = null
-  try {
-    const tpl = await fetchDemoTemplate()
-    form.value = {
-      ...form.value,
-      ...tpl,
-      board_date: tpl.board_date || '',
-      start_date: tpl.start_date || '',
-      production_date: tpl.production_date || '',
-    }
-  } catch (e: unknown) {
-    error.value = extractApiError(e)
-  }
-}
 
 function ensureAllDimensions() {
   if (!auth.isBusiness && catalog.value && form.value.compliance_dimensions.length === 0) {
@@ -316,6 +305,8 @@ async function buildPayload() {
   const extractFieldSnapshot = (file: DocumentExtractResult) => ({
     filename: file.filename,
     mode: file.mode,
+    scan_or_empty: file.scan_or_empty ?? false,
+    extraction_warning: file.extraction_warning ?? null,
     project_name: file.project_name ?? null,
     investment_destination: file.investment_destination ?? null,
     investment_structure: file.investment_structure ?? null,
@@ -386,6 +377,8 @@ async function buildPayload() {
         file_count: fileSnapshots.length || 1,
         files: fileSnapshots,
         mode: merged.mode,
+        scan_or_empty: merged.scan_or_empty ?? false,
+        extraction_warning: merged.extraction_warning ?? null,
         source: 'upload',
         ...mergedFormSnapshot(withDefaults),
         compliance_dimensions: merged.compliance_dimensions || [],
@@ -416,11 +409,19 @@ async function buildPayload() {
   }
 
   if (auth.isBusiness) {
-    const { compliance_dimensions: _dims, ...businessBase } = base as typeof base & { compliance_dimensions?: string[] }
-    const withDefaults = applyBusinessSubmitDefaults(businessBase)
+    const {
+      compliance_dimensions: _dims,
+      rules_pack_id: _pack,
+      country: _country,
+      state: _state,
+      city: _city,
+      industry: _industry,
+      action_type: _action,
+      ...businessBase
+    } = base as typeof base & { compliance_dimensions?: string[] }
     return {
-      ...withDefaults,
-      document_extract: buildDocumentExtractSnapshot(withDefaults),
+      ...businessBase,
+      document_extract: buildDocumentExtractSnapshot(businessBase),
     }
   }
   ensureAllDimensions()
@@ -435,6 +436,8 @@ async function buildPayload() {
         file_count: fileSnapshots.length || 1,
         files: fileSnapshots,
         mode: merged.mode,
+        scan_or_empty: merged.scan_or_empty ?? false,
+        extraction_warning: merged.extraction_warning ?? null,
         source: 'upload',
         project_name: merged.project_name ?? base.project_name,
         investment_destination: merged.investment_destination ?? base.investment_destination,
@@ -485,6 +488,7 @@ async function buildPayload() {
 
 function collectValidationIssues(): string[] {
   const issues: string[] = []
+  if (!catalogReady.value) issues.push('后端当前受控试点能力包（请刷新重试）')
   if (auth.isBusiness && !editMode.value && !pendingFiles.value.length) {
     issues.push('投资方案文件')
   }
@@ -521,6 +525,10 @@ function validateForm(target: 'page' | 'modal' = 'page'): boolean {
 
 function goToMaterialReview() {
   error.value = null
+  if (!catalogReady.value) {
+    error.value = '无法验证当前受控试点能力包，已禁止确认与提交，请刷新重试'
+    return
+  }
   if (!pendingFiles.value.length) {
     error.value = '请先上传至少一个方案文件'
     return
@@ -629,21 +637,7 @@ async function submit() {
       await router.push({ name: 'scenario-progress', params: { id: scenario.id } })
       return
     }
-    const scenario = await createScenario(payload)
-    router.push({ name: 'checklist', params: { id: scenario.id } })
-  } catch (e: unknown) {
-    error.value = extractApiError(e)
-  } finally {
-    submitting.value = false
-  }
-}
-
-async function submitDemoQuick() {
-  submitting.value = true
-  error.value = null
-  try {
-    const scenario = await createDemoScenario()
-    router.push({ name: 'checklist', params: { id: scenario.id } })
+    error.value = '旧的法务直接生成入口已关闭，请由业务提交材料后在复核台确认范围。'
   } catch (e: unknown) {
     error.value = extractApiError(e)
   } finally {
@@ -737,7 +731,7 @@ async function runDocumentExtract(files: File[]) {
   error.value = null
   extractFailedNotes.value = []
   try {
-    const batch = await extractDocumentsFromFiles(files)
+    const batch = await extractDocumentsFromFiles(files, llmConsentForUpload.value)
     extractBatch.value = batch
     extractFailedNotes.value = batch.failed
     pendingFiles.value = files
@@ -762,6 +756,26 @@ async function onDocumentSelected(event: Event) {
       merged.push(file)
     }
   }
+  const invalidType = merged.find(
+    (file) => !ALLOWED_UPLOAD_SUFFIXES.some((suffix) => file.name.toLowerCase().endsWith(suffix)),
+  )
+  if (invalidType) {
+    error.value = `不支持文件 ${invalidType.name}；仅允许 .txt / .md / .docx / .pdf`
+    return
+  }
+  const oversized = merged.find((file) => file.size > MAX_UPLOAD_FILE_BYTES)
+  if (oversized) {
+    error.value = `${oversized.name} 超过单文件 25MB 上限`
+    return
+  }
+  if (merged.length > MAX_UPLOAD_FILES) {
+    error.value = `单次最多上传 ${MAX_UPLOAD_FILES} 个文件`
+    return
+  }
+  if (merged.reduce((total, file) => total + file.size, 0) > MAX_UPLOAD_BATCH_BYTES) {
+    error.value = '所有文件合计不能超过 100MB'
+    return
+  }
   pendingFiles.value = merged
   await runDocumentExtract(merged)
 }
@@ -785,21 +799,19 @@ function shouldHighlightField(fieldPrefix: string): boolean {
         <p class="muted material-intake-note" v-else-if="auth.isBusiness && !editMode">
           请<strong>上传投资方案</strong>（Word、PDF 等，可多个文件）；系统抽取事实供核对。<strong>协查法域与范围由法务确认</strong>，业务端无需选择法域。
         </p>
-        <p class="industry-pack-note" v-else-if="catalog?.pack?.name && !auth.isBusiness">
-          协查法域：<strong>{{ activeCountryLabel }}</strong> · {{ catalog.pack.name }}
-          <span v-if="catalog.pack.focus"> · {{ catalog.pack.focus }}</span>
+        <p class="industry-pack-note" v-else-if="supportedPack && !auth.isBusiness">
+          当前能力包：<strong>{{ supportedPack.display_name }}</strong> · 版本 {{ supportedPack.version }}
         </p>
         <p class="warn-note role-mismatch-note" v-if="!editMode && !auth.isBusiness && route.name === 'scenario-create'">
           当前登录为<strong>法务账号</strong>（{{ auth.user?.email }}），此页展示的是法务端完整表单。业务端请使用 <strong>biz@demo.vela</strong> 登录，新建协查只需上传方案文件。
         </p>
       </div>
-      <div class="header-actions" v-if="!editMode && !auth.isBusiness">
-        <button type="button" class="btn-secondary" @click="loadDemo" :disabled="loading">填入 BYD 演示模板</button>
-        <button type="button" class="btn-secondary" @click="submitDemoQuick" :disabled="submitting">
-          {{ submitting ? '处理中…' : '一键生成演示清单' }}
-        </button>
-      </div>
     </header>
+
+    <CapabilityPackCard
+      v-if="auth.isBusiness && !editMode"
+      :pack="supportedPack"
+    />
 
     <form class="scenario-form panel" @submit.prevent="submit">
       <p class="error banner-error" v-if="error && !catalog">{{ error }}</p>
@@ -810,10 +822,10 @@ function shouldHighlightField(fieldPrefix: string): boolean {
       >
         <h2>上传投资方案</h2>
         <p class="muted" v-if="auth.isBusiness && !editMode">
-          支持 <strong>.txt / .md / .docx / .pdf</strong>（每个≤200MB，可上传多个）。上传后系统在后台抽取；<strong>全部文件就绪后</strong>再点「确认并核对」。原始文件将<strong>一并归档</strong>供法务回看。
+          支持 <strong>.txt / .md / .docx / .pdf</strong>（每个≤25MB、最多10个、合计≤100MB）。上传前请先通过贵司终端或 DMS 杀毒；系统会拦截常见主动内容但不替代完整杀毒。<strong>全部文件就绪后</strong>再点「确认并核对」。
         </p>
         <p class="muted" v-else>
-          支持 <strong>.txt / .md / .docx / .pdf</strong>（每个≤200MB，可上传多个）。系统将逐文件抽取事实并合并预填表单；<strong>不会</strong>自动生成法律结论。
+          支持 <strong>.txt / .md / .docx / .pdf</strong>（每个≤25MB、最多10个、合计≤100MB）。系统将逐文件抽取事实并合并预填表单；<strong>不会</strong>自动生成法律结论，也不替代企业杀毒系统。
         </p>
         <div class="doc-upload-row">
           <label class="btn-secondary file-upload-btn">
@@ -832,6 +844,12 @@ function shouldHighlightField(fieldPrefix: string): boolean {
           </span>
           <span class="muted" v-else-if="extracting">正在抽取…</span>
         </div>
+        <label class="llm-upload-consent">
+          <input v-model="llmConsentForUpload" type="checkbox" :disabled="extracting" />
+          <span>
+            仅本次抽取同意将材料内容发送至已配置的官方 LLM Provider（默认不外发；服务端环境 Key 不用于上传材料）
+          </span>
+        </label>
         <ul v-if="pendingFiles.length" class="upload-file-list">
           <li v-for="(file, idx) in pendingFiles" :key="`${file.name}-${file.size}`">
             <span>{{ file.name }}</span>
@@ -884,19 +902,11 @@ function shouldHighlightField(fieldPrefix: string): boolean {
           </label>
           <label>
             <span>行业</span>
-            <select v-model="form.industry">
-              <option v-for="ind in catalog?.industries || []" :key="ind.id" :value="ind.id">
-                {{ ind.name }}
-              </option>
-            </select>
+            <input :value="supportedPack?.industry || ''" readonly />
           </label>
           <label>
             <span>动作类型</span>
-            <select v-model="form.action_type">
-              <option v-for="act in catalog?.action_types || []" :key="act.id" :value="act.id">
-                {{ act.name }}
-              </option>
-            </select>
+            <input :value="supportedPack?.action_type || ''" readonly />
           </label>
         </div>
       </div>
@@ -958,7 +968,7 @@ function shouldHighlightField(fieldPrefix: string): boolean {
           v-if="auth.isBusiness && businessUploadOnly && extractResult"
           type="button"
           class="btn-primary"
-          :disabled="extracting"
+          :disabled="extracting || !catalogReady"
           @click="goToMaterialReview"
         >
           确认并核对

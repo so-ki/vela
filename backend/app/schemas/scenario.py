@@ -1,11 +1,22 @@
 from __future__ import annotations
 
+import json
 from datetime import date, datetime
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.document import ExtractedFact
+
+
+MAX_SCENARIO_DESCRIPTION_CHARS = 20_000
+MAX_SCENARIO_DETAIL_CHARS = 5_000
+MAX_SCENARIO_RISK_CHARS = 10_000
+MAX_SCENARIO_IDENTIFIER_CHARS = 128
+MAX_DOCUMENT_EXTRACT_SNAPSHOT_BYTES = 256 * 1024
+MAX_DOCUMENT_EXTRACT_FILES = 10
+MAX_DOCUMENT_EXTRACT_FACTS = 200
+MAX_DOCUMENT_EXTRACT_AUXILIARY_ITEMS = 100
 
 
 class DimensionInfo(BaseModel):
@@ -27,6 +38,21 @@ class RulesPackSummary(BaseModel):
     status: str = "active"
 
 
+class CapabilityPackSummary(BaseModel):
+    pack_id: str
+    version: str
+    pack_hash: str
+    status: Literal["active", "inactive"]
+    content_status: Literal["provisional", "expert_verified"]
+    display_name: str
+    description: str
+    country: str
+    state: str
+    industry: str
+    action_type: str
+    languages: List[str]
+
+
 class RulesClassificationResponse(BaseModel):
     schema_version: str
     default_pack_id: str
@@ -35,7 +61,11 @@ class RulesClassificationResponse(BaseModel):
 
 
 class RulesCatalogResponse(BaseModel):
-    rules_pack_id: str = Field(default="brazil_new_energy")
+    rules_pack_id: str
+    capability_pack: CapabilityPackSummary
+    issue_modules: List[str]
+    rules_artifact: dict
+    corpus_artifact: dict
     pack: dict = Field(default_factory=dict)
     jurisdiction: dict
     industries: List[dict]
@@ -51,26 +81,26 @@ class RulesCatalogResponse(BaseModel):
 
 class ScenarioCreateRequest(BaseModel):
     project_name: str = Field(min_length=1, max_length=255)
-    rules_pack_id: Optional[str] = None
-    country: str = Field(default="brazil")
-    state: str = Field(default="sao_paulo")
-    city: str = Field(default="campinas")
-    industry: str = Field(default="new_energy")
-    action_type: str = Field(default="greenfield_plant")
-    investment_structure: Optional[str] = None
-    investment_destination: Optional[str] = None
-    project_content_scale: Optional[str] = None
-    funding_source: Optional[str] = None
-    description: str = Field(min_length=10)
-    known_risks: Optional[str] = None
+    rules_pack_id: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_IDENTIFIER_CHARS)
+    country: str = Field(default="brazil", max_length=MAX_SCENARIO_IDENTIFIER_CHARS)
+    state: str = Field(default="sao_paulo", max_length=MAX_SCENARIO_IDENTIFIER_CHARS)
+    city: str = Field(default="campinas", max_length=MAX_SCENARIO_IDENTIFIER_CHARS)
+    industry: str = Field(default="new_energy", max_length=MAX_SCENARIO_IDENTIFIER_CHARS)
+    action_type: str = Field(default="greenfield_plant", max_length=MAX_SCENARIO_IDENTIFIER_CHARS)
+    investment_structure: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_DETAIL_CHARS)
+    investment_destination: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_DETAIL_CHARS)
+    project_content_scale: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_DETAIL_CHARS)
+    funding_source: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_DETAIL_CHARS)
+    description: str = Field(min_length=10, max_length=MAX_SCENARIO_DESCRIPTION_CHARS)
+    known_risks: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_RISK_CHARS)
     employee_count: Optional[int] = Field(default=None, ge=1)
-    capacity_notes: Optional[str] = None
-    facility_notes: Optional[str] = None
+    capacity_notes: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_DETAIL_CHARS)
+    facility_notes: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_DETAIL_CHARS)
     compliance_dimensions: List[str] = Field(default_factory=list)
     board_date: Optional[date] = None
     start_date: Optional[date] = None
     production_date: Optional[date] = None
-    remarks: Optional[str] = None
+    remarks: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_DETAIL_CHARS)
     document_extract: Optional["DocumentExtractSnapshot"] = None
 
 
@@ -78,33 +108,39 @@ class BusinessSubmitRequest(BaseModel):
     """业务提交项目材料；协查范围由法务后续确认。"""
 
     project_name: str = Field(min_length=1, max_length=255)
-    rules_pack_id: Optional[str] = None
-    country: str = Field(default="brazil")
-    state: str = Field(default="sao_paulo")
-    city: str = Field(default="campinas")
-    industry: str = Field(default="new_energy")
-    action_type: str = Field(default="greenfield_plant")
-    investment_structure: Optional[str] = None
-    investment_destination: Optional[str] = None
-    project_content_scale: Optional[str] = None
-    funding_source: Optional[str] = None
-    description: str = Field(min_length=10)
-    known_risks: Optional[str] = None
+    rules_pack_id: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_IDENTIFIER_CHARS)
+    # 业务端不负责路由。若旧客户端仍显式提交这些值，后端只把它们
+    # 用于检测与当前支持场景的冲突，最终 proposed scope 仍由后端创建。
+    country: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_IDENTIFIER_CHARS)
+    state: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_IDENTIFIER_CHARS)
+    city: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_IDENTIFIER_CHARS)
+    industry: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_IDENTIFIER_CHARS)
+    action_type: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_IDENTIFIER_CHARS)
+    scope_acknowledged: bool = False
+    scope_notice_version: str = Field(default="scope-notice-v2", max_length=64)
+    investment_structure: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_DETAIL_CHARS)
+    investment_destination: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_DETAIL_CHARS)
+    project_content_scale: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_DETAIL_CHARS)
+    funding_source: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_DETAIL_CHARS)
+    description: str = Field(min_length=10, max_length=MAX_SCENARIO_DESCRIPTION_CHARS)
+    known_risks: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_RISK_CHARS)
     employee_count: Optional[int] = Field(default=None, ge=1)
-    capacity_notes: Optional[str] = None
-    facility_notes: Optional[str] = None
+    capacity_notes: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_DETAIL_CHARS)
+    facility_notes: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_DETAIL_CHARS)
     board_date: Optional[date] = None
     start_date: Optional[date] = None
     production_date: Optional[date] = None
-    remarks: Optional[str] = None
+    remarks: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_DETAIL_CHARS)
     document_extract: Optional["DocumentExtractSnapshot"] = None
 
 
 class ScopeConfirmRequest(BaseModel):
     compliance_dimensions: List[str] = Field(default_factory=list)
+    expected_proposal_hash: str = Field(min_length=16)
+    fit_decision: Literal["fit", "accept_warning"]
     polish: bool = False
     match_threshold: int = Field(default=70, ge=50, le=95, description="条目匹配度门控阈值")
-    retrieval_top_k: int = Field(default=3, ge=1, le=10, description="每条核查题绑定的法条数量")
+    retrieval_top_k: int = Field(default=3, ge=0, le=10, description="每条核查题绑定的法条数量")
     include_playbook_suggestions: bool = Field(
         default=False,
         description="显式为 true 时，将 Playbook 建议核查项并入清单（不修改规则 JSON）",
@@ -121,12 +157,15 @@ class ArchivedMaterialFile(BaseModel):
     stored_name: str
     size: int = 0
     content_type: str = "application/octet-stream"
+    content_screening: str = "active_content_screened_not_antivirus"
     archived_at: Optional[datetime] = None
 
 
 class DocumentExtractFileSnapshot(BaseModel):
     filename: str = ""
     mode: str = Field(default="rules", description="rules | llm | manual")
+    scan_or_empty: bool = False
+    extraction_warning: Optional[str] = None
     project_name: Optional[str] = None
     investment_destination: Optional[str] = None
     investment_structure: Optional[str] = None
@@ -141,26 +180,31 @@ class DocumentExtractFileSnapshot(BaseModel):
     start_date: Optional[str] = None
     production_date: Optional[str] = None
     remarks: Optional[str] = None
-    compliance_dimensions: List[str] = Field(default_factory=list)
-    facts: List[ExtractedFact] = Field(default_factory=list)
+    compliance_dimensions: List[str] = Field(default_factory=list, max_length=16)
+    facts: List[ExtractedFact] = Field(default_factory=list, max_length=MAX_DOCUMENT_EXTRACT_FACTS)
     disclaimer: str = ""
     llm_skipped: Optional[str] = None
 
 
 class CustomReviewFieldSnapshot(BaseModel):
-    id: str
-    label: str
-    value: str = ""
-    layout: str = "standalone"
-    merge_target_key: Optional[str] = None
-    merge_target_label: Optional[str] = None
+    id: str = Field(max_length=MAX_SCENARIO_IDENTIFIER_CHARS)
+    label: str = Field(max_length=512)
+    value: str = Field(default="", max_length=MAX_SCENARIO_DESCRIPTION_CHARS)
+    layout: str = Field(default="standalone", max_length=64)
+    merge_target_key: Optional[str] = Field(default=None, max_length=MAX_SCENARIO_IDENTIFIER_CHARS)
+    merge_target_label: Optional[str] = Field(default=None, max_length=512)
 
 
 class DocumentExtractSnapshot(BaseModel):
     filename: str = ""
     file_count: int = Field(default=1, ge=0)
-    files: List[DocumentExtractFileSnapshot] = Field(default_factory=list)
+    files: List[DocumentExtractFileSnapshot] = Field(
+        default_factory=list,
+        max_length=MAX_DOCUMENT_EXTRACT_FILES,
+    )
     mode: str = Field(default="rules", description="rules | llm | manual")
+    scan_or_empty: bool = False
+    extraction_warning: Optional[str] = None
     extracted_at: Optional[datetime] = None
     project_name: Optional[str] = None
     investment_destination: Optional[str] = None
@@ -176,16 +220,45 @@ class DocumentExtractSnapshot(BaseModel):
     start_date: Optional[str] = None
     production_date: Optional[str] = None
     remarks: Optional[str] = None
-    compliance_dimensions: List[str] = Field(default_factory=list)
-    facts: List[ExtractedFact] = Field(default_factory=list)
+    compliance_dimensions: List[str] = Field(default_factory=list, max_length=16)
+    facts: List[ExtractedFact] = Field(default_factory=list, max_length=MAX_DOCUMENT_EXTRACT_FACTS)
     disclaimer: str = ""
     llm_skipped: Optional[str] = None
     source: str = Field(default="upload", description="upload | manual | demo")
-    field_conflicts: List[dict] = Field(default_factory=list)
-    hidden_field_keys: List[str] = Field(default_factory=list)
-    custom_fields: List[CustomReviewFieldSnapshot] = Field(default_factory=list)
-    field_display_order: List[str] = Field(default_factory=list)
-    archived_files: List[ArchivedMaterialFile] = Field(default_factory=list)
+    field_conflicts: List[dict] = Field(
+        default_factory=list,
+        max_length=MAX_DOCUMENT_EXTRACT_AUXILIARY_ITEMS,
+    )
+    hidden_field_keys: List[str] = Field(
+        default_factory=list,
+        max_length=MAX_DOCUMENT_EXTRACT_AUXILIARY_ITEMS,
+    )
+    custom_fields: List[CustomReviewFieldSnapshot] = Field(
+        default_factory=list,
+        max_length=MAX_DOCUMENT_EXTRACT_AUXILIARY_ITEMS,
+    )
+    field_display_order: List[str] = Field(
+        default_factory=list,
+        max_length=MAX_DOCUMENT_EXTRACT_AUXILIARY_ITEMS,
+    )
+    archived_files: List[ArchivedMaterialFile] = Field(
+        default_factory=list,
+        max_length=MAX_DOCUMENT_EXTRACT_FILES,
+    )
+
+    @model_validator(mode="after")
+    def enforce_serialized_size(self) -> DocumentExtractSnapshot:
+        serialized = json.dumps(
+            self.model_dump(mode="json"),
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        if len(serialized) > MAX_DOCUMENT_EXTRACT_SNAPSHOT_BYTES:
+            raise ValueError(
+                "文档抽取快照不能超过 "
+                f"{MAX_DOCUMENT_EXTRACT_SNAPSHOT_BYTES // 1024}KB"
+            )
+        return self
 
 
 class ChecklistItemResponse(BaseModel):
@@ -299,6 +372,8 @@ class ScenarioResponse(BaseModel):
     id: int
     project_name: str
     rules_pack_id: Optional[str] = None
+    scenario_scope: dict = Field(default_factory=dict)
+    is_demo: bool = False
     country: str
     state: str
     city: str

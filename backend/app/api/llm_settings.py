@@ -4,15 +4,20 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 
 from app.core.deps import get_current_user
+from app.core.config import get_settings
 from app.models.user import User
-from app.services.llm_client import test_llm_connection
+from app.services.llm_client import (
+    LlmSecurityError,
+    clear_user_api_key,
+    get_bound_user_api_key,
+    test_llm_connection,
+)
 from app.services.user_preference_service import (
     get_llm_settings_response,
-    get_user_llm_settings,
     update_user_llm_settings,
 )
 
@@ -32,6 +37,7 @@ class LlmSettingsPatch(BaseModel):
     provider: Optional[str] = None
     base_url: Optional[str] = None
     api_key: Optional[str] = None
+    clear_api_key: bool = False
     default_model: Optional[str] = None
     task_models: Optional[LlmTaskModels] = None
 
@@ -53,20 +59,45 @@ def patch_llm_settings(
     body: LlmSettingsPatch,
     current_user: User = Depends(get_current_user),
 ):
+    if get_settings().is_production:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="生产受控试点不接收 LLM 设置或 API Key",
+        )
     updates: dict[str, Any] = body.model_dump(exclude_unset=True)
     if body.task_models is not None:
         updates["task_models"] = body.task_models.model_dump()
-    return update_user_llm_settings(current_user.id, updates)
+    try:
+        return update_user_llm_settings(current_user.id, updates)
+    except LlmSecurityError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.delete("/settings/api-key")
+def delete_llm_api_key(current_user: User = Depends(get_current_user)):
+    clear_user_api_key(current_user.id)
+    return get_llm_settings_response(current_user.id)
 
 
 @router.post("/test")
 def test_llm(body: LlmTestRequest, current_user: User = Depends(get_current_user)):
+    if get_settings().is_production:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="生产受控试点已禁用第三方 LLM 外发",
+        )
     api_key = (body.api_key or "").strip()
     if not api_key:
-        saved = get_user_llm_settings(current_user.id)
-        api_key = (saved.get("api_key") or "").strip()
+        try:
+            api_key = get_bound_user_api_key(
+                current_user.id,
+                provider=body.provider,
+                base_url=body.base_url,
+            ) or ""
+        except LlmSecurityError as exc:
+            return {"ok": False, "error": str(exc)}
     if not api_key:
-        return {"ok": False, "error": "请提供 API Key 或在设置中保存后再测试"}
+        return {"ok": False, "error": "请提供短期 API Key 或先在当前进程中保存"}
     try:
         result = test_llm_connection(
             provider=body.provider,
@@ -75,5 +106,7 @@ def test_llm(body: LlmTestRequest, current_user: User = Depends(get_current_user
             model=body.model,
         )
         return result
-    except Exception as exc:
-        return {"ok": False, "error": str(exc)[:200]}
+    except LlmSecurityError as exc:
+        return {"ok": False, "error": str(exc)}
+    except Exception:
+        return {"ok": False, "error": "LLM 连接失败；未跟随重定向，也未回显凭据"}

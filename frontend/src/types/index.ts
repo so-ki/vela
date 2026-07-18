@@ -45,3 +45,9 @@ export interface ExportConfig {
   template: string
   docx_label: string
 }
+
+export interface OnboardingStatus {
+  completed: boolean
+  required: boolean
+  role: string
+}

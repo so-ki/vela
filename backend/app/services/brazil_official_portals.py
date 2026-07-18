@@ -9,6 +9,8 @@ from urllib.parse import quote
 
 import httpx
 
+from app.core.config import get_settings
+
 PORTALS_PATH = Path(__file__).resolve().parents[1] / "data" / "brazil_official_portals.json"
 
 # 各维度优先展示的官方法源（用于 portal_link 降级）
@@ -97,22 +99,36 @@ def probe_official_endpoints(*, timeout: float = 12.0) -> list[dict[str, Any]]:
             "label": "LexML URN（LGPD 样例）",
             "url": "https://www.lexml.gov.br/urn/urn:lex:br:federal:lei:2018-08-14;13709",
         },
-        {"id": "planalto", "label": "Planalto 立法", "url": "http://www4.planalto.gov.br/legislacao/"},
-        {"id": "stf", "label": "STF", "url": "http://www.stf.jus.br/"},
+        {"id": "planalto", "label": "Planalto 立法", "url": "https://www4.planalto.gov.br/legislacao/"},
+        {"id": "stf", "label": "STF", "url": "https://portal.stf.jus.br/"},
         {"id": "trabalho", "label": "劳动与就业部", "url": "https://www.gov.br/trabalho-e-emprego/pt-br"},
     ]
+    if get_settings().is_production:
+        return [
+            {
+                **item,
+                "reachable": False,
+                "probe_disabled": True,
+                "error": "生产受控试点禁用实时外部探测",
+            }
+            for item in probes
+        ]
     results: list[dict[str, Any]] = []
-    with httpx.Client(timeout=timeout, follow_redirects=True) as client:
+    with httpx.Client(timeout=timeout, follow_redirects=False, trust_env=False) as client:
         for item in probes:
             row = {**item, "reachable": False}
             try:
                 resp = client.head(item["url"])
-                if resp.status_code >= 400:
-                    resp = client.get(item["url"])
-                row["reachable"] = resp.status_code < 400
-                row["status_code"] = resp.status_code
-                row["final_url"] = str(resp.url)
-            except Exception as exc:
-                row["error"] = str(exc)[:120]
+                status_code = resp.status_code
+                final_url = str(resp.url)
+                if status_code >= 400:
+                    with client.stream("GET", item["url"]) as streamed:
+                        status_code = streamed.status_code
+                        final_url = str(streamed.url)
+                row["reachable"] = status_code < 400 and not 300 <= status_code < 400
+                row["status_code"] = status_code
+                row["final_url"] = final_url
+            except Exception:
+                row["error"] = "官方端点请求失败"
             results.append(row)
     return results

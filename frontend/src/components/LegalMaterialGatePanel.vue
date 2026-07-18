@@ -1,12 +1,25 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { RouterLink } from 'vue-router'
-import { generateInvestigationPack, downloadScenarioMaterialFile, fetchUserPreferences } from '@/api/client'
-import type { DimensionInfo, RulesCatalog, Scenario } from '@/types/scenario'
+import {
+  downloadScenarioMaterialFile,
+  fetchScenario,
+  fetchUserPreferences,
+  generateInvestigationPack,
+  retryInvestigationPack,
+} from '@/api/client'
+import CapabilityPackCard from '@/components/CapabilityPackCard.vue'
+import {
+  capabilityPackFromProposal,
+  capabilityPackFromSnapshot,
+  catalogMatchesProposal,
+  catalogMatchesSnapshot,
+} from '@/config/sceneClassification'
+import type { DimensionInfo, RulesCatalog, Scenario, ScenarioScopeSnapshot } from '@/types/scenario'
 
 const props = defineProps<{
   scenario: Scenario
-  catalog: RulesCatalog
+  catalog: RulesCatalog | null
 }>()
 
 const emit = defineEmits<{
@@ -19,38 +32,79 @@ const matchThreshold = ref(70)
 const retrievalTopK = ref(3)
 const submitting = ref(false)
 const error = ref<string | null>(null)
-const dimensionsLocked = ref(false)
-const legalHitsExpanded = ref<Record<string, boolean>>({})
-
-let generateTimer: ReturnType<typeof setTimeout> | null = null
+const dimensionsLocked = ref(
+  !!props.scenario.scenario_scope?.snapshot || props.scenario.status !== 'pending_scope',
+)
+const sceneConfirmed = ref(false)
 
 const archivedFiles = computed(() => props.scenario.document_extract?.archived_files ?? [])
+const scope = computed(() => props.scenario.scenario_scope)
+const proposedScene = computed(() => scope.value?.proposed)
+const frozenSnapshot = computed(() => scope.value?.snapshot)
+const proposalCatalogMatches = computed(() => catalogMatchesProposal(props.catalog, proposedScene.value))
+const snapshotCatalogMatches = computed(() => catalogMatchesSnapshot(props.catalog, frozenSnapshot.value))
+const catalogDimensions = computed(() => {
+  if (frozenSnapshot.value) {
+    return snapshotCatalogMatches.value ? props.catalog?.dimensions ?? [] : []
+  }
+  return proposalCatalogMatches.value ? props.catalog?.dimensions ?? [] : []
+})
+const displayedDimensions = computed<DimensionInfo[]>(() => {
+  if (!frozenSnapshot.value) return catalogDimensions.value
+  const byId = new Map(catalogDimensions.value.map((dimension) => [dimension.id, dimension]))
+  return selected.value.map((id, index) =>
+    byId.get(id) ?? {
+      id,
+      name: id,
+      name_pt: '',
+      description: '冻结快照中的合规维度',
+      order: index,
+    },
+  )
+})
+const displayedPack = computed(() =>
+  frozenSnapshot.value
+    ? capabilityPackFromSnapshot(frozenSnapshot.value, proposedScene.value)
+    : capabilityPackFromProposal(proposedScene.value, props.catalog),
+)
+const fitAssessment = computed(() => scope.value?.fit_assessment)
+const fitDecision = computed<'fit' | 'accept_warning'>(() =>
+  fitAssessment.value?.result === 'fit' ? 'fit' : 'accept_warning',
+)
 const materialFindings = computed(() => props.scenario.material_scope_findings ?? [])
 const issueSuggestions = computed(() => props.scenario.issue_suggestions ?? [])
 const unverifiedFacts = computed(() => props.scenario.unverified_facts ?? [])
 const docConflicts = computed(() => props.scenario.document_extract?.field_conflicts ?? [])
-
-const gapSummary = computed(() => {
-  const adequacy = props.scenario.investigation_adequacy
-  if (adequacy?.gap_summary) return adequacy.gap_summary
-  const missing = materialFindings.value.filter((f) => f.risk === 'RED').length
-  const yellow = materialFindings.value.filter((f) => f.risk === 'YELLOW').length
-  return {
-    missing_count: missing,
-    at_risk_count: yellow,
-    s2_count: 0,
-    s3_count: 0,
-    zero_hit_count: 0,
-  }
-})
+const canConfirmScope = computed(
+  () =>
+    !frozenSnapshot.value &&
+    props.scenario.status === 'pending_scope' &&
+    proposalCatalogMatches.value &&
+    !!proposedScene.value?.proposal_hash &&
+    selected.value.length > 0 &&
+    sceneConfirmed.value &&
+    fitAssessment.value?.result !== 'blocked' &&
+    !submitting.value,
+)
+const canRetryScope = computed(
+  () =>
+    !!frozenSnapshot.value &&
+    props.scenario.status === 'scope_generation_failed' &&
+    selected.value.length > 0 &&
+    !submitting.value,
+)
 
 async function downloadArchivedFile(storedName: string, filename: string) {
+  const accepted = window.confirm(
+    '原始文件仅通过格式、压缩结构和常见主动内容筛查，未做完整杀毒或内容净化。请确认文件已通过贵司终端/DMS安全扫描，并在隔离查看器中打开。',
+  )
+  if (!accepted) return
   await downloadScenarioMaterialFile(props.scenario.id, storedName, filename)
 }
 
 const suggestedDimensions = computed(() => {
   const fromExtract = props.scenario.document_extract?.compliance_dimensions || []
-  return fromExtract.filter((id) => props.catalog.dimensions.some((d) => d.id === id))
+  return fromExtract.filter((id) => catalogDimensions.value.some((d) => d.id === id))
 })
 
 function toggleDimension(id: string) {
@@ -62,6 +116,7 @@ function toggleDimension(id: string) {
 }
 
 function toggleIssueCode(code: string) {
+  if (dimensionsLocked.value) return
   const set = new Set(selectedIssueCodes.value)
   if (set.has(code)) set.delete(code)
   else set.add(code)
@@ -75,84 +130,108 @@ function initIssueSelections() {
   selectedIssueCodes.value = [...new Set(codes)]
 }
 
-function scheduleGenerate() {
-  if (generateTimer) clearTimeout(generateTimer)
-  if (selected.value.length === 0) return
-  generateTimer = setTimeout(() => {
-    void generatePack()
-  }, 400)
+function applyFrozenSnapshot(snapshot: ScenarioScopeSnapshot) {
+  matchThreshold.value = snapshot.match_threshold
+  retrievalTopK.value = snapshot.retrieval_top_k
+  selectedIssueCodes.value = [...snapshot.selected_issue_codes]
+  selected.value = [...snapshot.compliance_dimensions]
+  sceneConfirmed.value = true
+  dimensionsLocked.value = true
 }
 
-watch(selected, (dims) => {
-  error.value = null
-  if (dims.length === 0) {
-    if (generateTimer) clearTimeout(generateTimer)
-    return
-  }
-  scheduleGenerate()
-})
-
 onMounted(async () => {
-  matchThreshold.value = props.scenario.investigation_settings?.match_threshold ?? 70
-  retrievalTopK.value = props.scenario.investigation_settings?.retrieval_top_k ?? 3
-  initIssueSelections()
-  try {
+  const frozen = scope.value?.snapshot
+  matchThreshold.value = frozen?.match_threshold ?? props.scenario.investigation_settings?.match_threshold ?? 70
+  retrievalTopK.value = frozen?.retrieval_top_k ?? props.scenario.investigation_settings?.retrieval_top_k ?? 3
+  if (frozen) {
+    applyFrozenSnapshot(frozen)
+  } else {
+    initIssueSelections()
+  }
+  if (!frozen) try {
     const prefs = await fetchUserPreferences()
-    if (prefs.match_threshold != null && !props.scenario.investigation_settings?.match_threshold) {
+    if (prefs.match_threshold != null) {
       matchThreshold.value = prefs.match_threshold
     }
-    if (prefs.retrieval_top_k != null && !props.scenario.investigation_settings?.retrieval_top_k) {
+    if (prefs.retrieval_top_k != null) {
       retrievalTopK.value = prefs.retrieval_top_k
     }
   } catch {
     /* ignore */
   }
+  if (frozen) {
+    return
+  }
   if (suggestedDimensions.value.length) {
     selected.value = [...suggestedDimensions.value]
-  } else if (props.catalog.dimensions.length) {
-    selected.value = props.catalog.dimensions.map((d: DimensionInfo) => d.id)
+  } else if (catalogDimensions.value.length) {
+    selected.value = catalogDimensions.value.map((d: DimensionInfo) => d.id)
   }
 })
 
 watch(
   () => props.scenario.issue_suggestions,
-  () => initIssueSelections(),
+  () => {
+    if (!scope.value?.snapshot) initIssueSelections()
+  },
 )
 
-onBeforeUnmount(() => {
-  if (generateTimer) clearTimeout(generateTimer)
-})
+watch(
+  frozenSnapshot,
+  (snapshot) => {
+    if (snapshot) applyFrozenSnapshot(snapshot)
+  },
+)
 
 async function generatePack() {
-  if (selected.value.length === 0 || submitting.value) return
+  const retryingFrozenSnapshot = !!frozenSnapshot.value
+  if (retryingFrozenSnapshot ? !canRetryScope.value : !canConfirmScope.value) return
   submitting.value = true
   dimensionsLocked.value = true
   error.value = null
   try {
-    const updated = await generateInvestigationPack(
-      props.scenario.id,
-      selected.value,
-      false,
-      matchThreshold.value,
-      retrievalTopK.value,
-      selectedIssueCodes.value,
-    )
+    const updated = retryingFrozenSnapshot
+      ? await retryInvestigationPack(props.scenario.id)
+      : await generateInvestigationPack(
+          props.scenario.id,
+          selected.value,
+          false,
+          matchThreshold.value,
+          retrievalTopK.value,
+          selectedIssueCodes.value,
+          proposedScene.value?.proposal_hash || '',
+          fitDecision.value,
+        )
     emit('investigationGenerated', updated)
   } catch (e: unknown) {
-    dimensionsLocked.value = false
+    // confirm-scope may have frozen the snapshot before generation failed. Until the
+    // authoritative row is reloaded, keep every generation field locked (fail closed).
+    dimensionsLocked.value = true
     if (typeof e === 'object' && e !== null && 'response' in e) {
       const detail = (e as { response?: { data?: { detail?: string } } }).response?.data?.detail
       error.value = typeof detail === 'string' ? detail : '协查包生成失败，请稍后重试'
     } else {
       error.value = '协查包生成失败，请稍后重试'
     }
+    try {
+      const refreshed = await fetchScenario(props.scenario.id)
+      const refreshedSnapshot = refreshed.scenario_scope?.snapshot
+      if (refreshedSnapshot) {
+        applyFrozenSnapshot(refreshedSnapshot)
+      } else {
+        dimensionsLocked.value = refreshed.status !== 'pending_scope'
+      }
+      emit('investigationGenerated', refreshed)
+    } catch {
+      error.value = `${error.value}；无法确认服务端冻结状态，请刷新页面后再操作。`
+    }
   } finally {
     submitting.value = false
   }
 }
 
-function toggleLegalHits(code: string) {
-  legalHitsExpanded.value = { ...legalHitsExpanded.value, [code]: !legalHitsExpanded.value[code] }
+function conflictValueSummary(conflict: { sources: Array<{ value: string }> }): string {
+  return conflict.sources.map((item) => item.value).join(' / ')
 }
 </script>
 
@@ -164,6 +243,32 @@ function toggleLegalHits(code: string) {
         先看<strong>协查缺口摘要</strong>与材料 Playbook 命中，可选采纳 LLM 建议议题，再勾选维度生成协查包。
       </p>
     </div>
+
+    <CapabilityPackCard
+      :pack="displayedPack"
+      :frozen="!!frozenSnapshot"
+      compact
+      class="legal-scene-card"
+    >
+      <div
+        v-if="fitAssessment"
+        class="scope-fit-banner"
+        :class="fitAssessment.result === 'blocked' ? 'error' : 'warn-note'"
+      >
+        适配判断：{{ fitAssessment.result }} · {{ fitAssessment.reasons.join('；') }}
+      </div>
+      <p v-if="!frozenSnapshot && !proposalCatalogMatches" class="error">
+        当前 Registry catalog 与后端 proposed scope 的能力包身份不一致，已禁止确认。
+      </p>
+      <label v-if="!frozenSnapshot" class="scope-legal-confirmation">
+        <input
+          v-model="sceneConfirmed"
+          type="checkbox"
+          :disabled="dimensionsLocked || !proposalCatalogMatches || fitAssessment?.result === 'blocked'"
+        />
+        <span>我已结合项目材料核对该场景，并确认按以下维度生成协查包。</span>
+      </label>
+    </CapabilityPackCard>
 
     <div v-if="scenario.document_extract?.extraction_warning" class="conflict-banner red-flag-banner">
       <strong>抽取警告</strong>
@@ -203,6 +308,7 @@ function toggleLegalHits(code: string) {
             <input
               type="checkbox"
               :checked="selectedIssueCodes.includes(s.code)"
+              :disabled="dimensionsLocked"
               @change="toggleIssueCode(s.code)"
             />
             <strong>{{ s.code }}</strong> {{ s.title }}
@@ -217,7 +323,7 @@ function toggleLegalHits(code: string) {
       <strong>材料冲突</strong>
       <ul>
         <li v-for="c in docConflicts" :key="c.field">
-          {{ c.field }}：{{ c.values?.map((v: { value: string }) => v.value).join(' / ') }}
+          {{ c.field }}：{{ conflictValueSummary(c) }}
         </li>
       </ul>
     </div>
@@ -238,7 +344,7 @@ function toggleLegalHits(code: string) {
         <p class="muted scope-ai-hint" v-if="suggestedDimensions.length">
           AI 识别（仅供参考）：{{
             suggestedDimensions
-              .map((id) => catalog.dimensions.find((d) => d.id === id)?.name)
+              .map((id) => catalogDimensions.find((d) => d.id === id)?.name)
               .filter(Boolean)
               .join('、')
           }}
@@ -278,7 +384,7 @@ function toggleLegalHits(code: string) {
         </div>
         <div class="dimension-grid dimension-grid-sidebar">
           <label
-            v-for="dim in catalog.dimensions"
+            v-for="dim in displayedDimensions"
             :key="dim.id"
             class="dimension-card"
             :class="{ active: selected.includes(dim.id), disabled: dimensionsLocked }"
@@ -302,6 +408,7 @@ function toggleLegalHits(code: string) {
       <div class="review-gate-material-column">
         <div v-if="archivedFiles.length" class="archived-files-block panel">
           <h3>归档方案文件</h3>
+          <p class="warn-note">未做完整杀毒扫描；下载前须经贵司终端或 DMS 安全扫描。</p>
           <ul class="archived-files-list">
             <li v-for="file in archivedFiles" :key="file.id">
               <button type="button" class="btn-link sm" @click="downloadArchivedFile(file.stored_name, file.filename)">
@@ -317,15 +424,34 @@ function toggleLegalHits(code: string) {
           </div>
           <div v-else-if="error" class="gate-error-banner">
             <p class="error">{{ error }}</p>
-            <button type="button" class="btn-primary sm" @click="generatePack">重试生成</button>
+            <button
+              type="button"
+              class="btn-primary sm"
+              :disabled="frozenSnapshot ? !canRetryScope : !canConfirmScope"
+              @click="generatePack"
+            >
+              {{ frozenSnapshot ? '按冻结快照重试' : '重新确认并生成' }}
+            </button>
           </div>
           <p v-else class="muted">
             已选定 {{ selected.length }} 个维度
             <span v-if="selectedIssueCodes.length">· 含 {{ selectedIssueCodes.length }} 条 LLM 建议议题</span>
           </p>
+          <button
+            v-if="!submitting && !error"
+            type="button"
+            class="btn-primary"
+            :disabled="frozenSnapshot ? !canRetryScope : !canConfirmScope"
+            @click="generatePack"
+          >
+            {{ scope?.snapshot ? '按冻结快照重试' : '确认范围并生成' }}
+          </button>
         </div>
         <div v-else class="auto-generate-status panel">
           <p class="muted">请至少勾选一个合规维度。</p>
+          <button v-if="!frozenSnapshot && !proposalCatalogMatches" type="button" class="btn-primary" disabled>
+            当前能力包验证失败，禁止确认
+          </button>
         </div>
       </div>
     </div>

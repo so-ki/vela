@@ -3,6 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Optional
 
+from sqlalchemy.orm import Session
+
+from app.capability_packs.registry import CapabilityPackRegistryError, get_capability_pack_registry
 from app.services.rules_registry import (
     build_supported_locations,
     get_default_pack_id,
@@ -39,16 +42,29 @@ class ScenarioInput:
     rules_pack_id: Optional[str] = None
 
 
-def get_rules_catalog(pack_id: str | None = None) -> dict[str, Any]:
-    resolved = resolve_pack_id(pack_id)
-    rules = load_rules(resolved)
+def get_rules_catalog(capability_pack_id: str | None = None) -> dict[str, Any]:
+    registry = get_capability_pack_registry()
+    if capability_pack_id:
+        capability = registry.get(capability_pack_id)
+    else:
+        active = registry.list_active()
+        if len(active) != 1:
+            raise CapabilityPackRegistryError("当前 active Capability Pack 数量不唯一")
+        capability = active[0]
+    manifest = capability.manifest
+    resolved = manifest.rules_artifact.artifact_id
+    rules = capability.rules
     pack = rules.get("pack", {})
+    binding = manifest.artifact_binding
+    locations = build_supported_locations(rules)
     industries_out = []
     for k, v in rules["industries"].items():
+        if k != binding.industry:
+            continue
         sub_defs = v.get("sub_sector_defs", {})
         industries_out.append(
             {
-                "id": k,
+                "id": manifest.industry,
                 "name": v["name"],
                 "sub_sectors": [
                     {"id": sid, "name": sdef["name"]}
@@ -58,11 +74,17 @@ def get_rules_catalog(pack_id: str | None = None) -> dict[str, Any]:
         )
     return {
         "rules_pack_id": pack.get("id", resolved),
+        "capability_pack": manifest.public_summary(),
+        "issue_modules": list(manifest.issue_modules),
+        "rules_artifact": manifest.rules_artifact.model_dump(mode="json", exclude={"resource"}),
+        "corpus_artifact": manifest.corpus_artifact.model_dump(mode="json", exclude={"resource"}),
         "pack": pack,
         "jurisdiction": rules["jurisdiction"],
         "industries": industries_out,
         "action_types": [
-            {"id": k, "name": v["name"]} for k, v in rules["action_types"].items()
+            {"id": manifest.action_type, "name": v["name"]}
+            for k, v in rules["action_types"].items()
+            if k == binding.action_type
         ],
         "dimensions": [
             {
@@ -74,8 +96,17 @@ def get_rules_catalog(pack_id: str | None = None) -> dict[str, Any]:
             }
             for k, v in sorted(rules["dimensions"].items(), key=lambda x: x[1]["order"])
         ],
-        "supported_locations": build_supported_locations(rules),
-        "scene_defaults": get_scene_defaults(resolved),
+        "supported_locations": [
+            {**location, "country": manifest.country} for location in locations
+        ],
+        "scene_defaults": {
+            "rules_pack_id": resolved,
+            "country": manifest.country,
+            "state": (locations[0].get("state") if locations else rules.get("jurisdiction", {}).get("default_state")) or "",
+            "city": (locations[0].get("city") if locations else "") or "",
+            "industry": manifest.industry,
+            "action_type": manifest.action_type,
+        },
         "ui_groups": rules.get("ui_groups", []),
         "material_fields": rules.get("material_fields", []),
         "material_intake_policy": rules.get("material_intake_policy", {}),
@@ -94,6 +125,14 @@ def get_dimension_field_requirements(pack_id: str | None = None) -> dict[str, li
 
 def get_material_field_labels(pack_id: str | None = None) -> dict[str, str]:
     return {item["key"]: item["label"] for item in get_material_field_defs(pack_id) if item.get("key")}
+
+
+def get_material_field_labels_from_rules(rules: dict[str, Any]) -> dict[str, str]:
+    return {
+        item["key"]: item["label"]
+        for item in rules.get("material_fields", [])
+        if item.get("key")
+    }
 
 
 def get_required_material_field_keys(
@@ -159,31 +198,51 @@ def _build_rationale(item: dict[str, Any], matched_triggers: list[str]) -> str:
     return "根据所选审查维度纳入核查清单。"
 
 
-def detect_industry(description: str, industry: str, pack_id: str | None = None) -> str:
-    rules = load_rules(pack_id)
+def detect_industry(
+    description: str,
+    industry: str,
+    pack_id: str | None = None,
+    *,
+    rules_data: dict[str, Any] | None = None,
+    fallback_industry: str | None = None,
+) -> str:
+    rules = rules_data or load_rules(pack_id)
     corpus = _normalize_text(description)
     if industry in rules["industries"]:
         return industry
     for ind_id, ind in rules["industries"].items():
         if any(kw.lower() in corpus for kw in ind["keywords"]):
             return ind_id
-    return industry or "new_energy"
+    return fallback_industry or industry
 
 
-def detect_action_type(description: str, action_type: str, pack_id: str | None = None) -> str:
-    rules = load_rules(pack_id)
+def detect_action_type(
+    description: str,
+    action_type: str,
+    pack_id: str | None = None,
+    *,
+    rules_data: dict[str, Any] | None = None,
+    fallback_action_type: str | None = None,
+) -> str:
+    rules = rules_data or load_rules(pack_id)
     corpus = _normalize_text(description)
     if action_type in rules["action_types"]:
         return action_type
     for act_id, act in rules["action_types"].items():
         if any(kw.lower() in corpus for kw in act["keywords"]):
             return act_id
-    return action_type or "greenfield_plant"
+    return fallback_action_type or action_type
 
 
-def detect_sub_sectors(corpus: str, industry_id: str, pack_id: str | None = None) -> list[dict[str, str]]:
+def detect_sub_sectors(
+    corpus: str,
+    industry_id: str,
+    pack_id: str | None = None,
+    *,
+    rules_data: dict[str, Any] | None = None,
+) -> list[dict[str, str]]:
     """从场景描述识别新能源子赛道（电动客车 / 电池 / 光伏 / 储能 / 研发）。"""
-    rules = load_rules(pack_id)
+    rules = rules_data or load_rules(pack_id)
     industry = rules["industries"].get(industry_id, {})
     sub_defs = industry.get("sub_sector_defs", {})
     normalized = _normalize_text(corpus)
@@ -210,13 +269,29 @@ def _item_matches_sub_sectors(item: dict[str, Any], detected_sub_sector_ids: set
 
 
 def generate_checklist(
+    db: Session,
     scenario: ScenarioInput,
     pack_id: str | None = None,
     *,
     extra_codes_from_playbook: set[str] | None = None,
+    generation_config: Any = None,
 ) -> dict[str, Any]:
-    resolved = resolve_pack_id(pack_id or scenario.rules_pack_id, scenario.country)
-    rules = load_rules(resolved)
+    from app.services.generation_guard import require_generation_config
+
+    config = require_generation_config(db, generation_config)
+    if (
+        scenario.country != config.country
+        or scenario.state != config.state
+        or scenario.city != config.city
+        or scenario.industry != config.industry
+        or scenario.action_type != config.action_type
+        or set(scenario.compliance_dimensions) != set(config.compliance_dimensions)
+    ):
+        raise ValueError("ScenarioInput 与冻结生成配置不一致")
+    resolved = pack_id or scenario.rules_pack_id
+    if resolved != config.rules_artifact_id:
+        raise ValueError("规则包与冻结生成配置不一致")
+    rules = config.rules_data
     corpus = _normalize_text(
         " ".join(
             filter(
@@ -238,28 +313,20 @@ def generate_checklist(
     valid_dimensions = set(rules["dimensions"].keys())
     selected = selected & valid_dimensions
 
-    intent_meta: dict[str, Any] = {"mode": "rules"}
-    try:
-        from app.services.intent_parser import parse_scenario_intent
+    intent_meta: dict[str, Any] = {"mode": "disabled_by_snapshot", "dimensions": list(config.compliance_dimensions)}
+    if not selected or selected != set(config.compliance_dimensions):
+        raise ValueError("冻结维度无效，禁止回退或动态扩展")
 
-        intent, err = parse_scenario_intent(
-            description=scenario.description,
-            project_name=scenario.project_name,
-            investment_structure=scenario.investment_structure,
-        )
-        if intent and intent.get("dimensions"):
-            selected = selected | (set(intent["dimensions"]) & valid_dimensions)
-            intent_meta = intent
-        elif err:
-            intent_meta = {"mode": "rules", "llm_skipped": err}
-    except Exception as exc:
-        intent_meta = {"mode": "rules", "llm_skipped": str(exc)[:120]}
-
-    if not selected:
-        selected = valid_dimensions
-
-    detected_industry = detect_industry(scenario.description, scenario.industry, resolved)
-    detected_sub_sectors = detect_sub_sectors(corpus, detected_industry, resolved)
+    detected_industry = detect_industry(
+        scenario.description,
+        scenario.industry,
+        resolved,
+        rules_data=rules,
+        fallback_industry=config.artifact_binding.get("industry"),
+    )
+    detected_sub_sectors = detect_sub_sectors(
+        corpus, detected_industry, resolved, rules_data=rules
+    )
     detected_sub_sector_ids = {s["id"] for s in detected_sub_sectors}
 
     scored_items: list[dict[str, Any]] = []
@@ -355,14 +422,20 @@ def generate_checklist(
             }
         )
 
-    detected_action = detect_action_type(scenario.description, scenario.action_type, resolved)
+    detected_action = detect_action_type(
+        scenario.description,
+        scenario.action_type,
+        resolved,
+        rules_data=rules,
+        fallback_action_type=config.artifact_binding.get("action_type"),
+    )
     pack = rules.get("pack", {})
 
     return {
         "title": f"《拉美投资合规专项核查清单》— {scenario.project_name}",
         "jurisdiction": rules["jurisdiction"]["name"],
-        "industry_pack_id": pack.get("id", resolved or get_default_pack_id()),
-        "industry_pack_name": pack.get("name", "巴西 · 投资协查"),
+        "industry_pack_id": config.capability_pack_id,
+        "industry_pack_name": config.capability_pack_display_name,
         "detected_industry": detected_industry,
         "detected_industry_name": rules["industries"].get(detected_industry, {}).get("name", detected_industry),
         "detected_sub_sectors": detected_sub_sectors,
@@ -392,9 +465,13 @@ def get_demo_scenario_template(pack_id: str | None = None) -> dict[str, Any]:
         "investment_structure": "中资母公司通过巴西全资子公司投资，100% 外资",
         "investment_destination": "巴西圣保罗州坎皮纳斯市",
         "funding_source": "境内自有资金及银行贷款",
-        "project_content_scale": "电动客车组装、动力电池生产及光伏储能产线，首年产能 1000 台客车",
+        "project_content_scale": (
+            "受控演示假设：在圣保罗州绿地设厂（新建新能源制造工厂），建设电动客车组装、"
+            "动力电池生产及光伏储能产线，首年产能 1000 台客车"
+        ),
         "description": (
-            "巴西圣保罗州的坎皮纳斯市（Campinas）已被选为比亚迪最新工厂的所在地，"
+            "本受控演示按巴西圣保罗州坎皮纳斯市（Campinas）绿地设厂场景处理；"
+            "以下内容不代表对真实历史项目性质的认定。坎皮纳斯被设定为演示工厂所在地，"
             "该项目将为当地创造约450个新的就业岗位。该工厂预计于2020年投产，"
             "不仅将启动南美洲唯一一款长续航纯电动公交车的制造与组装业务，"
             "还将生产首款具备极高防火安全性且可回收的磷酸铁锂电池包。"

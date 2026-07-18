@@ -90,7 +90,9 @@ def run_gap_explanations(
     user_id: Optional[int] = None,
 ) -> dict[str, Any]:
     adequacy = checklist_payload.get("investigation_adequacy") or {}
-    pack_id = scenario.rules_pack_id or "brazil_new_energy"
+    pack_id = scenario.rules_pack_id
+    if not pack_id:
+        raise ValueError("场景缺少 proposed Capability Pack 的 rules artifact identity")
     meta = _checklist_meta(pack_id)
     targets = _targets_from_payload(checklist_payload, adequacy)
 
@@ -100,7 +102,7 @@ def run_gap_explanations(
             "agent_step": {"step": "gap_explanation", "status": "skipped", "count": 0},
         }
 
-    if not is_llm_enabled(user_id):
+    if not is_llm_enabled(user_id, task="gap"):
         items = [_template_fallback(t["code"], meta.get(t["code"], {}), t["rationale"]) for t in targets]
         return {
             "items": items,

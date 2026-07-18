@@ -1,0 +1,78 @@
+{
+  "pack": {
+    "id": "test_fixture_rules",
+    "name": "测试能力制品",
+    "version": "0.1.0",
+    "primary_country": "fixture_country"
+  },
+  "jurisdiction": {
+    "id": "fixture_country",
+    "name": "非真实测试法域",
+    "default_state": "fixture_state"
+  },
+  "industries": {
+    "fixture_industry_rules": {
+      "id": "fixture_industry_rules",
+      "name": "非真实测试行业",
+      "keywords": ["fixture-industry-token"]
+    }
+  },
+  "action_types": {
+    "fixture_action": {
+      "id": "fixture_action",
+      "name": "非真实测试动作",
+      "keywords": ["fixture-action-token"]
+    }
+  },
+  "dimensions": {
+    "fixture_supported": {
+      "id": "fixture_supported",
+      "name": "有虚拟依据的议题",
+      "name_pt": "dimensao-com-fonte-ficticia",
+      "description": "验证确定性命中，不代表任何真实法律要求。",
+      "order": 1
+    },
+    "fixture_missing": {
+      "id": "fixture_missing",
+      "name": "无虚拟依据的议题",
+      "name_pt": "dimensao-sem-fonte-ficticia",
+      "description": "验证零命中时系统拒绝形成肯定结论。",
+      "order": 2
+    }
+  },
+  "state_overlays": {
+    "fixture_state": {
+      "name": "非真实测试州",
+      "cities": {
+        "fixture_city": {
+          "name": "非真实测试市",
+          "extra_items": []
+        }
+      },
+      "extra_items": []
+    }
+  },
+  "material_fields": [],
+  "dimension_field_requirements": {},
+  "dimension_elements": {},
+  "checklist_items": [
+    {
+      "id": "FIX-SUP-001",
+      "dimension": "fixture_supported",
+      "title": "permit-token 虚拟许可核查",
+      "description": "核验 permit-token 是否具备虚拟测试依据。",
+      "priority": "high",
+      "triggers": ["fixture-permit-trigger"],
+      "always_include": true
+    },
+    {
+      "id": "FIX-MISS-001",
+      "dimension": "fixture_missing",
+      "title": "orphan-token 虚拟空白核查",
+      "description": "该项故意没有任何语料，用于验证拒答门控。",
+      "priority": "medium",
+      "triggers": ["fixture-missing-trigger"],
+      "always_include": true
+    }
+  ]
+}

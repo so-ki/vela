@@ -71,7 +71,7 @@ def legal_status(_: User = Depends(get_current_user)):
 @router.post("/index", response_model=LegalIndexResponse)
 def build_index(
     force: bool = Query(default=False, description="强制重建索引"),
-    _: User = Depends(get_current_user),
+    _: User = Depends(get_current_legal_user),
 ):
     result = ingest_corpus(force=force)
     return LegalIndexResponse(
@@ -84,14 +84,14 @@ def build_index(
 
 
 @router.get("/monitor", response_model=LegalMonitorResponse)
-def legal_monitor_status(_: User = Depends(get_current_user)):
+def legal_monitor_status(_: User = Depends(get_current_legal_user)):
     return LegalMonitorResponse(**get_monitor_status())
 
 
 @router.post("/monitor/scan", response_model=LegalMonitorScanResponse)
 def legal_monitor_scan(
     force_reindex: bool = Query(default=False, description="扫描同时强制重建索引"),
-    _: User = Depends(get_current_user),
+    _: User = Depends(get_current_legal_user),
 ):
     result = scan_regulatory_updates(force_reindex=force_reindex)
     scan_reg_feed()
@@ -317,15 +317,28 @@ def legal_corpus_lexml_sync(
 ):
     from app.services.lexml_fetch_service import enrich_corpus_document_from_lexml
 
-    result = enrich_corpus_document_from_lexml(doc_id, persist=True)
+    from app.services.corpus_maintenance_agent_service import enqueue_pending_corpus_review
+
+    result = enrich_corpus_document_from_lexml(doc_id, persist=False)
     if result.get("status") == "error":
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=result.get("message"))
     if result.get("status") == "ok":
-        rebuild_corpus_index(force=True)
+        enqueue_pending_corpus_review(
+            [
+                {
+                    "source_id": "lexml",
+                    "doc_id": doc_id,
+                    "title": result.get("urn") or doc_id,
+                    "url": result.get("official_url"),
+                    "reason": "manual_lexml_candidate",
+                    "candidate": result.get("candidate"),
+                }
+            ]
+        )
     write_audit_log(
         db,
         user=user,
-        action="corpus.lexml_sync",
+        action="corpus.lexml_candidate",
         resource_type="legal_corpus",
         resource_id=doc_id,
         detail=result.get("message", ""),
@@ -343,13 +356,19 @@ def brazil_connector_search(
 ):
     from app.services.brazil_connector_service import connector_retrieve_for_item
 
-    hits, meta = connector_retrieve_for_item(
-        item_code=item_code,
-        dimension=dimension,
-        title=q,
-        description=q,
-        state=state,
-    )
+    try:
+        hits, meta = connector_retrieve_for_item(
+            item_code=item_code,
+            dimension=dimension,
+            title=q,
+            description=q,
+            state=state,
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="独立法源检索暂不可用，请稍后重试",
+        ) from exc
     return {"query": q, "hits": hits, "meta": meta}
 
 
@@ -365,12 +384,24 @@ def brazil_connector_status(_: User = Depends(get_current_user)):
     return {
         "connector": "brazil_legal",
         "citation_tiers": CITATION_TIERS,
-        "official_source_chain": "语料库 → LexML URN 实时 → Planalto · STF · gov.br 门户",
-        "modes": ["corpus_verified", "lexml_live", "portal_link"],
+        "official_source_chain": (
+            "版本化本地语料 → 官方门户人工核验"
+            if settings.is_production
+            else "语料库 → LexML URN 实时 → Planalto · STF · gov.br 门户"
+        ),
+        "modes": (
+            ["corpus_verified", "portal_link"]
+            if settings.is_production
+            else ["corpus_verified", "lexml_live", "portal_link"]
+        ),
         "lexml_available_now": lexml_ok,
         "lexml_note": (
-            "LexML 是巴西联邦官方法律文献统一检索与 URN 标识系统（lexml.gov.br），"
-            "公开 HTTP 访问，无需 API Key；跨境网络可能较慢，本地语料优先。"
+            "生产受控试点禁用实时外部探测与抓取，只使用冻结语料并提供官方链接供人工核验。"
+            if settings.is_production
+            else (
+                "LexML 是巴西联邦官方法律文献统一检索与 URN 标识系统（lexml.gov.br），"
+                "公开访问无需 API Key；跨境网络可能较慢，本地语料优先。"
+            )
         ),
         "official_portals": list_portals(),
         "endpoint_probes": probes,
@@ -390,11 +421,16 @@ def corpus_agent_status(_: User = Depends(get_current_legal_user)):
 def corpus_agent_run(
     db: Session = Depends(get_db),
     user: User = Depends(get_current_legal_user),
-    sync_lexml: bool = Query(default=True),
-    auto_reindex: bool = Query(default=True),
+    sync_lexml: bool = Query(default=False),
+    auto_reindex: bool = Query(default=False),
 ):
     from app.services.corpus_maintenance_agent_service import run_corpus_maintenance_agent
 
+    if auto_reindex:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Agent 不得自动重建 active corpus 索引；候选发布后由发布流程重建",
+        )
     result = run_corpus_maintenance_agent(
         db,
         scheduled=False,
@@ -407,7 +443,10 @@ def corpus_agent_run(
         action="corpus_agent.run",
         resource_type="legal_corpus",
         resource_id=result.get("run_id"),
-        detail=f"impacts={result.get('impacted_project_count', 0)}; sync={result.get('lexml_synced', 0)}",
+        detail=(
+            f"impacts={result.get('impacted_project_count', 0)}; "
+            f"candidates={result.get('lexml_candidates_fetched', 0)}"
+        ),
     )
     return result
 

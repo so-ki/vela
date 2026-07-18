@@ -51,7 +51,7 @@ P1 Harness 是套在 **规则引擎 + 关键词 RAG** 之上的**可选辅助层
 
 ### 环境变量回退（服务端）
 
-未保存用户偏好时，可读 `backend/.env` 中的 `QWEN_*` 或 `DEEPSEEK_*`；`LLM_POLISH_ENABLED` 控制润色开关。Key **仅存服务端或用户加密偏好**，不出现在 Skill 文档或前端明文。
+未保存用户偏好时，本地开发可读进程环境中的 `QWEN_*` 或 `DEEPSEEK_*`；`LLM_POLISH_ENABLED` 控制润色开关。用户提交的 Key 只保存在服务端进程内存并按 TTL 失效，持久化偏好会主动移除明文 Key。生产受控试点强制关闭第三方 LLM 外发。
 
 ---
 
@@ -87,7 +87,7 @@ curl -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/v1/llm/status
 curl -X POST -H "Authorization: Bearer $TOKEN" http://localhost:8000/api/v1/llm/test
 ```
 
-`available: false` 时演示仍可走 Golden Path 规则模式 + 一键样本。
+`available: false` 时仍走同一条业务知情 → 法务确认 → 快照冻结 Golden Path，并使用规则模板模式；不存在一键样本绕过入口。
 
 ---
 
@@ -97,6 +97,6 @@ LLM 输出为协查辅助草稿，**不构成正式法律意见**。用户须配
 
 ## 延伸阅读
 
-- [D1 Skills 树](../skills/brazil-fdi/README.md)
+- [正式 Capability Pack manifest](../backend/app/capability_packs/brazil_new_energy_greenfield/manifest.json)
 - [DEMO Golden Path](./DEMO_GOLDEN_PATH.md)
 - [匹配度与门控](./match_tier_and_gate.md)

@@ -1,0 +1,21 @@
+FROM postgres:16.14-alpine3.24@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
+
+# The upstream image ships gosu 1.19, built with Go 1.24.6. Replace that
+# scanner-flagged Go binary with Alpine's tiny C implementation. Patch the one
+# pinned upstream entrypoint call instead of recreating the deleted gosu path:
+# Trivy's layer analysis otherwise retains the replaced Go binary metadata.
+RUN set -eux; \
+    apk add --no-cache su-exec=0.3-r0; \
+    entrypoint='/usr/local/bin/docker-entrypoint.sh'; \
+    test -x /sbin/su-exec; \
+    test "$(grep -Fc 'exec gosu postgres "$BASH_SOURCE" "$@"' "$entrypoint")" = '1'; \
+    sed -i 's|exec gosu postgres "$BASH_SOURCE" "$@"|exec /sbin/su-exec postgres "$BASH_SOURCE" "$@"|' "$entrypoint"; \
+    test "$(grep -Fc 'exec /sbin/su-exec postgres "$BASH_SOURCE" "$@"' "$entrypoint")" = '1'; \
+    ! grep -Fq 'exec gosu postgres "$BASH_SOURCE" "$@"' "$entrypoint"; \
+    bash -n "$entrypoint"; \
+    rm -f /usr/local/bin/gosu /usr/local/bin/su-exec; \
+    test ! -e /usr/local/bin/gosu && test ! -L /usr/local/bin/gosu; \
+    test ! -e /usr/local/bin/su-exec && test ! -L /usr/local/bin/su-exec; \
+    test "$(/sbin/su-exec postgres id -u)" = '70'; \
+    test "$(/sbin/su-exec postgres id -g)" = '70'; \
+    test "$(/sbin/su-exec postgres sh -c 'printf %s "$HOME"')" = '/var/lib/postgresql'

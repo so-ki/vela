@@ -50,8 +50,62 @@ def migrate_sqlite_scenario_columns() -> None:
         statements.append("ALTER TABLE investigation_scenarios ADD COLUMN known_risks TEXT")
     if "rules_pack_id" not in cols:
         statements.append("ALTER TABLE investigation_scenarios ADD COLUMN rules_pack_id VARCHAR(64)")
+    if "scenario_scope" not in cols:
+        statements.append("ALTER TABLE investigation_scenarios ADD COLUMN scenario_scope JSON")
+    if "scope_snapshot_hash" not in cols:
+        statements.append("ALTER TABLE investigation_scenarios ADD COLUMN scope_snapshot_hash VARCHAR(64)")
+    if "active_generation_attempt_id" not in cols:
+        statements.append("ALTER TABLE investigation_scenarios ADD COLUMN active_generation_attempt_id VARCHAR(36)")
+    if "is_demo" not in cols:
+        statements.append("ALTER TABLE investigation_scenarios ADD COLUMN is_demo BOOLEAN DEFAULT 0 NOT NULL")
     if not statements:
         return
     with engine.begin() as conn:
         for stmt in statements:
             conn.execute(text(stmt))
+
+
+def migrate_sqlite_generation_attempt_columns() -> None:
+    """Backfill P0.1 lease/input columns for existing local SQLite databases."""
+    if not str(engine.url).startswith("sqlite"):
+        return
+    inspector = inspect(engine)
+    if "scenario_generation_attempts" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("scenario_generation_attempts")}
+    statements = []
+    for name, ddl in (
+        ("generation_input_id", "VARCHAR(36)"),
+        ("generation_input_hash", "VARCHAR(64)"),
+        ("sequence", "INTEGER DEFAULT 1 NOT NULL"),
+        ("lease_owner", "VARCHAR(128) DEFAULT 'legacy' NOT NULL"),
+        ("lease_token", "VARCHAR(64)"),
+        ("lease_acquired_at", "DATETIME"),
+        ("lease_expires_at", "DATETIME"),
+        ("heartbeat_at", "DATETIME"),
+    ):
+        if name not in cols:
+            statements.append(f"ALTER TABLE scenario_generation_attempts ADD COLUMN {name} {ddl}")
+    with engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
+
+
+def migrate_sqlite_checklist_revision_column() -> None:
+    """Backfill optimistic-lock state in pre-Alembic local SQLite databases."""
+
+    if not str(engine.url).startswith("sqlite"):
+        return
+    inspector = inspect(engine)
+    if "compliance_checklists" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("compliance_checklists")}
+    if "revision" in cols:
+        return
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "ALTER TABLE compliance_checklists "
+                "ADD COLUMN revision INTEGER DEFAULT 0 NOT NULL"
+            )
+        )

@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
-import { fetchScenario, retrieveLegalSources } from '@/api/client'
+import { fetchScenario } from '@/api/client'
+import CapabilityPackCard from '@/components/CapabilityPackCard.vue'
+import { capabilityPackFromSnapshot } from '@/config/sceneClassification'
 import { useAuthStore } from '@/stores/auth'
 import type { ChecklistSection, Scenario } from '@/types/scenario'
 
@@ -11,8 +13,7 @@ const auth = useAuthStore()
 const scenario = ref<Scenario | null>(null)
 const legalSections = ref<ChecklistSection[] | null>(null)
 const loading = ref(true)
-const retrieving = ref(false)
-const generatingBrief = ref(false)
+const openingBrief = ref(false)
 const error = ref<string | null>(null)
 const retrievalNote = ref<string | null>(null)
 
@@ -26,7 +27,8 @@ onMounted(async () => {
   try {
     const id = Number(route.params.id)
     scenario.value = await fetchScenario(id)
-    await runRetrieval(id)
+    legalSections.value = scenario.value?.checklist?.sections || null
+    if (legalSections.value?.length) retrievalNote.value = '展示已生成并冻结的法源检索结果'
   } catch {
     error.value = '无法加载核查清单'
   } finally {
@@ -34,35 +36,14 @@ onMounted(async () => {
   }
 })
 
-async function runRetrieval(id: number) {
-  retrieving.value = true
-  error.value = null
-  try {
-    const result = await retrieveLegalSources(id)
-    legalSections.value = result.sections
-    retrievalNote.value = `已绑定 ${result.total_hits} 条法源片段（索引 ${result.index_status?.document_count ?? 0} 条）`
-    if (result.zero_hit_items?.length) {
-      retrievalNote.value += `；${result.zero_hit_items.length} 条未命中，建议扩大检索`
-    }
-  } catch (e: unknown) {
-    const msg = extractError(e)
-    error.value = msg
-  } finally {
-    retrieving.value = false
-  }
-}
-
-function extractError(e: unknown): string {
-  if (typeof e === 'object' && e !== null && 'response' in e) {
-    const resp = (e as { response?: { status?: number; data?: { detail?: string } } }).response
-    if (resp?.status === 404) return '接口未找到，请重启后端（./scripts/start.sh）'
-    if (typeof resp?.data?.detail === 'string') return resp.data.detail
-  }
-  return '法条检索失败，请确认已安装 RAG 依赖并重启服务'
-}
-
 const checklist = computed(() => scenario.value?.checklist)
 const displaySections = computed(() => legalSections.value || checklist.value?.sections || [])
+const frozenCapabilityPack = computed(() =>
+  capabilityPackFromSnapshot(
+    scenario.value?.scenario_scope?.snapshot,
+    scenario.value?.scenario_scope?.proposed,
+  ),
+)
 
 const sectionOpen = ref<Record<string, boolean>>({})
 const itemOpen = ref<Record<string, boolean>>({})
@@ -155,14 +136,14 @@ const briefLinkQuery = computed(() =>
 
 async function goToBrief() {
   if (!scenario.value) return
-  generatingBrief.value = true
+  openingBrief.value = true
   error.value = null
   try {
     await router.push({ name: 'brief', params: { id: scenario.value.id } })
   } catch {
     error.value = '无法打开简报页'
   } finally {
-    generatingBrief.value = false
+    openingBrief.value = false
   }
 }
 </script>
@@ -192,9 +173,15 @@ async function goToBrief() {
             >{{ sub.name }}</span>
           </p>
           <p class="meta" v-if="retrievalNote">{{ retrievalNote }}</p>
-          <p class="meta warn" v-if="retrieving">正在检索 LexML / STF / STJ 法源…</p>
         </div>
         <div class="header-actions">
+          <RouterLink
+            v-if="scenario"
+            :to="{ name: 'mechanism', params: { id: scenario.id } }"
+            class="btn-secondary link-btn"
+          >
+            保证机制
+          </RouterLink>
           <RouterLink
             v-if="auth.isLegal && route.query.from === 'review' && scenario"
             :to="{ name: 'review', params: { id: scenario.id } }"
@@ -227,20 +214,27 @@ async function goToBrief() {
             v-else-if="auth.isLegal"
             type="button"
             class="btn-primary"
-            :disabled="generatingBrief || retrieving || !legalSections"
+            :disabled="openingBrief || !legalSections"
             @click="goToBrief"
           >
-            {{ generatingBrief ? '跳转中…' : '生成双语简报' }}
+            {{ openingBrief ? '打开中…' : '查看双语简报' }}
           </button>
           <RouterLink to="/" class="btn-secondary link-btn">返回工作台</RouterLink>
         </div>
       </header>
 
+      <CapabilityPackCard
+        v-if="frozenCapabilityPack"
+        :pack="frozenCapabilityPack"
+        frozen
+        compact
+      />
+
       <div class="disclaimer-banner" v-if="auth.isBusiness">
         清单与法条检索结果仅供业务侧<strong>查阅</strong>，不构成正式法律意见；法律判断与定稿由法务完成。
       </div>
       <div class="disclaimer-banner" v-else-if="legalSections">
-        以下法条片段来自 LexML / STF / STJ 开放法源索引，仅供协查参考，不构成正式法律意见。匹配度低于 70 分须标注「需法务复核」。
+        以下片段来自本次冻结检索实际返回的法源；具体来源以各命中项为准，仅供协查参考，不构成正式法律意见。匹配度低于 70 分须标注「需法务复核」。
       </div>
       <div class="disclaimer-banner" v-else>
         {{ checklist.disclaimer }}

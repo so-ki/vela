@@ -59,13 +59,18 @@ def apply_hit_grounding(
     out["grounding_score"] = check["grounding_score"]
     out["grounded"] = check["grounded"]
     out["citation_status"] = check["citation_status"]
+    out["verification_scope"] = check.get("verification_scope", "excerpt_consistency_only")
     if check.get("reason"):
         out["grounding_note"] = check["reason"]
     return out
 
 
-def verify_sections_grounding(sections: list[dict[str, Any]]) -> dict[str, Any]:
-    corpus = load_corpus()
+def verify_sections_grounding(
+    sections: list[dict[str, Any]],
+    *,
+    corpus_data: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    corpus = corpus_data if corpus_data is not None else load_corpus()
     by_id = {d["id"]: d for d in corpus.get("sources", []) if d.get("id")}
     item_results: list[dict[str, Any]] = []
     total_hits = 0
@@ -107,7 +112,9 @@ def verify_sections_grounding(sections: list[dict[str, Any]]) -> dict[str, Any]:
         "total_hits": total_hits,
         "grounded_hits": grounded_hits,
         "grounding_rate": round(grounded_hits / total_hits, 3) if total_hits else 1.0,
+        "excerpt_consistency_rate": round(grounded_hits / total_hits, 3) if total_hits else 1.0,
         "ungrounded_codes": ungrounded_codes,
         "items": item_results,
         "requires_legal_check": bool(ungrounded_codes),
+        "verification_scope": "摘录与本地语料一致性，不代表法源有效性、适用性或法律结论正确性",
     }

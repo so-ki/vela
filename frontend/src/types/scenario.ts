@@ -6,6 +6,36 @@ export interface DimensionInfo {
   order: number
 }
 
+export interface CapabilityPackIdentity {
+  pack_id: string
+  version: string
+  pack_hash: string
+  status: string
+  content_status: 'provisional' | 'expert_verified'
+  display_name: string
+  description: string
+  country: string
+  state: string
+  industry: string
+  action_type: string
+  languages: string[]
+}
+
+export interface CapabilityPackDisplay {
+  pack_id: string
+  version: string
+  pack_hash: string
+  status: string
+  content_status?: 'provisional' | 'expert_verified'
+  display_name: string
+  description?: string
+  country?: string
+  state?: string
+  industry?: string
+  action_type?: string
+  languages?: string[]
+}
+
 export interface SceneDefaults {
   rules_pack_id: string
   country: string
@@ -46,6 +76,7 @@ export interface RulesClassification {
 }
 
 export interface RulesCatalog {
+  capability_pack: CapabilityPackIdentity
   rules_pack_id?: string
   pack?: {
     id: string
@@ -132,6 +163,96 @@ export interface ScenarioFormData {
   remarks?: string
 }
 
+export interface ScenarioScopeProposal {
+  pack_id: string
+  pack_version: string
+  pack_hash: string
+  rules_pack_id: string
+  country: string
+  state: string
+  city: string
+  industry: string
+  action_type: string
+  proposal_hash: string
+  labels: {
+    country: string
+    industry: string
+    action_type: string
+    pack: string
+  }
+}
+
+export interface ScenarioScopeSnapshot {
+  capability_pack_id: string
+  capability_pack_version: string
+  capability_pack_hash: string
+  issue_modules: string[]
+  rules_artifact_id: string
+  rules_artifact_version: string
+  rules_artifact_hash: string
+  corpus_artifact_id: string
+  corpus_artifact_version: string
+  corpus_artifact_hash: string
+  retrieval_config: Record<string, unknown>
+  output_profile: Record<string, unknown>
+  rules_pack_id: string
+  country: string
+  state: string
+  city: string
+  industry: string
+  action_type: string
+  rules_pack_version: string
+  rules_pack_hash: string
+  corpus_version: string
+  corpus_hash?: string
+  corpus_manifest_hash: string
+  generation_config_hash: string
+  compliance_dimensions: string[]
+  selected_issue_codes: string[]
+  match_threshold: number
+  retrieval_top_k: number
+  expansion_enabled: boolean
+  expansion_candidate_top_k: number
+  expansion_min_keyword_score: number
+  expansion_context_limit: number
+  polish: boolean
+  include_playbook_suggestions: boolean
+  playbook_suggestion_codes: string[]
+  profile_hash: string
+  code_adjustments: Record<string, number>
+  intent_dimension_expansion: boolean
+  fit_decision: 'fit' | 'accept_warning'
+  generation_input_id: string
+  generation_input_hash: string
+  audit_metadata: {
+    confirmed_by: number
+    confirmed_by_name: string
+    confirmed_at: string
+    labels?: ScenarioScopeProposal['labels']
+  }
+  snapshot_hash: string
+}
+
+export interface ScenarioScope {
+  schema_version: string
+  status: 'proposed' | 'demo_proposed' | 'generating' | 'generated' | 'generation_failed' | 'legacy_unconfirmed'
+  proposed: ScenarioScopeProposal
+  business_ack?: {
+    acknowledged: boolean
+    acknowledged_by: number
+    acknowledged_by_name: string
+    acknowledged_at: string
+    statement_version: string
+  } | null
+  fit_assessment: {
+    result: 'fit' | 'requires_legal_confirmation' | 'warning' | 'blocked' | 'not_assessed'
+    reasons: string[]
+    mismatches?: Array<{ field: string; submitted: string; supported: string }>
+    assessed_at?: string
+  }
+  snapshot?: ScenarioScopeSnapshot | null
+}
+
 export interface LegalHit {
   id: string
   source: string
@@ -149,6 +270,11 @@ export interface LegalHit {
   vector_similarity: number
   keyword_overlap: number
   requires_review: boolean
+  review_status?: 'expert_verified' | 'provisional' | 'pending' | 'quarantined'
+  verification_scope?: string
+  citation_status?: 'excerpt_matched' | 'corpus_verified' | 'weak_grounding' | 'ungrounded'
+  grounding_score?: number
+  grounded?: boolean
 }
 
 export interface ChecklistItem {
@@ -196,6 +322,8 @@ export interface Scenario {
   id: number
   project_name: string
   rules_pack_id?: string | null
+  scenario_scope: ScenarioScope
+  is_demo: boolean
   country: string
   state: string
   city: string
@@ -293,6 +421,8 @@ export interface GroundingReport {
   total_hits?: number
   grounded_hits?: number
   grounding_rate?: number
+  excerpt_consistency_rate?: number
+  verification_scope?: string
   ungrounded_codes?: string[]
   requires_legal_check?: boolean
 }
@@ -438,9 +568,18 @@ export interface DocumentExtractFileSnapshot {
   production_date?: string | null
   remarks?: string | null
   compliance_dimensions?: string[]
-  facts: Array<{ field: string; value: string; source_snippet?: string | null; source_filename?: string | null }>
+  facts: Array<{
+    field: string
+    value: string
+    source_snippet?: string | null
+    source_filename?: string | null
+    verification_status?: 'verified' | 'unverified' | 'weak_grounding'
+    grounding_score?: number
+  }>
   disclaimer?: string
   llm_skipped?: string | null
+  scan_or_empty?: boolean
+  extraction_warning?: string | null
 }
 
 export interface ExtractFieldConflict {
@@ -472,9 +611,18 @@ export interface DocumentExtractSnapshot {
   production_date?: string | null
   remarks?: string | null
   compliance_dimensions?: string[]
-  facts: Array<{ field: string; value: string; source_snippet?: string | null; source_filename?: string | null }>
+  facts: Array<{
+    field: string
+    value: string
+    source_snippet?: string | null
+    source_filename?: string | null
+    verification_status?: 'verified' | 'unverified' | 'weak_grounding'
+    grounding_score?: number
+  }>
   disclaimer?: string
   llm_skipped?: string | null
+  scan_or_empty?: boolean
+  extraction_warning?: string | null
   field_conflicts?: ExtractFieldConflict[]
   archived_files?: Array<{
     id: string
@@ -482,6 +630,7 @@ export interface DocumentExtractSnapshot {
     stored_name: string
     size: number
     content_type?: string
+    content_screening?: string
     archived_at?: string | null
   }>
 }
@@ -624,6 +773,11 @@ export interface BriefCitation {
   url: string
   match_score: number
   requires_review: boolean
+  review_status?: 'expert_verified' | 'provisional' | 'pending' | 'quarantined'
+  verification_scope?: string
+  citation_status?: 'excerpt_matched' | 'corpus_verified' | 'weak_grounding' | 'ungrounded'
+  grounding_score?: number
+  grounded?: boolean
 }
 
 export interface BriefItem {
@@ -676,11 +830,17 @@ export interface ReviewItem {
   dimension_name: string
   gate_status: string
   match_score: number
+  tier?: string
+  hard_block?: boolean
   decision: string
   comment?: string | null
   external_counsel_required?: boolean
   legal_hits?: LegalHit[]
   reviewed_at?: string | null
+  reviewer_id?: number | null
+  reviewer_name?: string | null
+  manual_override?: boolean
+  review_revision?: number | null
   carry_forward?: boolean
   invalidated?: boolean
 }
@@ -689,6 +849,7 @@ export interface ReviewState {
   scenario_id: number
   status: string
   reviewer_name: string
+  reviewer_id?: number | null
   started_at: string
   finalized_at?: string | null
   items: ReviewItem[]
@@ -698,5 +859,10 @@ export interface ReviewState {
   can_finalize: boolean
   can_export: boolean
   can_return_to_business?: boolean
+  s3_finalize_blocked?: boolean
   version_label?: string | null
+  revision: number
+  last_changed_at?: string | null
+  last_changed_by_id?: number | null
+  last_changed_by_name?: string | null
 }
