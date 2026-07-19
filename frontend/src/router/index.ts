@@ -111,6 +111,12 @@ const router = createRouter({
           component: () => import('@/views/LegalCorpusView.vue'),
           meta: { requiresDisclaimer: true, legalOnly: true },
         },
+        {
+          path: 'rc0/:section?',
+          name: 'rc0-workspace',
+          component: () => import('@/views/Rc0WorkspaceView.vue'),
+          meta: { requiresDisclaimer: true },
+        },
       ],
     },
   ],

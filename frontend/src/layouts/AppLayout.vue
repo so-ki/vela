@@ -8,13 +8,13 @@ const auth = useAuthStore()
 const route = useRoute()
 
 const wideLayout = computed(() =>
-  ['review', 'checklist', 'mechanism', 'delivery-assurance', 'brief', 'project-hub', 'material-review', 'legal-corpus'].includes(String(route.name)),
+  ['review', 'checklist', 'mechanism', 'delivery-assurance', 'brief', 'project-hub', 'material-review', 'legal-corpus', 'rc0-workspace'].includes(String(route.name)),
 )
 </script>
 
 <template>
   <div class="app-shell">
-    <header class="topbar">
+    <header class="topbar" :class="{ 'topbar--rc0': route.name === 'rc0-workspace' }">
       <div class="brand">
         <img src="/vela.svg" alt="Vela" class="brand-icon" />
         <div>
@@ -24,6 +24,7 @@ const wideLayout = computed(() =>
       </div>
       <nav class="nav">
         <RouterLink to="/">工作台</RouterLink>
+        <RouterLink to="/rc0/overview">RC0 演示</RouterLink>
         <RouterLink v-if="auth.isLegal" to="/legal/corpus">法源维护</RouterLink>
       </nav>
       <div class="user-area" v-if="auth.user">
@@ -34,7 +35,7 @@ const wideLayout = computed(() =>
       </div>
     </header>
 
-    <main class="main-content" :class="{ 'main-content--wide': wideLayout }">
+    <main class="main-content" :class="{ 'main-content--wide': wideLayout, 'main-content--rc0': route.name === 'rc0-workspace' }">
       <RouterView />
     </main>
 
