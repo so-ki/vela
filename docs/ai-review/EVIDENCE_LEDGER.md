@@ -358,3 +358,21 @@
 - **提交 SHA**: 本阶段账本提交的实时 SHA 必须按 D-0004 由 Git 查询。
 - **是否已复现**: 是，本轮单次完整基线验证。
 - **限制和不确定性**: 当前 macOS 宿主无 Docker CLI、`psql` 或 `pg_isready`；PostgreSQL/Docker 最终验证必须由后续可信运行环境或绑定精确 SHA 的 GitHub Actions 补齐，未验证前不得声称通过。
+
+## EV-0035
+
+- **claim**: Finalist P0-1/P0-2 已在不修改 frozen compiler 0.2、proof 0.1 与四个 Golden 的前提下完成。Compiler 0.3 固定正式 Pack 分母为 30，Scope 只标记 in/out，CoverageProof 0.2 对五类 in-scope disposition 做计数守恒；无真实法律草稿时只创建独立 ResearchItem。正式比赛案件通过上传、事实确认、Scope、compiler、Claim、proof、Gate、delivery 与 audit API 产生；关键已确认事实变化会改变真实 compiler input/output hash；八页比赛工作台读取 live scenario API，RC0 synthetic 工作台仍是隔离附录。
+- **文件与精确行号**: `backend/app/services/versioned/claim_compiler/v0_3.py`;`backend/app/services/versioned/coverage_proof/v0_2.py`;`backend/app/models/mechanism.py`;`backend/app/services/mechanism_service.py`;`backend/alembic/versions/20260719_0008_research_items.py`;`backend/tests/test_full_denominator_compiler.py`;`backend/tests/test_demo_onboarding.py`;`frontend/src/views/CompetitionWorkspaceView.vue`;`frontend/src/views/CompetitionWorkspaceView.spec.ts`。
+- **命令与原始结果摘要**: 本机 Python 3.12.13 全量 backend **412 passed**；frontend **9 files / 36 passed** + production build；专项验证固定 30、计数公式、not_applicable 双确认、ResearchItem/Claim 分离、unknown reader fail-closed、事实变化导致双 hash 变化与 delivery `blocked_external`。
+- **提交 SHA**: 实施链 `fc1c3e2`,`92c60db`,`e89d337`;完整已验证实现 SHA `b2c1be62d52bdda6b18aac31cbd548f7efaa946c`。
+- **是否已复现**: 本机专项/全量与远端精确 SHA CI 均已复现。
+- **限制和不确定性**: 流程输入为允许的合成企业材料；正式计算不是硬编码 synthetic output。工程通过不构成法律认证、真实客户 UAT 或生产部署证据，三项继续 `blocked_external`。
+
+## EV-0036
+
+- **claim**: 精确实现 SHA `b2c1be62d52bdda6b18aac31cbd548f7efaa946c` 的 GitHub Actions 最终矩阵为 `completed/success`。五个 job 全绿：backend/migrations 412 passed；API golden 23 passed；frontend 36 passed + build；release boundary + 5 surfaces 竞赛禁语扫描；生产镜像 High/Critical CVE gate、CycloneDX SBOM、PostgreSQL 16.14、Alembic head 0008、0008→0007→0008 往返、正式 PostgreSQL API path 22 passed、business/legal/admin Playwright 3 passed、readiness 与隔离 Compose smoke 通过。
+- **文件与精确行号**: `.github/workflows/ci.yml`;`scripts/prod_smoke.sh`;`scripts/verify_e2e.sh`;`frontend/e2e/production-smoke.spec.ts`;`docs/competition/FINALIST_VERIFICATION.md`。
+- **命令与原始结果摘要**: GitHub Actions <https://github.com/so-ki/vela/actions/runs/29681515075>；证据 artifact ID `8440743065`，ZIP SHA-256 `2367aaba2063456ab29b3e1c435ba914e25596ff662c0931b80b96364392139f`。runtime evidence:PostgreSQL `16.14`;migration head `20260719_0008`;backend/frontend/PostgreSQL image identities 分别 `sha256:64b0a3fa...c38e` / `sha256:044df113...0c24` / `sha256:38baa300...8a3d`;API/browser/readiness 均 `passed`。
+- **提交 SHA**: `b2c1be62d52bdda6b18aac31cbd548f7efaa946c`。
+- **是否已复现**: 是；CI event=`push`，run result=`completed/success`。
+- **限制和不确定性**: 容器与 PostgreSQL 证据来自 GitHub 托管 runner 的隔离生产 Compose，不代表客户生产环境。镜像值为该 run 输出的内容身份；artifact 保留期有限。没有创建正式 Release、没有合并分支、没有外部律师或客户证明。

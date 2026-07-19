@@ -8,7 +8,7 @@
 - Codex integration branch: `codex/vela-mvp-integration`(从上述精确交接点创建;不得自动合并或推送 Draft 分支)
 - RC0 sprint branch: `codex/vela-rc0-sprint-20260719`(从可信 C3-A.2 交接提交 `33d8fe1cfdfebb2bdd4066f7aa4b49658d6ce16e` 创建并已推送；不得触碰占用旧 integration 分支的 worktree)
 - Finalist hardening branch: `codex/vela-finalist-hardening-20260719`(从精确 RC0 提交 `14e3cd395cccfe2218b8013a448a137b881a9860` 创建并已推送空恢复点；本轮唯一可写分支)
-- Last verified implementation SHA: `4ea1dfc`(RC0 nested synthetic boundary fix；基于 C3-B/C4/C5/UI 已推送提交链)
+- Last verified implementation SHA: `b2c1be62d52bdda6b18aac31cbd548f7efaa946c`(Finalist P0-1~P0-5 实现与精确 SHA CI 全绿；交接文件实时 HEAD 仍须按 D-0004 查询)
 - Allowed commits: 5 个交接文件 + 经批准的 WS-1C 产品提交(C1/C1.1/C2/C2.1/C3-A/C3-A.1/C3-A.2/C3-B/C4/C5) + RC0 synthetic preview UI、测试、研究账本、截图与验证证据
 - Resume 时必须执行的 Git 核验命令:
   ```
@@ -22,9 +22,9 @@
 - 注意:Git 的实时 HEAD 只能在恢复时通过 `git rev-parse HEAD` 获取;本文件不记录、也不得用文件记录替代 Git 实时查询(D-0004)。
 
 ## Current Phase
-- Phase: Vela 决赛竞争力硬化——P0-1 固定分母实施中
+- Phase: Vela 决赛竞争力硬化——工程 Green Gate 完成
 - Workstream: WS-1C(C1、C1.1、C2、C2.1、C3-A/C3-A.1/C3-A.2 已独立复核批准；C3-B/C4/C5 已获本轮明确实施授权)
-- Status: finalist_hardening_in_progress
+- Status: finalist_hardening_engineering_verified
 - 分支说明: `codex/vela-rc0-sprint-20260719` 从已复核交接提交 `33d8fe1` 建立；旧 `codex/vela-mvp-integration` 与其占用 worktree 保留为历史恢复点且禁止操作
 - 外部状态: 法律认证、真实客户 UAT、客户生产部署证据继续为 `blocked_external`,工程测试不得升级这些状态
 - 分支说明: C2 在独立分支 `claude/vela-ws-1c-c2-real-archive`(基于 C1.1 提交 730b9fd);checkpoint 分支 `claude/gracious-brahmagupta-bbg2dw` 停在 C1.1
@@ -46,6 +46,9 @@
 - C4/C5(提交 `8ceaff3`、`c8328b4`):新增只读 `/api/v1/readiness` 与启动审计；空库 ready、development warning、production unknown-version blocked；历史 evaluator 只用存储版本 reader；新增升级/恢复/回滚手册与需求追踪。
 - RC0 UI(提交 `360ab8b`、`4ea1dfc`):八页原创拟制工作台、持久上下文栏、法律研究三栏、九阶段交付链、审计时间线、八类非 happy-path；所有嵌套拟制对象递归携带四元组，正式 Release 保持 `blocked_external`。
 - Final validation(2026-07-19):Python 3.12.13 专项 98 passed、全量后端 404 passed；前端 34 passed + production build；SQLite 0006→0007→0006→head/fresh head/backfill/NOT NULL/no-default/unknown downgrade guard；release boundaries、compileall、Ruff、git diff、四个 frozen golden SHA 全通过；浏览器八页 desktop/mobile smoke 与控制台检查通过。
+- Finalist P0-1/P0-2(提交 `fc1c3e2`,`92c60db`,`e89d337`):compiler 0.3 固定 30 项、proof 0.2 disposition 守恒、ResearchItem/Claim 分离、Alembic 0008、版本 registry/readiness/Gate 边界与 live scenario API 八页工作台完成；关键事实变化导致真实 input/output hash 变化；正式 delivery 保持 `blocked_external`。
+- Finalist P0-3/P0-4(提交 `d5fe2de`):唯一定位口径、allow/block list、五表面禁语扫描与显式 estimate/hypothesis 商业模型完成。
+- Finalist P0-5(EV-0036):精确实现 SHA `b2c1be62d52bdda6b18aac31cbd548f7efaa946c` 的 GitHub Actions <https://github.com/so-ki/vela/actions/runs/29681515075> 全绿；backend 412 passed、frontend 36 passed、API/release boundary、CVE/SBOM、PostgreSQL 16.14、0008 downgrade/re-upgrade、生产 Compose、business/legal/admin E2E 与 readiness 全通过。
 
 ## WS-1C Frozen Plan(v1,历史记录；完成状态以上文为准)
 - **核心结论**:采用**文件系统不可变归档 + 代码级 reader 版本注册表,零 Alembic 迁移**。不建 DB 版本表(与现行"文件系统为 Pack 事实源"一致,并把 Alembic 0007 让给 WS-1A 的 ResearchItem,避免迁移冲突)。
@@ -66,7 +69,7 @@
 - C3-B/C4/C5:delivery snapshot/release frozen readers 与 registry、`ScenarioDeliveryRelease.schema_version`、Alembic 0007、readiness service/API/startup audit、migration/readiness/revalidation/release-safety tests、运维手册与需求追踪。
 - RC0 UI:`frontend/src/demo/rc0SyntheticCase.ts`、`Rc0WorkspaceView.vue`/spec、`Rc0StatePanel.vue`、`styles/rc0.css`、router/layout 入口、`docs/ui/UI_RESEARCH_LEDGER.md` 与 `docs/ai-review/screenshots/`。
 - 交接文件:5 个(持续更新)。
-- 冻结不变量:frozen v0_2/v0_1 readers、四个 goldens、active manifest、生产 rules/corpus 与 archive 内容未改；ResearchItem 未开始。
+- 冻结不变量:frozen v0_2/v0_1 readers、四个 goldens、active manifest、生产 rules/corpus 与 archive 内容未改；ResearchItem 已通过独立模型与 Alembic 0008 实现，不复用 ClaimRecord。
 
 ## Tests and Commands(本轮,EV-0018)
 - environment: 远程受管容器 Linux;Python 3.12.3(uv venv,scratchpad;未用系统 3.11);Node v22.22.2;npm 10.9.7;Docker 29.3.1
@@ -74,13 +77,15 @@
 - 未运行:Alembic 升降级往返(需一次性 PostgreSQL,专项);PostgreSQL 并发(WS-4);浏览器 E2E。
 - Codex C3-A.2(EV-0029,macOS/Python 3.12):专项 34 passed;指定组合 73 passed;全量后端 393 passed;compileall、Ruff、release boundaries、git diff --check 全通过;四个 golden SHA 与 EV-0027 一致。
 - RC0 final(EV-0030~EV-0033,macOS/Python 3.12.13):C3-B/C4/C5 专项 **98 passed**;全量后端 **404 passed**;前端 **34 passed** + build;浏览器 desktop 1280 与 mobile 390 八页 smoke 无横向溢出/console error;SQLite Alembic 矩阵通过;release boundaries、compileall、Ruff、git diff、golden raw SHA 全通过。无本机 Docker/Podman/Colima 与 PostgreSQL，真实 context probe 和 PostgreSQL migration 保持 environment-unverified。
+- Finalist(EV-0035~EV-0036):本机 Python 3.12.13 全量 **412 passed**；前端 **36 passed** + build；release safety 14 passed、发布边界/禁语/allowlist/秘密扫描与 diff check 通过。远端精确 SHA 补齐 PostgreSQL 16.14 fresh/0007→0008/downgrade/re-upgrade、三镜像 CVE/SBOM、生产 Compose/readiness/API、business/legal/admin browser E2E；详见 `docs/competition/FINALIST_VERIFICATION.md`。
 
 ## Findings
 - 前轮 findings(R1、C1~C11、potential、experiment_required、blocked_external)不变,见 Phase 0.5 记录与 EV-0013~EV-0016;本轮新增 EV-0019(版本链设计前提):冻结快照只存 hash 不存内容、全库无历史归档、消费方为"重算+哈希相等"式 fail-closed、格式变更即历史制品失配——证实 D-0008 所需的归档+版本注册表是当前缺失能力。
-- experiment_required 消项:基线动态验证、SQLite Alembic 往返与 RC0 业务用户浏览器 smoke 已完成；仍留:PostgreSQL migration/并发/事务、Docker runtime context probe、全角色浏览器 E2E、四合成案例动态回归、priming 定量。
+- experiment_required 消项:基线动态验证、SQLite/Alembic 往返、PostgreSQL 0008 migration、Docker runtime、三角色浏览器 E2E 与正式 API 比赛路径均完成；仍留:高并发/事务专项、四合成案例动态回归、priming 定量与全部真实外部证据。
 
 ## Unresolved Questions(真正需要用户决定)
-1. ResearchItem 模型命名偏好:`ResearchItem` vs `ClaimCompilationItem`(D-0009 两候选；不属于本轮 C3-B/C4/C5/RC0 UI 范围)。
+1. 是否在独立复核 `b2c1be62d52bdda6b18aac31cbd548f7efaa946c` 与本交接提交后，进入后续集成决策；本任务不自动合并。
+2. 真实律师认证、客户 UAT 与客户生产部署由谁、在哪个环境、以何种可审计证据完成；未确定前正式交付继续 `blocked_external`。
 
 ## C3 Frozen Plan(v1,历史审计记录；D-0016 与 EV-0030 已完成后续实施)
 - **四个版本单元**(reader 只增不减,显式静态 mapping,无动态 import):`versioned/claim_compiler/v0_2`(七个 builder 函数+FactRecord 查询序+全部 hash 承载字符串)、`versioned/coverage_proof/v0_1`(纯函数,零依赖)、`versioned/delivery_snapshot/v1_0`(build_delivery_snapshot+_current_mechanism_snapshot+gate 字典 1.0 形状——gate 无独立持久化身份,其字典被嵌入 snapshot 散列,故随 snapshot 冻结)、`versioned/delivery_release/v1_1`(_release_body+六个 evidence helper+私有 _iso/_as_utc)。
@@ -95,7 +100,7 @@
 - **ultracode 建议**:C3 实施为 hash 冻结高精度重构,建议**单线实施+每 commit 全量测试**,不切换 ultracode;实施完成后的对抗验证(WS-5 式)可用多代理。
 
 ## Next Exact Action
-- 在 `codex/vela-finalist-hardening-20260719` 上实施 P0-1：新增 compiler 0.3、ResearchItem、Alembic 0008 与固定 30 项分母，保持 frozen 0.2/0.1 及四个 Golden 不变；随后实施 proof 0.2 与 Gate/readiness 对应边界。
+- 停止新增工程功能。独立复核本分支的实现 SHA `b2c1be62d52bdda6b18aac31cbd548f7efaa946c`、EV-0035/EV-0036 与最终交接提交；由用户另行决定是否集成。正式 Release 必须等待真实律师认证、客户 UAT 和客户生产部署证据，当前继续 `blocked_external`。
 
 ## Stop Conditions
 - 远端基线移动、产品代码出现非授权改动、或操作将超出当前批准文件范围 → 立即停止并报告。
