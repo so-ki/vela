@@ -166,6 +166,127 @@ assert d.get('status')=='pending_legal_review', d
 assert d.get('checklist',{}).get('total_items',0)>=20, d
 print('items:', d['checklist']['total_items'])
 " && ok "legal confirm scope" || bad "legal confirm scope"
+
+log "5b. Formal finalist mechanism path: Fact -> Claim Compiler 0.3 -> CoverageProof 0.2"
+FACT=$(curl_t_post "$CURL_MAX" "$API/scenarios/$SUB_ID/mechanism/facts" \
+  -H "$(auth_header "$BIZ")" -H 'Content-Type: application/json' \
+  -d '{"subject":"project","attribute":"confirmed_project_material","value":"圣保罗州新能源绿地设厂测试材料","fact_time":"2026-07-19","block_id":"submitted-material:project","fact_pack_version":"facts-v0.1","source_document":"sample_storage_project.txt","assertion_polarity":"affirmative"}')
+FACT_ID=$(echo "$FACT" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+curl_t_post "$CURL_MAX" "$API/scenarios/$SUB_ID/mechanism/facts/$FACT_ID/confirm" \
+  -H "$(auth_header "$BIZ")" -H 'Content-Type: application/json' \
+  -d '{"confirmation_note":"业务提交人确认该事实来自本次正式上传的测试材料。"}' >/dev/null
+BRIEF=$(curl_t "$CURL_MAX" "$API/scenarios/$SUB_ID/brief" -H "$(auth_header "$LEGAL")")
+DRAFT_PAYLOAD=$(echo "$BRIEF" | python3 -c "
+import json, sys
+brief=json.load(sys.stdin)
+fact_id=sys.argv[1]
+drafts=[]
+for section in brief.get('sections', []):
+    for item in section.get('items', []):
+        grounded=[value for value in item.get('citations', []) if value.get('grounded')]
+        if not grounded:
+            continue
+        drafts.append({
+            'checklist_code': item['code'],
+            'statement': item['risk_zh'],
+            'fact_refs': [fact_id],
+            'evidence_refs': [f\"{item['code']}:{grounded[0]['id']}\"],
+        })
+assert drafts, 'formal retrieval must support at least one legal draft'
+print(json.dumps({'drafts': drafts}, ensure_ascii=False))
+" "$FACT_ID")
+FIRST_COMPILATION=$(curl_t_post "$CURL_MAX" "$API/scenarios/$SUB_ID/mechanism/claims/compile" \
+  -H "$(auth_header "$LEGAL")" -H 'Content-Type: application/json' -d "$DRAFT_PAYLOAD")
+echo "$FIRST_COMPILATION" | python3 -c "
+import json, sys
+d=json.load(sys.stdin)
+assert d.get('compiler_version')=='0.3', d
+assert d.get('denominator_count')==30, d
+assert len(d.get('research_items', []))==30, d
+assert len({item['checklist_code'] for item in d['research_items']})==30, d
+assert d.get('ready_count', 0)>0, d
+assert all(claim.get('statement','').strip() for claim in d.get('claims', [])), d
+" && ok "compiler 0.3 fixed denominator and real Claims" || bad "compiler 0.3"
+FIRST_INPUT_HASH=$(echo "$FIRST_COMPILATION" | python3 -c "import sys,json; print(json.load(sys.stdin)['input_hash'])")
+FIRST_OUTPUT_HASH=$(echo "$FIRST_COMPILATION" | python3 -c "import sys,json; print(json.load(sys.stdin)['output_hash'])")
+
+SUPPLEMENTAL_FACT=$(curl_t_post "$CURL_MAX" "$API/scenarios/$SUB_ID/mechanism/facts" \
+  -H "$(auth_header "$BIZ")" -H 'Content-Type: application/json' \
+  -d '{"subject":"project","attribute":"hazardous_material_inventory","value":"测试补充事实：规划阶段预计储存 18 吨危险化学品","fact_time":"2026-07-19","block_id":"submitted-material:hazardous-inventory","fact_pack_version":"facts-v0.1","source_document":"sample_storage_project.txt","assertion_polarity":"affirmative"}')
+SUPPLEMENTAL_FACT_ID=$(echo "$SUPPLEMENTAL_FACT" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+curl_t_post "$CURL_MAX" "$API/scenarios/$SUB_ID/mechanism/facts/$SUPPLEMENTAL_FACT_ID/confirm" \
+  -H "$(auth_header "$BIZ")" -H 'Content-Type: application/json' \
+  -d '{"confirmation_note":"业务提交人确认该补充事实来自本次正式上传的测试材料。"}' >/dev/null
+CHANGED_DRAFT_PAYLOAD=$(echo "$DRAFT_PAYLOAD" | python3 -c "
+import json, sys
+d=json.load(sys.stdin)
+d['drafts'][0]['fact_refs'].append(sys.argv[1])
+print(json.dumps(d, ensure_ascii=False))
+" "$SUPPLEMENTAL_FACT_ID")
+CHANGED_COMPILATION=$(curl_t_post "$CURL_MAX" "$API/scenarios/$SUB_ID/mechanism/claims/compile" \
+  -H "$(auth_header "$LEGAL")" -H 'Content-Type: application/json' -d "$CHANGED_DRAFT_PAYLOAD")
+echo "$CHANGED_COMPILATION" | python3 -c "
+import json, sys
+d=json.load(sys.stdin)
+assert d['input_hash'] != sys.argv[1], d
+assert d['output_hash'] != sys.argv[2], d
+assert any(sys.argv[3] in claim['fact_refs'] for claim in d['claims']), d
+" "$FIRST_INPUT_HASH" "$FIRST_OUTPUT_HASH" "$SUPPLEMENTAL_FACT_ID" \
+  && ok "confirmed fact changes real compiler input/output hashes" \
+  || bad "fact-sensitive hashes"
+
+GATE_COMPILATION=$(curl_t_post "$CURL_MAX" "$API/scenarios/$SUB_ID/mechanism/claims/compile" \
+  -H "$(auth_header "$LEGAL")" -H 'Content-Type: application/json' -d "$DRAFT_PAYLOAD")
+GATE_COMPILATION_ID=$(echo "$GATE_COMPILATION" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+CLAIM_IDS=$(echo "$GATE_COMPILATION" | python3 -c "
+import json, sys
+d=json.load(sys.stdin)
+print('\\n'.join(claim['id'] for claim in d['claims'] if claim['status']=='awaiting_human_confirmation'))
+")
+while IFS= read -r CLAIM_ID; do
+  [ -n "$CLAIM_ID" ] || continue
+  curl_t_post "$CURL_MAX" "$API/scenarios/$SUB_ID/mechanism/claims/$CLAIM_ID/confirm" \
+    -H "$(auth_header "$LEGAL")" -H 'Content-Type: application/json' \
+    -d '{"decision":"confirmed","confirmation_note":"测试法务逐项核对事实、限定表述和冻结法源定位后确认。"}' >/dev/null
+done <<< "$CLAIM_IDS"
+PROOF=$(curl_t_post "$CURL_MAX" "$API/scenarios/$SUB_ID/mechanism/coverage-proofs" \
+  -H "$(auth_header "$LEGAL")" -H 'Content-Type: application/json' \
+  -d "{\"compilation_id\":\"$GATE_COMPILATION_ID\",\"denominator_ref\":\"frozen capability pack denominator\"}")
+echo "$PROOF" | python3 -c "
+import json, sys
+d=json.load(sys.stdin)['proof']
+assert d.get('schema_version')=='0.2', d
+assert d.get('pack_total')==30, d
+assert d['pack_total']==d['scope_total']+d['out_of_scope_by_scope_count'], d
+assert d['scope_total']==sum(d[f'{name}_count'] for name in ('supported','not_applicable','rejected','unanswerable','uncovered')), d
+" && ok "coverage proof 0.2 count conservation" || bad "coverage proof 0.2"
+DELIVERY_STATUS=$(curl_t "$CURL_MAX" "$API/scenarios/$SUB_ID/delivery-assurance/status" -H "$(auth_header "$LEGAL")")
+echo "$DELIVERY_STATUS" | python3 -c "
+import json, sys
+d=json.load(sys.stdin)
+assert d.get('delivery_allowed') is False, d
+assert d.get('blocking_reasons'), d
+" && ok "formal delivery remains blocked_external" || bad "formal delivery boundary"
+AUDIT=$(curl_t "$CURL_MAX" "$API/scenarios/$SUB_ID/mechanism/audit" -H "$(auth_header "$LEGAL")")
+echo "$AUDIT" | python3 -c "
+import json, sys
+actions=[item['action'] for item in json.load(sys.stdin)]
+assert actions.count('mechanism.claim_compile')==3, actions
+assert 'mechanism.coverage_proof_create' in actions, actions
+" && ok "mechanism audit timeline" || bad "mechanism audit"
+READINESS=$(curl_t "$CURL_MAX" "$API/readiness")
+echo "$READINESS" | python3 -c "
+import json, sys
+d=json.load(sys.stdin)
+assert d.get('ready') is True, d
+assert d.get('status')=='ready', d
+assert all(value=='passed' for key,value in d['checks'].items() if key!='automatic_history_rewrite'), d
+" && ok "version readiness" || bad "version readiness"
+
+if [ -n "${VELA_E2E_SCENARIO_ID_FILE:-}" ]; then
+  printf '%s\n' "$SUB_ID" > "$VELA_E2E_SCENARIO_ID_FILE"
+fi
+
 REVIEW=$(curl_t_post "$CURL_MAX" "$API/scenarios/$SUB_ID/review/init" -H "$(auth_header "$LEGAL")")
 REVIEW_REVISION=$(echo "$REVIEW" | python3 -c "import sys,json; print(json.load(sys.stdin)['revision'])")
 REVIEW=$(curl_t_patch "$CURL_MAX" "$API/scenarios/$SUB_ID/review/items/LAB-001" \
@@ -236,6 +357,10 @@ log "8. Legacy generate-and-submit is blocked"
 GEN_CODE=$(curl -s --max-time "$CURL_MAX" -o /dev/null -w '%{http_code}' -X POST "$API/scenarios/generate-and-submit" -H "$(auth_header "$TOKEN")" -H 'Content-Type: application/json' -d '{"project_name":"legacy","description":"这是足够长的旧入口测试描述","compliance_dimensions":["labor"]}')
 [ "$GEN_CODE" = "410" ] && ok "generate-and-submit blocked" || bad "generate-and-submit status=$GEN_CODE"
 
+if [ "${VELA_PRESERVE_FINALIST_SCENARIO:-false}" = "true" ]; then
+  log "9. Preserve finalist scenario for browser verification"
+  ok "finalist scenario preserved at id=$SUB_ID"
+else
 log "9. Return to business + revise resubmit"
 curl_t_post "$CURL_MAX" "$API/scenarios/$SUB_ID/review/return-to-business" \
   -H "$(auth_header "$LEGAL")" -H 'Content-Type: application/json' \
@@ -274,6 +399,7 @@ assert d.get('status')=='pending_scope', d
 assert (d.get('revision_round') or 0)>=1, d
 print('revision_round:', d.get('revision_round'))
 " && ok "revise resubmit" || bad "revise resubmit"
+fi
 
 echo ""
 echo "Passed: $PASS  Failed: $FAIL"

@@ -194,6 +194,7 @@ EXPLICIT_RUNTIME_FILES = (
     "backend/scripts/run_legal_quality_gate.py",
     "backend/scripts/run_state_metadata_coverage.py",
     "backend/scripts/seed_demo_user.py",
+    "backend/scripts/seed_finalist_smoke_admin.py",
     "frontend/.dockerignore",
     "frontend/index.html",
     "frontend/package-lock.json",
@@ -823,7 +824,11 @@ def check_docker() -> None:
         errors.append("生产 Compose smoke 未用真实浏览器覆盖构建后的 SPA 登录路径")
     if "VELA_ENTRYPOINT_MODE=check" not in prod_smoke:
         errors.append("生产 Compose smoke 未在真实 PostgreSQL 上断言 migration head 与 schema drift")
-    if 'VELA_API="http://127.0.0.1:${SMOKE_PORT}/api/v1" bash scripts/verify_e2e.sh' not in prod_smoke:
+    if (
+        'VELA_API="http://127.0.0.1:${SMOKE_PORT}/api/v1"' not in prod_smoke
+        or "bash scripts/verify_e2e.sh" not in prod_smoke
+        or "VELA_PRESERVE_FINALIST_SCENARIO=true" not in prod_smoke
+    ):
         errors.append("生产 Compose smoke 未在真实 PostgreSQL 上执行完整业务/法务 API 金路径")
     action_references = re.findall(r"(?m)^\s*(?:-\s+)?uses:\s+([^\s#]+)", ci_workflow)
     unpinned_actions = sorted(

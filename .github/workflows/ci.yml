@@ -48,6 +48,15 @@ jobs:
           python -m alembic upgrade head
           python -m alembic downgrade base
           python -m alembic upgrade head
+      - name: Exercise SQLite 0007 to 0008 downgrade and re-upgrade
+        env:
+          DATABASE_URL: sqlite:////tmp/vela-migrations-0008.db
+        run: |
+          python -m alembic upgrade 20260719_0007
+          python -m alembic upgrade 20260719_0008
+          python -m alembic downgrade 20260719_0007
+          python -m alembic upgrade head
+          test "$(python -m alembic current | awk '{print $1}')" = "20260719_0008"
 
   frontend:
     name: Frontend audit, tests and build
@@ -168,6 +177,7 @@ jobs:
           name: production-security-and-smoke-evidence
           path: |
             security-artifacts/*.cdx.json
+            security-artifacts/finalist-runtime-evidence.txt
             frontend/playwright-report/
           if-no-files-found: ignore
           retention-days: 14

@@ -22,6 +22,7 @@ if ! python3 -c 'import sys; value=int(sys.argv[1]); assert 1024 <= value <= 655
 fi
 PROJECT_NAME="vela-smoke-$$-$(python3 -c 'import secrets; print(secrets.token_hex(4))')"
 ENV_FILE=""
+SCENARIO_ID_FILE=""
 COMPOSE=()
 
 cleanup() {
@@ -38,6 +39,9 @@ cleanup() {
   fi
   if [ -n "$ENV_FILE" ]; then
     rm -f "$ENV_FILE"
+  fi
+  if [ -n "$SCENARIO_ID_FILE" ]; then
+    rm -f "$SCENARIO_ID_FILE"
   fi
   exit "$status"
 }
@@ -107,6 +111,45 @@ assert payload.get("environment") == "production", "health environment is not pr
 print(json.dumps(payload, ensure_ascii=False, indent=2))
 '
 
+run_alembic() {
+  local operation="$1"
+  local target="$2"
+  "${COMPOSE[@]}" exec -T backend python -c '
+import sys
+from alembic import command
+from alembic.config import Config
+from scripts.container_entrypoint import configure_database_url
+configure_database_url()
+config = Config("/app/alembic.ini")
+if sys.argv[1] == "current":
+    command.current(config, verbose=True)
+else:
+    getattr(command, sys.argv[1])(config, sys.argv[2])
+' "$operation" "$target"
+}
+
+echo "==> PostgreSQL version and Alembic 0008 lifecycle"
+POSTGRES_VERSION="$("${COMPOSE[@]}" exec -T db psql -U vela -d vela -Atc 'SHOW server_version')"
+echo "PostgreSQL ${POSTGRES_VERSION}"
+run_alembic current head
+run_alembic downgrade 20260719_0007
+run_alembic upgrade 20260719_0008
+run_alembic downgrade 20260719_0007
+run_alembic upgrade head
+MIGRATION_HEAD="$("${COMPOSE[@]}" exec -T backend python -c '
+from alembic.config import Config
+from alembic.runtime.migration import MigrationContext
+from sqlalchemy import create_engine
+from scripts.container_entrypoint import configure_database_url
+connection_url = configure_database_url()
+with create_engine(connection_url).connect() as connection:
+    print(MigrationContext.configure(connection).get_current_revision())
+')"
+if [ "$MIGRATION_HEAD" != "20260719_0008" ]; then
+  echo "FAIL: unexpected migration head ${MIGRATION_HEAD}" >&2
+  exit 1
+fi
+
 assert_container_hardening() {
   local service="$1"
   local protected_path="$2"
@@ -141,11 +184,24 @@ echo "==> provision disposable smoke users"
   python -c 'import sys; from scripts.container_entrypoint import configure_database_url; configure_database_url(); path = "/app/scripts/seed_demo_user.py"; exec(compile(sys.stdin.read(), path, "exec"), {"__name__": "__main__", "__file__": path})' \
   < "$ROOT/backend/scripts/seed_demo_user.py"
 
+"${COMPOSE[@]}" exec -T backend env PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=/app \
+  python -c 'import sys; from scripts.container_entrypoint import configure_database_url; configure_database_url(); path = "/app/scripts/seed_finalist_smoke_admin.py"; exec(compile(sys.stdin.read(), path, "exec"), {"__name__": "__main__", "__file__": path})' \
+  < "$ROOT/backend/scripts/seed_finalist_smoke_admin.py"
+
 echo "==> PostgreSQL migration head and model drift"
 "${COMPOSE[@]}" exec -T -e VELA_ENTRYPOINT_MODE=check backend python -m scripts.container_entrypoint
 
 echo "==> full business/legal API golden path on PostgreSQL"
-VELA_API="http://127.0.0.1:${SMOKE_PORT}/api/v1" bash scripts/verify_e2e.sh
+SCENARIO_ID_FILE="$(mktemp "${TMPDIR:-/tmp}/vela-finalist-scenario.XXXXXX")"
+VELA_API="http://127.0.0.1:${SMOKE_PORT}/api/v1" \
+  VELA_E2E_SCENARIO_ID_FILE="$SCENARIO_ID_FILE" \
+  VELA_PRESERVE_FINALIST_SCENARIO=true \
+  bash scripts/verify_e2e.sh
+FINALIST_SCENARIO_ID="$(tr -d '[:space:]' < "$SCENARIO_ID_FILE")"
+if ! python3 -c 'import sys; assert int(sys.argv[1]) > 0' "$FINALIST_SCENARIO_ID" 2>/dev/null; then
+  echo "FAIL: finalist scenario id is invalid" >&2
+  exit 1
+fi
 
 echo "==> login"
 LOGIN_RESPONSE="$(curl -fsS -X POST "http://127.0.0.1:${SMOKE_PORT}/api/v1/auth/login" \
@@ -190,9 +246,30 @@ if [ ! -x "$ROOT/frontend/node_modules/.bin/playwright" ]; then
 fi
 (
   cd "$ROOT/frontend"
-  VELA_E2E_BASE_URL="http://127.0.0.1:${SMOKE_PORT}" npm run test:e2e
+  VELA_E2E_BASE_URL="http://127.0.0.1:${SMOKE_PORT}" \
+    VELA_E2E_SCENARIO_ID="$FINALIST_SCENARIO_ID" \
+    npm run test:e2e
 )
 unset TOKEN
+
+mkdir -p "$ROOT/security-artifacts"
+FINAL_SHA="${GITHUB_SHA:-$(git rev-parse HEAD)}"
+BACKEND_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$("${COMPOSE[@]}" ps -q backend)")"
+FRONTEND_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$("${COMPOSE[@]}" ps -q frontend)")"
+POSTGRES_IMAGE_ID="$(docker inspect --format '{{.Image}}' "$("${COMPOSE[@]}" ps -q db)")"
+{
+  printf 'commit_sha=%s\n' "$FINAL_SHA"
+  printf 'postgresql_version=%s\n' "$POSTGRES_VERSION"
+  printf 'migration_head=%s\n' "$MIGRATION_HEAD"
+  printf 'backend_image_digest=%s\n' "$BACKEND_IMAGE_ID"
+  printf 'frontend_image_digest=%s\n' "$FRONTEND_IMAGE_ID"
+  printf 'postgres_image_digest=%s\n' "$POSTGRES_IMAGE_ID"
+  printf 'finalist_scenario_id=%s\n' "$FINALIST_SCENARIO_ID"
+  printf 'api_golden_path=passed\n'
+  printf 'browser_roles=business,legal,admin\n'
+  printf 'browser_e2e=passed\n'
+  printf 'readiness=passed\n'
+} | tee "$ROOT/security-artifacts/finalist-runtime-evidence.txt"
 
 echo ""
 echo "Passed: 生产 Compose 冒烟 (http://127.0.0.1:${SMOKE_PORT})"
