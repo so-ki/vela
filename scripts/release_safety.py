@@ -227,6 +227,7 @@ PACKAGE_TREES = (
 
 PACKAGE_SCRIPTS = (
     "scripts/build_submission_package.sh",
+    "scripts/check_competition_claims.py",
     "scripts/check_release_boundaries.sh",
     "scripts/fixtures/sample_storage_project.txt",
     "scripts/init_db.py",
