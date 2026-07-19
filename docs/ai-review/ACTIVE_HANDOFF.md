@@ -7,6 +7,7 @@
 - Claude handoff source: `origin/claude/vela-ws-1c-c3a-versioned-readers` = `00b47bc89f11aa5a8eaaf38dae18565e8fd07274`(Codex 接管时已 fetch 核验)
 - Codex integration branch: `codex/vela-mvp-integration`(从上述精确交接点创建;不得自动合并或推送 Draft 分支)
 - RC0 sprint branch: `codex/vela-rc0-sprint-20260719`(从可信 C3-A.2 交接提交 `33d8fe1cfdfebb2bdd4066f7aa4b49658d6ce16e` 创建并已推送；不得触碰占用旧 integration 分支的 worktree)
+- Finalist hardening branch: `codex/vela-finalist-hardening-20260719`(从精确 RC0 提交 `14e3cd395cccfe2218b8013a448a137b881a9860` 创建并已推送空恢复点；本轮唯一可写分支)
 - Last verified implementation SHA: `4ea1dfc`(RC0 nested synthetic boundary fix；基于 C3-B/C4/C5/UI 已推送提交链)
 - Allowed commits: 5 个交接文件 + 经批准的 WS-1C 产品提交(C1/C1.1/C2/C2.1/C3-A/C3-A.1/C3-A.2/C3-B/C4/C5) + RC0 synthetic preview UI、测试、研究账本、截图与验证证据
 - Resume 时必须执行的 Git 核验命令:
@@ -21,14 +22,14 @@
 - 注意:Git 的实时 HEAD 只能在恢复时通过 `git rev-parse HEAD` 获取;本文件不记录、也不得用文件记录替代 Git 实时查询(D-0004)。
 
 ## Current Phase
-- Phase: Vela Engineering Demonstrator RC0 七小时冲刺——feature freeze 后最终验证完成
+- Phase: Vela 决赛竞争力硬化——P0-1 固定分母实施中
 - Workstream: WS-1C(C1、C1.1、C2、C2.1、C3-A/C3-A.1/C3-A.2 已独立复核批准；C3-B/C4/C5 已获本轮明确实施授权)
-- Status: engineering_rc0_complete_awaiting_independent_review
+- Status: finalist_hardening_in_progress
 - 分支说明: `codex/vela-rc0-sprint-20260719` 从已复核交接提交 `33d8fe1` 建立；旧 `codex/vela-mvp-integration` 与其占用 worktree 保留为历史恢复点且禁止操作
 - 外部状态: 法律认证、真实客户 UAT、客户生产部署证据继续为 `blocked_external`,工程测试不得升级这些状态
 - 分支说明: C2 在独立分支 `claude/vela-ws-1c-c2-real-archive`(基于 C1.1 提交 730b9fd);checkpoint 分支 `claude/gracious-brahmagupta-bbg2dw` 停在 C1.1
-- Allowed file scope(RC0): C3-B/C4/C5 所需 versioned reader、服务、模型、Alembic 0007、schema/API、容器 allowlist、测试与文档；完整原创 RC0 UI、研究账本及严格隔离的 synthetic demo preview。
-- Prohibited actions: ResearchItem/后续迁移；伪造律师、客户或生产证据；让 synthetic 对象进入正式 Release Gate；创建 PR；合并；推送 Draft 分支；修改/删除旧 integration 分支或占用它的 worktree。
+- Allowed file scope(Finalist): D-0018 所需 compiler 0.3、proof 0.2、ResearchItem、Alembic 0008、registry/readiness/Gate、正式 API 流程、比赛工作台、竞赛文档、测试、CI 与证据。
+- Prohibited actions: 改动 frozen compiler 0.2 / proof 0.1 / 现有 Golden；伪造律师、客户或生产证据；使正式流程依赖硬编码输出；弱化 Gate；创建正式 Release；合并 Draft；修改/删除历史分支或它们的 worktree。
 
 ## Frozen Product Definition
 - 见 `AGENTS.md` 第 2–4 节与 D-0006;产品语义新增冻结决定:**D-0007(分母 A+ 方案)、D-0008(多版本不可变共存)、D-0009(ResearchItem 与 ClaimRecord 分离)、D-0010(外证矩阵采用状态修正)**——以 DECISION_LOG 原文为准,不得再列为 unresolved。
@@ -94,7 +95,7 @@
 - **ultracode 建议**:C3 实施为 hash 冻结高精度重构,建议**单线实施+每 commit 全量测试**,不切换 ultracode;实施完成后的对抗验证(WS-5 式)可用多代理。
 
 ## Next Exact Action
-- 对 RC0 分支 `codex/vela-rc0-sprint-20260719` 的提交 `88c2195..4ea1dfc` 做独立只读复核；在可信 PostgreSQL 与可用 Docker/兼容 runtime 环境补跑 0007 migration 与无网络 context probe。复核前不得合并、创建 PR、修改 Draft 或把任何 `blocked_external` 状态升级为完成。
+- 在 `codex/vela-finalist-hardening-20260719` 上实施 P0-1：新增 compiler 0.3、ResearchItem、Alembic 0008 与固定 30 项分母，保持 frozen 0.2/0.1 及四个 Golden 不变；随后实施 proof 0.2 与 Gate/readiness 对应边界。
 
 ## Stop Conditions
 - 远端基线移动、产品代码出现非授权改动、或操作将超出当前批准文件范围 → 立即停止并报告。

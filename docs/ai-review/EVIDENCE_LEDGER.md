@@ -349,3 +349,12 @@
 - **提交 SHA**: 实施提交 `88c2195`,`1e4bc79`,`8ceaff3`,`c8328b4`,`360ab8b`,`4ea1dfc`;证据提交的实时 SHA 必须按 D-0004 由 Git 查询。
 - **是否已复现**: 是；所有可在本机执行的 P0/P1 工程验证均完成。
 - **限制和不确定性**: PostgreSQL 与真实容器 runtime probe 未执行；Legal Content MVP、Controlled Pilot Ready、Formal Customer Release Ready 均缺真实律师、客户与生产证据，只能保持 `blocked_external`。
+
+## EV-0034
+
+- **claim**: Finalist hardening 从精确提交 `14e3cd395cccfe2218b8013a448a137b881a9860` 建立绿色基线。当前分支与远端恢复点同为该 SHA，工作树干净；历史分支和其 worktree 未移动。生产规则制品实测为 30 项且 code 唯一，六维分布 5/5/5/8/4/3。Python 3.12.13 基线专项 `test_versioned_registry.py test_version_readiness.py test_versioned_payload_validation.py test_mechanism_layer.py` 为 **76 passed**。四个 frozen Golden raw SHA-256 与 EV-0027/EV-0033 精确相同。
+- **文件与精确行号**: `backend/app/rules/brazil_new_energy.json`；`backend/tests/goldens/versioned/{compiler_v0_2,coverage_proof_v0_1,answerability_v1_0,delivery_release_v1_1}.json`；D-0018。
+- **命令与原始结果摘要**: Python 3.12.13 读取规则 JSON 计数 `checklist_items=30, unique_codes=30`；专项 `76 passed, 3 warnings`；`shasum -a 256` 四值为 `8787a164...9b4 / 206cb553...7ffb / e40f6805...257a / 6cdce303...c256`。
+- **提交 SHA**: 本阶段账本提交的实时 SHA 必须按 D-0004 由 Git 查询。
+- **是否已复现**: 是，本轮单次完整基线验证。
+- **限制和不确定性**: 当前 macOS 宿主无 Docker CLI、`psql` 或 `pg_isready`；PostgreSQL/Docker 最终验证必须由后续可信运行环境或绑定精确 SHA 的 GitHub Actions 补齐，未验证前不得声称通过。

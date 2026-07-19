@@ -173,3 +173,14 @@
 - **影响范围**: RC0 前端预览数据、状态标签、演示导出、测试与最终声明。
 - **谁批准**: 用户。
 - **是否可逆**: 演示适配器可删除；正式证据隔离与声明边界不可弱化。
+
+## D-0018(决赛硬化的固定分母与真实流程边界)
+
+- **Decision ID**: D-0018
+- **日期**: 2026-07-19
+- **问题**: 如何在不改动历史 compiler 0.2 / CoverageProof 0.1 及现有 Golden、不弱化正式 Release Gate 的前提下，实现决赛演示需要的全量分母和真实 API 流程。
+- **最终决定**: (1) 新增 Claim Compiler 0.3、CoverageProof 0.2、独立 ResearchItem 与 Alembic 0008；历史 reader 只增不减，writer 显式持久所选 `reader.version`。(2) 正式 Capability Pack 分母固定为规则制品的 30 项，不受 Scope、trigger、subsector 或 embedding 筛选改变；Scope 仅标记 `in_scope` / `out_of_scope_by_scope`，screening 仅是注解。(3) in-scope disposition 仅为 `supported | not_applicable | rejected | unanswerable | uncovered`；`not_applicable` 同时要求已确认的业务否定事实与法务明示确认。(4) 无真实法律 Claim 草稿时只创建/更新 ResearchItem，不得创建占位 ClaimRecord。(5) 比赛主演示必须使用正式上传、事实登记/确认、Scope 冻结、编译、证明、Gate 和 audit API；RC0 synthetic workspace 仅保留为机制说明附录，不得给正式计算结果贴硬编码 synthetic output 标记。(6) 正式 delivery 一直保持 fail-closed；没有真实外部证据时必须继续 `blocked_external`。
+- **依据**: D-0007、D-0008、D-0009、D-0014、D-0015、D-0016、D-0017；用户 2026-07-19 决赛竞争力硬化任务明确授权。
+- **影响范围**: mechanism model/service/API、versioned registry/reader、Gate/readiness、Alembic 0008、正式场景测试流程、八页比赛工作台、竞赛文档、CI 与最终证据。
+- **谁批准**: 用户。
+- **是否可逆**: 新 reader/writer 默认可由后续决定前移；已持久版本的 reader 与迁移历史不可删改；历史 0.2/0.1 制品必须 byte-identical。
