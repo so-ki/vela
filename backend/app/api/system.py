@@ -10,8 +10,13 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models.user import User
-from app.schemas.common import HealthResponse, SystemStatusResponse
+from app.schemas.common import (
+    HealthResponse,
+    SystemStatusResponse,
+    VersionReadinessResponse,
+)
 from app.services.llm_client import llm_status
+from app.services.version_readiness_service import build_version_readiness_report
 
 router = APIRouter(tags=["系统"])
 
@@ -39,6 +44,27 @@ def health(db: Session = Depends(get_db)):
         version="0.1.0",
         environment=settings.app_env,
     )
+
+
+@router.get("/readiness", response_model=VersionReadinessResponse)
+def readiness(db: Session = Depends(get_db)):
+    settings = get_settings()
+    try:
+        db.execute(text("SELECT 1"))
+        report = build_version_readiness_report(
+            db, environment=settings.app_env
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="version readiness unavailable",
+        ) from exc
+    if settings.is_production and not report["ready"]:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=report,
+        )
+    return VersionReadinessResponse(**report)
 
 
 @router.get("/status", response_model=SystemStatusResponse)

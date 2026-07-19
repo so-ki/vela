@@ -59,6 +59,19 @@ async def lifespan(_: FastAPI):
     validate_runtime_configuration()
     init_db()
     validate_instance_database_boundary()
+    from app.core.database import SessionLocal
+    from app.services.version_readiness_service import build_version_readiness_report
+
+    with SessionLocal() as readiness_db:
+        version_readiness = build_version_readiness_report(
+            readiness_db, environment=get_settings().app_env
+        )
+    if not version_readiness["ready"]:
+        logger.warning(
+            "persisted version readiness is %s; production readiness will fail closed: %s",
+            version_readiness["status"],
+            version_readiness["version_issues"],
+        )
     agent_task = None
     try:
         ingest_corpus(force=False)
