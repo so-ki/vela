@@ -4,8 +4,10 @@
 - Product baseline SHA: 65f0b398f94af72680f8c1139aa59f7df6b88d71
 - Target base branch: codex/vela-release-hardening(不得直接推送)
 - Checkpoint branch: claude/gracious-brahmagupta-bbg2dw(仅承载交接文件提交)
-- Last verified product-code SHA: 65f0b398 基线 + 已批准的 WS-1C 产品提交:C1(362a0c0)、C1.1(730b9fd)、C2(f120b00)、C2.1(ace91d2);实施基线 = ace91d2c95295ef36e5c7c5e53ad512cc099b8f8(C2 分支)
-- Allowed commits: 5 个交接文件 + 经用户逐项批准的 workstream 产品提交(当前 C1/C1.1/C2/C2.1)
+- Claude handoff source: `origin/claude/vela-ws-1c-c3a-versioned-readers` = `00b47bc89f11aa5a8eaaf38dae18565e8fd07274`(Codex 接管时已 fetch 核验)
+- Codex integration branch: `codex/vela-mvp-integration`(从上述精确交接点创建;不得自动合并或推送 Draft 分支)
+- Last verified product-code SHA: `a6d985402ebe606cc423c9c3d2c270e00229979c`(C3-A.2;基于 C3-A/C3-A.1 交接点)
+- Allowed commits: 5 个交接文件 + 经批准的 WS-1C 产品提交(C1/C1.1/C2/C2.1/C3-A/C3-A.1/C3-A.2)
 - Resume 时必须执行的 Git 核验命令:
   ```
   git status --short
@@ -13,18 +15,19 @@
   git rev-parse HEAD
   git fetch origin
   git rev-parse origin/codex/vela-release-hardening        # 必须 = 65f0b398...
-  git diff --stat 65f0b398f94af72680f8c1139aa59f7df6b88d71 HEAD  # 差异只允许:5 个交接文件 + 已批准的 C1/C1.1/C2/C2.1 产品文件
+  git diff --stat 65f0b398f94af72680f8c1139aa59f7df6b88d71 HEAD  # 差异只允许:5 个交接文件 + 已批准的 WS-1C 产品文件
   ```
 - 注意:Git 的实时 HEAD 只能在恢复时通过 `git rev-parse HEAD` 获取;本文件不记录、也不得用文件记录替代 Git 实时查询(D-0004)。
 
 ## Current Phase
-- Phase: WS-1C/C3-A + C3-A.1(持久化 JSON 结构验证/Registry 自检/writer 单源)——已实施并全量验证,等待用户复核
-- Workstream: WS-1C(C1、C1.1、C2、C2.1、C3-A 完成;C3-B/C4/C5 未开始,未获批准)
+- Phase: WS-1C/C3-A + C3-A.1 + C3-A.2(嵌套持久化 JSON 引用结构验证)——已实施并全量验证,等待独立复核
+- Workstream: WS-1C(C1、C1.1、C2、C2.1、C3-A/C3-A.1/C3-A.2 完成;C3-B/C4/C5 未开始)
 - Status: complete_pending_review
-- 分支说明: C3-A 在独立分支 `claude/vela-ws-1c-c3a-versioned-readers`(基于 efc76e0);产品提交 061be1e/dafc96e/e39edf0
+- 分支说明: Codex 从 Claude 精确 HEAD `00b47bc` 建立 `codex/vela-mvp-integration`;C3-A.2 产品提交 `a6d9854`
+- 外部状态: 法律认证、真实客户 UAT、客户生产部署证据继续为 `blocked_external`,工程测试不得升级这些状态
 - 分支说明: C2 在独立分支 `claude/vela-ws-1c-c2-real-archive`(基于 C1.1 提交 730b9fd);checkpoint 分支 `claude/gracious-brahmagupta-bbg2dw` 停在 C1.1
-- Allowed file scope(本轮 C3 设计轮): 仅 5 个交接文件(产品代码零改动)
-- Prohibited actions: 修改产品代码/测试/迁移/规则/语料/归档制品/Docker/前端;新增 version registry;移动函数;开始 ResearchItem 与 C4/C5;创建 PR;合并;推送 Draft 分支
+- Allowed file scope(C3-A.2): `answerability_gate_service.py`、`test_versioned_payload_validation.py` 与交接文件;已严格遵守
+- Prohibited actions: 未获明确批准前开始 C3-B 迁移/Release reader、ResearchItem、C4/C5;创建 PR;合并;推送 Draft 分支
 
 ## Frozen Product Definition
 - 见 `AGENTS.md` 第 2–4 节与 D-0006;产品语义新增冻结决定:**D-0007(分母 A+ 方案)、D-0008(多版本不可变共存)、D-0009(ResearchItem 与 ClaimRecord 分离)、D-0010(外证矩阵采用状态修正)**——以 DECISION_LOG 原文为准,不得再列为 unresolved。
@@ -35,6 +38,7 @@
 ## Work Completed
 - Phase 0 / 0.5:见前轮(EV-0001~EV-0017)。
 - Phase 0.6:(1) D-0007~D-0010 落账;(2) **基线动态验证首次通过**(EV-0018):靶向 35 passed、全量后端 295 passed、compileall、前端 29 passed + 构建、发布边界、git diff --check,全部绿,Python 3.12.3(未用系统 3.11);(3) WS-1C 设计前提事实采集(EV-0019);(4) WS-1C 实施方案冻结(见下节)。
+- C3-A.2(EV-0029):draft 引用、ClaimRecord 三个 JSON 字段及 CoverageProof 0.1 嵌套元素全部在 frozen reader 前按 `list[str]`/对象结构校验;非法形状即 422,新增 13 个对抗测试;全量后端 **393 passed**;四个 golden raw SHA 不变。
 
 ## WS-1C Frozen Plan(v1,待批准;完整版见本轮会话报告)
 - **核心结论**:采用**文件系统不可变归档 + 代码级 reader 版本注册表,零 Alembic 迁移**。不建 DB 版本表(与现行"文件系统为 Pack 事实源"一致,并把 Alembic 0007 让给 WS-1A 的 ResearchItem,避免迁移冲突)。
@@ -51,20 +55,22 @@
 
 ## Files Changed
 - WS-1C/C1 产品提交:`backend/app/capability_packs/registry.py`(修改)、`backend/app/capability_packs/version_index.py`(新增)、`backend/tests/test_capability_pack_version_archive.py`(新增)。
+- WS-1C/C3-A.2 产品提交:`backend/app/services/answerability_gate_service.py`、`backend/tests/test_versioned_payload_validation.py`。
 - 交接文件:5 个(持续更新)。
-- 未触碰:active manifest、生产 rules/corpus JSON、loader.py、机制层、evaluator、Alembic、前端、产品文档;仓库内未创建任何真实 archive 目录(C1 仅用临时目录合成 bundle)。
+- C3-A.2 未触碰:frozen v0_2/v0_1 readers、四个 goldens、active manifest、生产 rules/corpus、loader、release evaluator、Alembic、前端与产品文档。
 
 ## Tests and Commands(本轮,EV-0018)
 - environment: 远程受管容器 Linux;Python 3.12.3(uv venv,scratchpad;未用系统 3.11);Node v22.22.2;npm 10.9.7;Docker 29.3.1
 - 靶向 6 文件 pytest → 35 passed(32.11s);`python -m compileall -q app tests` → 通过;全量 `pytest tests -q` → **295 passed**(73.70s);`npm ci` + `npm run test:components` → 29 passed;`npm run build` → 成功(3.62s);`bash scripts/check_release_boundaries.sh` → OK;`git diff --check` → 干净
 - 未运行:Alembic 升降级往返(需一次性 PostgreSQL,专项);PostgreSQL 并发(WS-4);浏览器 E2E。
+- Codex C3-A.2(EV-0029,macOS/Python 3.12):专项 34 passed;指定组合 73 passed;全量后端 393 passed;compileall、Ruff、release boundaries、git diff --check 全通过;四个 golden SHA 与 EV-0027 一致。
 
 ## Findings
 - 前轮 findings(R1、C1~C11、potential、experiment_required、blocked_external)不变,见 Phase 0.5 记录与 EV-0013~EV-0016;本轮新增 EV-0019(版本链设计前提):冻结快照只存 hash 不存内容、全库无历史归档、消费方为"重算+哈希相等"式 fail-closed、格式变更即历史制品失配——证实 D-0008 所需的归档+版本注册表是当前缺失能力。
 - experiment_required 消项:基线动态验证已完成(EV-0018);仍留:PostgreSQL 并发/事务、Alembic 往返(一次性库)、四合成案例动态回归、全角色浏览器 E2E、priming 定量。
 
 ## Unresolved Questions(真正需要用户决定)
-1. WS-1C 实施批准(按上节冻结方案与 commit 计划 C1~C5)。
+1. C3-B 的迁移与 release reader 实施批准:是否按冻结设计为 `ScenarioDeliveryRelease` 增加显式 schema identity,以及 Alembic 0007/后续 ResearchItem 0008 的线性编号。
 2. ResearchItem 模型命名偏好:`ResearchItem` vs `ClaimCompilationItem`(D-0009 两候选,WS-1A 冻结方案时定,可由实施者建议)。
 
 ## C3 Frozen Plan(v1,待批准;完整版见本轮会话报告,证据 EV-0026)
@@ -80,8 +86,8 @@
 - **ultracode 建议**:C3 实施为 hash 冻结高精度重构,建议**单线实施+每 commit 全量测试**,不切换 ultracode;实施完成后的对抗验证(WS-5 式)可用多代理。
 
 ## Next Exact Action
-- 等待用户复核 WS-1C/C3-A + C3-A.1(证据 EV-0027/EV-0028;全量 380 passed;goldens raw SHA 保持冻结值)。经复核通过后请求批准 C3-B(delivery snapshot 1.0 / release 1.1 reader + Alembic 0007 迁移裁决仍悬置:方案 A vs 方案 B)。复核前不得开始 C3-B。
+- 独立复核 C3-A.2 产品提交 `a6d9854` 与 EV-0029;通过后进行 **C3-B 只读实施前审计**(delivery snapshot 1.0 / release 1.1 reader / Alembic 0007)。C3-B 涉及迁移和 release 语义,在 Decision Log 追加明确批准前不得修改产品代码。
 
 ## Stop Conditions
-- 远端基线移动、产品代码出现非授权改动、或操作将超出 5 个允许文件 → 立即停止并报告。
-- 本轮输出完成 → 停止等待批准;不修改产品代码、不建迁移、不开始 WS-1A/B/D/E、不推送 Draft 分支、不建 PR。
+- 远端基线移动、产品代码出现非授权改动、或操作将超出当前批准文件范围 → 立即停止并报告。
+- 不自动合并 `main` 或 `codex/vela-release-hardening`,不向 Draft 分支推送,不创建 PR;法律认证、客户 UAT、生产部署证据只能保持 `blocked_external` 直到真实证据进入审计链。

@@ -297,3 +297,18 @@
 - **提交 SHA**: b41921e(fix(versioning): validate persisted reader identities),分支 claude/vela-ws-1c-c3a-versioned-readers
 - **是否已复现**: 单轮全绿;21 个对抗测试均先按"攻击者重算哈希"构造。
 - **限制和不确定性**: compile 写路径(payload 服务器生成)未加同套结构验证——gate 是唯一交付边界;PostgreSQL 动态验证仍属 WS-4/WS-5。
+
+## EV-0029
+
+- **claim**: Codex 从远端 Claude 交接分支的精确 HEAD `00b47bc89f11aa5a8eaaf38dae18565e8fd07274` 建立独立 `codex/vela-mvp-integration`,并完成 WS-1C/C3-A.2。修复内容:(1) persisted draft 的 `fact_refs`/`evidence_refs` 除外层必须为 list 外,元素必须全部为字符串;非法形状在 frozen compiler 0.2 reader 前返回 422 `compiler_input_snapshot_invalid`。(2) 每个 ClaimRecord 的 `fact_refs`、`evidence_refs`、`reason_codes` 必须为 `list[str]`;None、标量、字符串、dict 或含非字符串元素的 list 返回 422 `claim_record_json_invalid:<checklist_code>`,并在任何 `list(...)`、集合推导或 provisional evidence disclosure 前阻断。(3) CoverageProof 0.1 的 denominator 元素必须含字符串 checklist_code/statement,covered_checklist_codes 必须为 `list[str]`,uncovered 的 checklist_code/status 必须为字符串且 unanswerable_reasons 必须为 `list[str]`;非法结构返回 422 `coverage_proof_body_invalid`。全部攻击测试在可行处同步重算 input/proof/denominator hash 与 counts,证明阻断来自结构验证而非哈希碰巧失配。
+- **文件与精确行号**: `backend/app/services/answerability_gate_service.py:85-120`(draft/Claim JSON),`:170-199`(proof 嵌套结构),`:289-306`(Claim 校验早于 JSON 消费);`backend/tests/test_versioned_payload_validation.py:90-127`(draft 引用),`:148-178`(Claim JSON 与 supported disclosure),`:208-242`(proof 嵌套结构)。
+- **命令与结果**(macOS;独立 `work/vela-review-venv`;Python 3.12;requirements.lock + CI 同版 pytest 8.4.2):
+  1. `python -m pytest -q tests/test_versioned_payload_validation.py` → **34 passed**,1 个既有 reportlab 弃用警告;
+  2. 指定组合 `test_versioned_payload_validation.py test_versioned_registry.py test_versioned_goldens.py test_mechanism_layer.py test_delivery_assurance.py` → **73 passed**,3 个既有第三方弃用警告;
+  3. `python -m compileall -q app tests` → 通过;`ruff check app/services/answerability_gate_service.py tests/test_versioned_payload_validation.py` → All checks passed;
+  4. 全量 `python -m pytest tests -q` → **393 passed**,3 warnings,零失败零跳过;
+  5. `bash scripts/check_release_boundaries.sh` → 全部 OK;`git diff --check` → 干净;
+  6. 四个 golden raw SHA-256 逐一与 EV-0027 相同:compiler `8787a1644a0c6fe4076978e3b181caa9f3072e29db1e71d3b5670415df4679b4`;proof `206cb55372dcdb7d00a12d4af38b69a95e10ec57d662f538498c64e138807ffb`;answerability `e40f68050c8e3f56c26ea20fb19772a6fe78109c76d2f5d29d98efc5426f257a`;release `6cdce303c806ff36e804f01d67e42595d6307984a83312efe211a50f4fdac256`。
+- **提交 SHA**: `a6d985402ebe606cc423c9c3d2c270e00229979c` (`fix(versioning): validate nested persisted references`)
+- **是否已复现**: 专项和全量各完成一次最终绿测试;全量首次运行暴露测试夹具收集顺序问题(29 setup errors,非产品失败),修正为保留原 pytest fixture 导入并对该特定 F811 语义加窄范围 Ruff 指令后,专项与全量均重跑通过。
+- **限制和不确定性**: 本轮数据库为 SQLite 合成测试;PostgreSQL 并发/事务攻击仍属 WS-4/WS-5。C3-B 的 delivery snapshot/release reader 与 Alembic 0007 未实施。完整生产镜像运行探针仍按 EV-0024 未验证。法律认证、真实客户 UAT、客户生产部署证据均继续为 `blocked_external`。
