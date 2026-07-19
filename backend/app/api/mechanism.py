@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.roles import is_legal_role
-from app.models.mechanism import ClaimCompilation, ClaimRecord, FactRecord
+from app.models.mechanism import ClaimCompilation, ClaimRecord, FactRecord, ResearchItem
 from app.models.scenario import InvestigationScenario
 from app.models.user import User
 from app.schemas.mechanism import (
@@ -23,18 +23,22 @@ from app.schemas.mechanism import (
     FactRecordResponse,
     MaterialLedgerResponse,
     MaterialLedgerUpsertRequest,
+    ResearchItemDecisionRequest,
+    ResearchItemResponse,
 )
 from app.services.audit import write_audit_log
 from app.services.mechanism_service import (
     MechanismConflict,
     MechanismValidationError,
     compilation_claims,
+    compilation_research_items,
     compile_claims,
     confirm_fact_record,
     confirm_claim,
     create_coverage_proof,
     create_coverage_task,
     create_fact_record,
+    decide_research_item,
     latest_compilation,
     latest_coverage_proof,
     list_coverage_tasks,
@@ -76,7 +80,9 @@ def _raise_service_error(exc: Exception) -> None:
 
 
 def _compilation_response(
-    compilation: ClaimCompilation, claims: list[ClaimRecord]
+    compilation: ClaimCompilation,
+    claims: list[ClaimRecord],
+    research_items: list[ResearchItem] | None = None,
 ) -> ClaimCompilationResponse:
     return ClaimCompilationResponse(
         id=compilation.id,
@@ -91,6 +97,10 @@ def _compilation_response(
         created_by=compilation.created_by,
         created_at=compilation.created_at,
         claims=[ClaimRecordResponse.model_validate(claim) for claim in claims],
+        research_items=[
+            ResearchItemResponse.model_validate(item)
+            for item in (research_items or [])
+        ],
     )
 
 
@@ -333,7 +343,11 @@ def post_compile_claims(
         db.refresh(compilation)
         for claim in claims:
             db.refresh(claim)
-        return _compilation_response(compilation, claims)
+        return _compilation_response(
+            compilation,
+            claims,
+            compilation_research_items(db, compilation.id),
+        )
     except MechanismValidationError as exc:
         db.rollback()
         _raise_service_error(exc)
@@ -352,7 +366,73 @@ def get_latest_claims(
     result = latest_compilation(db, scenario_id)
     if result is None:
         raise HTTPException(status_code=404, detail="尚无 Claim 编译结果")
-    return _compilation_response(*result)
+    compilation, claims = result
+    return _compilation_response(
+        compilation,
+        claims,
+        compilation_research_items(db, compilation.id),
+    )
+
+
+@router.get(
+    "/scenarios/{scenario_id}/mechanism/research-items/latest",
+    response_model=list[ResearchItemResponse],
+)
+def get_latest_research_items(
+    scenario_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _load_scenario(db, scenario_id, current_user)
+    result = latest_compilation(db, scenario_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="尚无 ResearchItem 编译结果")
+    compilation, _claims = result
+    return compilation_research_items(db, compilation.id)
+
+
+@router.post(
+    "/scenarios/{scenario_id}/mechanism/research-items/{item_id}/decision",
+    response_model=ResearchItemResponse,
+)
+def post_research_item_decision(
+    scenario_id: int,
+    item_id: str,
+    body: ResearchItemDecisionRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _require_legal(current_user)
+    scenario = _load_scenario(db, scenario_id, current_user)
+    item = db.get(ResearchItem, item_id)
+    if item is None or item.scenario_id != scenario_id:
+        raise HTTPException(status_code=404, detail="ResearchItem 不存在")
+    try:
+        item = decide_research_item(
+            db,
+            scenario=scenario,
+            item=item,
+            request=body,
+            user=current_user,
+        )
+        write_audit_log(
+            db,
+            user=current_user,
+            action="mechanism.research_item_decision",
+            resource_type="research_item",
+            resource_id=item.id,
+            detail=(
+                f"scenario={scenario_id} code={item.checklist_code} "
+                f"disposition={body.disposition}"
+            ),
+            commit=False,
+        )
+        db.commit()
+        db.refresh(item)
+        return item
+    except (MechanismConflict, MechanismValidationError) as exc:
+        db.rollback()
+        _raise_service_error(exc)
 
 
 @router.post(

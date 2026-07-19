@@ -72,6 +72,7 @@ def test_canonical_hash_v1_reproduces_all_golden_hashes() -> None:
 
 def test_registry_contains_required_historical_entries() -> None:
     assert "0.2" in versioned_registry.SUPPORTED_COMPILER_READERS
+    assert "0.3" in versioned_registry.SUPPORTED_COMPILER_READERS
     assert versioned_registry.CURRENT_COMPILER_WRITE_VERSION == "0.2"
     reader = get_compiler_reader("0.2")
     assert reader.version == "0.2"
@@ -120,8 +121,9 @@ def test_current_write_version_not_used_for_reader_selection(monkeypatch) -> Non
     monkeypatch.setattr(versioned_registry, "CURRENT_COMPILER_WRITE_VERSION", "0.3")
     reader = get_compiler_reader("0.2")
     assert reader.version == "0.2"
+    assert get_compiler_reader("0.3").version == "0.3"
     with pytest.raises(UnsupportedVersionError):
-        get_compiler_reader("0.3")
+        get_compiler_reader("0.4")
 
 
 def test_future_delivery_write_defaults_do_not_replace_historical_readers(

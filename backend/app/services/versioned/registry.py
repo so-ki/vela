@@ -20,6 +20,7 @@ from typing import Any, Callable, Iterable, Mapping
 from sqlalchemy.orm import Session
 
 from app.services.versioned.claim_compiler import v0_2 as claim_compiler_v0_2
+from app.services.versioned.claim_compiler import v0_3 as claim_compiler_v0_3
 from app.services.versioned.coverage_proof import v0_1 as coverage_proof_v0_1
 from app.services.versioned.delivery_release import v1_1 as delivery_release_v1_1
 from app.services.versioned.delivery_snapshot import v1_0 as delivery_snapshot_v1_0
@@ -68,6 +69,9 @@ class CompilerReader:
     build_claim_values: Callable[..., list[dict[str, Any]]]
     checklist_items: Callable[[dict[str, Any]], list[dict[str, Any]]]
     hash_payload: Callable[[Any], str]
+    build_denominator: Callable[..., list[dict[str, Any]]] | None = None
+    build_research_values: Callable[..., list[dict[str, Any]]] | None = None
+    build_output_payload: Callable[..., Any] | None = None
 
 
 _COMPILER_V0_2 = CompilerReader(
@@ -76,6 +80,17 @@ _COMPILER_V0_2 = CompilerReader(
     build_claim_values=claim_compiler_v0_2.build_claim_values,
     checklist_items=claim_compiler_v0_2.checklist_items,
     hash_payload=claim_compiler_v0_2.hash_payload,
+)
+
+_COMPILER_V0_3 = CompilerReader(
+    version=claim_compiler_v0_3.VERSION,
+    build_input_snapshot=claim_compiler_v0_3.build_input_snapshot,
+    build_claim_values=claim_compiler_v0_3.build_claim_values,
+    checklist_items=claim_compiler_v0_3.checklist_items,
+    hash_payload=claim_compiler_v0_3.hash_payload,
+    build_denominator=claim_compiler_v0_3.build_denominator,
+    build_research_values=claim_compiler_v0_3.build_research_values,
+    build_output_payload=claim_compiler_v0_3.build_output_payload,
 )
 
 
@@ -102,6 +117,7 @@ SUPPORTED_COMPILER_READERS: Mapping[str, CompilerReader] = build_unique_version_
     "claim_compiler",
     (
         ("0.2", _COMPILER_V0_2),
+        ("0.3", _COMPILER_V0_3),
     ),
 )
 

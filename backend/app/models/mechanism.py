@@ -90,6 +90,9 @@ class FactRecord(Base):
     block_id: Mapped[str] = mapped_column(String(255), nullable=False)
     fact_pack_version: Mapped[str] = mapped_column(String(64), nullable=False)
     source_document: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    assertion_polarity: Mapped[str] = mapped_column(
+        String(16), default="unspecified", nullable=False
+    )
     status: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
     confirmation_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     business_confirmed_by: Mapped[Optional[int]] = mapped_column(ForeignKey("users.id"), nullable=True)
@@ -143,6 +146,56 @@ class ClaimRecord(Base):
     confirmed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     confirmation_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
+    )
+
+
+class ResearchItem(Base):
+    """One immutable Pack-denominator item with an independently reviewable disposition."""
+
+    __tablename__ = "research_items"
+    __table_args__ = (
+        UniqueConstraint(
+            "compilation_id",
+            "checklist_code",
+            name="uq_research_item_compilation_code",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    compilation_id: Mapped[str] = mapped_column(
+        ForeignKey("claim_compilations.id"), index=True, nullable=False
+    )
+    scenario_id: Mapped[int] = mapped_column(
+        ForeignKey("investigation_scenarios.id"), index=True, nullable=False
+    )
+    checklist_code: Mapped[str] = mapped_column(String(128), nullable=False)
+    denominator_order: Mapped[int] = mapped_column(Integer, nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    dimension: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
+    scope_status: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    screening_status: Mapped[str] = mapped_column(String(32), nullable=False)
+    disposition: Mapped[Optional[str]] = mapped_column(String(32), index=True, nullable=True)
+    research_status: Mapped[str] = mapped_column(String(32), index=True, nullable=False)
+    missing_facts: Mapped[list] = mapped_column(JSON, nullable=False)
+    reason_codes: Mapped[list] = mapped_column(JSON, nullable=False)
+    negative_fact_refs: Mapped[list] = mapped_column(JSON, nullable=False)
+    linked_claim_id: Mapped[Optional[str]] = mapped_column(
+        ForeignKey("claim_records.id"), index=True, nullable=True
+    )
+    compiler_version: Mapped[str] = mapped_column(String(16), nullable=False)
+    item_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    legal_confirmed_by: Mapped[Optional[int]] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+    legal_confirmed_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    legal_confirmation_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow, nullable=False
     )

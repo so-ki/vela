@@ -14,6 +14,7 @@ from app.models.mechanism import (
     CoverageTask,
     FactRecord,
     MaterialLedgerEntry,
+    ResearchItem,
 )
 from app.models.scenario import InvestigationScenario
 from app.models.user import User
@@ -22,6 +23,7 @@ from app.schemas.mechanism import (
     CoverageTaskCreateRequest,
     FactRecordCreateRequest,
     MaterialLedgerUpsertRequest,
+    ResearchItemDecisionRequest,
 )
 from app.services.generation_guard import stable_hash
 from app.services.versioned import registry as versioned_registry
@@ -227,6 +229,7 @@ def create_fact_record(
         block_id=request.block_id,
         fact_pack_version=request.fact_pack_version,
         source_document=request.source_document.strip() if request.source_document else None,
+        assertion_polarity=request.assertion_polarity,
         status="submitted",
         created_by=user.id,
     )
@@ -313,24 +316,59 @@ def compile_claims(
     user: User,
 ) -> tuple[ClaimCompilation, list[ClaimRecord]]:
     payload = scenario.checklist.payload if scenario.checklist else {}
-    items = _checklist_items(payload)
+    writer = versioned_registry.current_compiler_writer()
+    items = (
+        writer.build_denominator(scenario=scenario)
+        if writer.build_denominator is not None
+        else writer.checklist_items(payload)
+    )
     if not items:
         raise MechanismValidationError("场景没有可编译的 checklist 分母")
-    item_by_code = {str(item["code"]): item for item in items}
+    item_by_code = {
+        str(item.get("checklist_code") or item.get("code")): item for item in items
+    }
     draft_by_code = {draft.checklist_code: draft for draft in request.drafts}
     unknown_codes = sorted(set(draft_by_code) - set(item_by_code))
     if unknown_codes:
         raise MechanismValidationError(
             f"Claim 草稿引用了不在当前清单中的 code: {', '.join(unknown_codes[:10])}"
         )
+    out_of_scope_drafts = sorted(
+        code
+        for code in draft_by_code
+        if item_by_code[code].get("scope_status") == "out_of_scope_by_scope"
+    )
+    if out_of_scope_drafts:
+        raise MechanismValidationError(
+            "out_of_scope_by_scope 项不得创建 Claim: "
+            + ", ".join(out_of_scope_drafts[:10])
+        )
 
     drafts = [draft.model_dump(mode="json") for draft in request.drafts]
-    writer = versioned_registry.current_compiler_writer()
-    input_snapshot = writer.build_input_snapshot(
-        db,
-        scenario=scenario,
-        drafts=drafts,
-    )
+    research_decisions = [
+        decision.model_dump(mode="json") for decision in request.research_decisions
+    ]
+    if writer.build_research_values is not None:
+        _validate_research_decisions(
+            db,
+            scenario=scenario,
+            items=item_by_code,
+            decisions=research_decisions,
+        )
+        input_snapshot = writer.build_input_snapshot(
+            db,
+            scenario=scenario,
+            drafts=drafts,
+            research_decisions=research_decisions,
+        )
+    else:
+        if research_decisions:
+            raise MechanismValidationError("当前 compiler 不支持 ResearchItem 决定")
+        input_snapshot = writer.build_input_snapshot(
+            db,
+            scenario=scenario,
+            drafts=drafts,
+        )
     claim_values = writer.build_claim_values(
         items,
         drafts=drafts,
@@ -338,8 +376,24 @@ def compile_claims(
         evidence=input_snapshot["evidence"],
     )
 
+    research_values: list[dict[str, Any]] = []
+    if writer.build_research_values is not None:
+        research_values = writer.build_research_values(
+            items,
+            claim_values=claim_values,
+            research_decisions=research_decisions,
+        )
+
     input_hash = writer.hash_payload(input_snapshot)
-    output_hash = writer.hash_payload(claim_values)
+    output_payload = (
+        writer.build_output_payload(
+            claim_values=claim_values,
+            research_values=research_values,
+        )
+        if writer.build_output_payload is not None
+        else claim_values
+    )
+    output_hash = writer.hash_payload(output_payload)
     compilation = ClaimCompilation(
         id=str(uuid4()),
         scenario_id=scenario.id,
@@ -347,7 +401,7 @@ def compile_claims(
         input_hash=input_hash,
         output_hash=output_hash,
         input_snapshot=input_snapshot,
-        denominator_count=len(claim_values),
+        denominator_count=(len(research_values) if research_values else len(claim_values)),
         ready_count=sum(1 for value in claim_values if value["status"] == "awaiting_human_confirmation"),
         refused_count=sum(1 for value in claim_values if value["status"] == "refused"),
         created_by=user.id,
@@ -365,7 +419,92 @@ def compile_claims(
     ]
     db.add_all(claims)
     db.flush()
+    claim_by_code = {claim.checklist_code: claim for claim in claims}
+    decision_by_code = {
+        decision["checklist_code"]: decision for decision in research_decisions
+    }
+    research_items = [
+        ResearchItem(
+            id=str(uuid4()),
+            compilation_id=compilation.id,
+            scenario_id=scenario.id,
+            linked_claim_id=(
+                claim_by_code[value["checklist_code"]].id
+                if value["checklist_code"] in claim_by_code
+                else None
+            ),
+            legal_confirmed_by=(
+                user.id if value["checklist_code"] in decision_by_code else None
+            ),
+            legal_confirmed_at=(
+                _now() if value["checklist_code"] in decision_by_code else None
+            ),
+            **value,
+        )
+        for value in research_values
+    ]
+    if research_items:
+        db.add_all(research_items)
+        db.flush()
     return compilation, claims
+
+
+def _validate_research_decisions(
+    db: Session,
+    *,
+    scenario: InvestigationScenario,
+    items: dict[str, dict[str, Any]],
+    decisions: list[dict[str, Any]],
+) -> None:
+    unknown = sorted(
+        str(decision["checklist_code"])
+        for decision in decisions
+        if str(decision["checklist_code"]) not in items
+    )
+    if unknown:
+        raise MechanismValidationError(
+            f"研究决定引用了不在 Pack 分母中的 code: {', '.join(unknown[:10])}"
+        )
+    out_of_scope = sorted(
+        str(decision["checklist_code"])
+        for decision in decisions
+        if items[str(decision["checklist_code"])].get("scope_status")
+        == "out_of_scope_by_scope"
+    )
+    if out_of_scope:
+        raise MechanismValidationError(
+            "out_of_scope_by_scope 项只能保持 Scope 状态，不得设置 disposition: "
+            + ", ".join(out_of_scope[:10])
+        )
+
+    negative_refs = {
+        ref
+        for decision in decisions
+        if decision["disposition"] == "not_applicable"
+        for ref in decision.get("negative_fact_refs") or []
+    }
+    if not negative_refs:
+        return
+    facts = {
+        fact.id: fact
+        for fact in db.query(FactRecord)
+        .filter(FactRecord.id.in_(negative_refs))
+        .all()
+    }
+    for ref in sorted(negative_refs):
+        fact = facts.get(ref)
+        if fact is None or fact.scenario_id != scenario.id:
+            raise MechanismValidationError(
+                f"not_applicable 否定事实不存在或与场景不匹配: {ref}"
+            )
+        if fact.status != "business_confirmed":
+            raise MechanismValidationError(
+                f"not_applicable 否定事实未经业务确认: {ref}"
+            )
+        if fact.assertion_polarity != "negative":
+            raise MechanismValidationError(
+                f"not_applicable 必须引用 assertion_polarity=negative 的事实: {ref}"
+            )
 
 
 def compilation_claims(db: Session, compilation_id: str) -> list[ClaimRecord]:
@@ -373,6 +512,17 @@ def compilation_claims(db: Session, compilation_id: str) -> list[ClaimRecord]:
         db.query(ClaimRecord)
         .filter(ClaimRecord.compilation_id == compilation_id)
         .order_by(ClaimRecord.checklist_code.asc())
+        .all()
+    )
+
+
+def compilation_research_items(
+    db: Session, compilation_id: str
+) -> list[ResearchItem]:
+    return (
+        db.query(ResearchItem)
+        .filter(ResearchItem.compilation_id == compilation_id)
+        .order_by(ResearchItem.denominator_order.asc())
         .all()
     )
 
@@ -414,8 +564,86 @@ def confirm_claim(
     )
     if result.rowcount != 1:
         raise MechanismConflict("只有 awaiting_human_confirmation 的 Claim 可被确认或驳回")
+    db.execute(
+        update(ResearchItem)
+        .where(ResearchItem.linked_claim_id == claim.id)
+        .values(
+            disposition="supported" if decision == "confirmed" else "rejected",
+            research_status="resolved",
+            reason_codes=[] if decision == "confirmed" else ["legal_rejected"],
+            legal_confirmed_by=user.id,
+            legal_confirmed_at=now,
+            legal_confirmation_note=confirmation_note.strip(),
+            updated_at=now,
+        )
+    )
     db.flush()
     return db.get(ClaimRecord, claim.id)
+
+
+def decide_research_item(
+    db: Session,
+    *,
+    scenario: InvestigationScenario,
+    item: ResearchItem,
+    request: ResearchItemDecisionRequest,
+    user: User,
+) -> ResearchItem:
+    if item.scenario_id != scenario.id:
+        raise MechanismValidationError("ResearchItem 与场景不匹配")
+    if item.scope_status != "in_scope":
+        raise MechanismValidationError(
+            "out_of_scope_by_scope 项不得设置 in-scope disposition"
+        )
+    if item.linked_claim_id is not None:
+        raise MechanismValidationError(
+            "已绑定真实 Claim 的 ResearchItem 必须通过 Claim 审核决定"
+        )
+    decision = {
+        "checklist_code": item.checklist_code,
+        **request.model_dump(mode="json"),
+    }
+    _validate_research_decisions(
+        db,
+        scenario=scenario,
+        items={item.checklist_code: {"scope_status": item.scope_status}},
+        decisions=[decision],
+    )
+    now = _now()
+    reasons = sorted(
+        set(
+            list(request.reason_codes)
+            + {
+                "not_applicable": [
+                    "business_negative_fact_confirmed",
+                    "legal_not_applicable_confirmed",
+                ],
+                "rejected": ["legal_rejected"],
+                "unanswerable": ["legal_unanswerable"],
+                "uncovered": ["legal_research_incomplete"],
+            }[request.disposition]
+        )
+    )
+    db.execute(
+        update(ResearchItem)
+        .where(ResearchItem.id == item.id)
+        .values(
+            disposition=request.disposition,
+            research_status=(
+                "resolved"
+                if request.disposition in {"not_applicable", "rejected"}
+                else "research_open"
+            ),
+            reason_codes=reasons,
+            negative_fact_refs=list(request.negative_fact_refs),
+            legal_confirmed_by=user.id,
+            legal_confirmed_at=now,
+            legal_confirmation_note=request.confirmation_note.strip(),
+            updated_at=now,
+        )
+    )
+    db.flush()
+    return db.get(ResearchItem, item.id)
 
 
 def build_coverage_proof_body(
