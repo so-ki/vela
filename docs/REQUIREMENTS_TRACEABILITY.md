@@ -23,6 +23,7 @@
 | A-05 | Word/PDF/审计包 | `accepted`（工程） | 精确 bytes 在签署前冻结；最终端点只返回 active release 绑定的原制品，携带可复核哈希 | `test_export_citation_service.py`、`test_delivery_assurance.py` |
 | A-06 | 单客户私有化部署 | `accepted`（RC） | PostgreSQL migration、三镜像、登录/业务页面和 API 黄金路径通过 | GitHub Actions production compose smoke |
 | A-07 | 法律内容达到可对客户交付质量 | `implemented / blocked_external` | 两名巴西执业律师认证 rules/corpus/gold release；场景律师签署精确制品；客户 UAT 与生产证据有效 | 代码门见 Alembic `0006`、`test_delivery_assurance.py`；真实证据仍为 0 |
+| A-08 | Engineering Demonstrator RC0 | `accepted`（工程演示） | 八页 synthetic preview 可运行、可理解、可验证；全部拟制对象携带四元组且正式 Gate 仍阻断；desktop/mobile smoke、前后端回归和 frozen hash 全绿 | EV-0030~EV-0033；不得外推为法律内容、受控试点或正式客户发布就绪 |
 
 ## B. 冻结讨论中的机制层
 

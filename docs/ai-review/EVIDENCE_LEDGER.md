@@ -312,3 +312,40 @@
 - **提交 SHA**: `a6d985402ebe606cc423c9c3d2c270e00229979c` (`fix(versioning): validate nested persisted references`)
 - **是否已复现**: 专项和全量各完成一次最终绿测试;全量首次运行暴露测试夹具收集顺序问题(29 setup errors,非产品失败),修正为保留原 pytest fixture 导入并对该特定 F811 语义加窄范围 Ruff 指令后,专项与全量均重跑通过。
 - **限制和不确定性**: 本轮数据库为 SQLite 合成测试;PostgreSQL 并发/事务攻击仍属 WS-4/WS-5。C3-B 的 delivery snapshot/release reader 与 Alembic 0007 未实施。完整生产镜像运行探针仍按 EV-0024 未验证。法律认证、真实客户 UAT、客户生产部署证据均继续为 `blocked_external`。
+
+## EV-0030
+
+- **claim**: C3-B 已实现持久化版本精确分发且不改变冻结 hash。Delivery Snapshot / Answerability Gate 1.0 与 Delivery Release 1.1 已抽入只增不减 reader；兼容组合为 compiler 0.2 / proof 0.1 / snapshot 1.0 / release 1.1；release writer 显式保存所选 `reader.version`；evaluator 按 `ScenarioDeliveryRelease.schema_version` 与 snapshot 内版本读取，unknown release/snapshot 分别稳定阻断为 `delivery_release_schema_unsupported` / `delivery_snapshot_schema_unsupported`，无 current/latest fallback。状态响应继续使用 envelope 1.1，并以普通字符串 `release_schema_version` 披露未来 reader 身份，避免响应校验 500。
+- **文件与精确行号**: `backend/app/services/versioned/registry.py:191-297`;`backend/app/services/versioned/delivery_snapshot/v1_0.py`;`backend/app/services/versioned/delivery_release/v1_1.py:157`;`backend/app/services/delivery_assurance_service.py:2298-2355,2438-2453,2742-2750`;`backend/app/models/delivery_assurance.py:398-430`;`backend/app/schemas/delivery_assurance.py:518,541-549`。
+- **命令与原始结果摘要**: Python 3.12.13 靶向 C3-A.2/C3-B/readiness/migration/release-safety 组合 → **98 passed**；全量后端 → **404 passed**；compileall 与本轮全部 Python 文件 Ruff 通过；四个 golden raw SHA-256 与 EV-0027 精确一致。
+- **提交 SHA**: `1e4bc79` (`feat(versioning): freeze delivery readers and release schema`)。
+- **是否已复现**: 是；专项与全量各完成最终绿测试。
+- **限制和不确定性**: PostgreSQL 实例验证未执行；本轮 migration 动态证据来自 disposable SQLite。法律正确性与真实外部证据不在该工程证据内。
+
+## EV-0031
+
+- **claim**: C4/C5 已实现只读 version readiness 与存储版本重验。空库为 ready 且不写库；未知 compiler/proof/snapshot/release 在 development 明确 warning、在 production readiness 阻断；启动审计与 `/api/v1/readiness` 不自动修复数据。历史 release 重验在模拟未来 snapshot/release writer 后仍使用存储的 1.0/1.1 reader；unknown 版本 fail-closed。Alembic 0007 将存量 release 回填为 1.1，最终 `NOT NULL` 且无 server default；downgrade 遇非 1.1 行拒绝删除版本身份。
+- **文件与精确行号**: `backend/app/services/version_readiness_service.py:27-152`;`backend/app/api/system.py:50-64`;`backend/app/main.py:63-73`;`backend/tests/test_version_readiness.py:97-155`;`backend/tests/test_delivery_assurance.py:859-944`;`backend/alembic/versions/20260719_0007_delivery_release_schema_version.py:20-63`;`backend/tests/test_delivery_release_schema_migration.py:65-125`;`docs/operations/VERSIONED_READERS_RUNBOOK.md`;`docs/REQUIREMENTS_TRACEABILITY.md` B-09。
+- **命令与原始结果摘要**: SQLite migration tests 覆盖 fresh head、0006→0007、backfill、NOT NULL、无默认、0007→0006→head、unknown downgrade guard，均包含在 98 passed；历史 writer 前移/unknown 版本攻击包含在同一专项与 404 passed 全量中；`bash scripts/check_release_boundaries.sh` 全部 OK。
+- **提交 SHA**: `8ceaff3` (`feat(readiness): audit persisted reader versions`)、`c8328b4` (`test(versioning): prove historical revalidation isolation`)。
+- **是否已复现**: 是，SQLite 与服务层均为真实动态执行。
+- **限制和不确定性**: 本机没有 PostgreSQL、Docker、Podman、Colima 或 nerdctl；因此 PostgreSQL migration 与真实无网络 `FROM scratch` context probe 保持 environment-unverified。静态 Docker transmitted/COPY candidate 检查已通过，但不得替代 runtime probe。
+
+## EV-0032
+
+- **claim**: Engineering Demonstrator RC0 的原创 synthetic preview UI 已完成八项信息架构、持久上下文/版本/Gate/演示标识、法律研究三栏、完整九阶段交付管线、CoverageProof、审计时间线和 loading/empty/error/blocked/read-only/demo-only/stale/unknown-version。所有拟制对象（含嵌套 context、versions、counts）经递归测试强制携带 `simulated=true`、`evidence_origin=synthetic_demo`、`status=demo_only`、`formal_release_allowed=false`；页面与导出持续警示；正式 Expert Attestation/UAT/Deployment/Release 保持 `blocked_external`。RC0 前端不调用正式 API，BYD/Campinas 不进入该 demo adapter。
+- **文件与精确行号**: `frontend/src/demo/rc0SyntheticCase.ts:1-136`;`frontend/src/views/Rc0WorkspaceView.vue:9-130`;`frontend/src/views/Rc0WorkspaceView.spec.ts:14-91`;`frontend/src/styles/rc0.css:1-356`;`frontend/src/router/index.ts`;`docs/ui/UI_RESEARCH_LEDGER.md`。
+- **命令与原始结果摘要**: `npm run test:components` → **8 files / 34 passed**；`npm run build` → 164 modules transformed、production build 成功。真实浏览器 desktop 1280 与 mobile 390 检查八个路由：每页 `SYNTHETIC DEMO` 可见、390px 时 `scrollWidth == viewportWidth`、交付 9 stages、desktop 法律研究 3 columns、console errors 0；原生 link/button、`aria-pressed` 与 focus ring 已检查。自动化 Tab 漫游受 in-app browser keypress 运行时限制，未将该工具限制误报为通过。
+- **截图路径**: `docs/ai-review/screenshots/rc0-overview-desktop.jpg`;`rc0-legal-research-desktop.jpg`;`rc0-delivery-desktop.jpg`;`rc0-overview-mobile-390.jpg`。
+- **提交 SHA**: `360ab8b` (`feat(rc0): add synthetic matter workspace`)、`4ea1dfc` (`fix(rc0): mark nested synthetic objects`)。
+- **是否已复现**: 单元/build 两次绿；浏览器 desktop/mobile smoke 一次完整通过。
+- **限制和不确定性**: UI 是隔离的 synthetic preview，不是法律内容、真实客户 UAT、律师认证或生产部署证据；截图中的本地用户与数据库为一次性合成环境，已停止并移至废纸篓中的临时清理路径。
+
+## EV-0033
+
+- **claim**: RC0 feature-freeze 最终工程验证通过，且冻结制品未漂移。Golden raw SHA-256:compiler `8787a1644a0c6fe4076978e3b181caa9f3072e29db1e71d3b5670415df4679b4`;proof `206cb55372dcdb7d00a12d4af38b69a95e10ec57d662f538498c64e138807ffb`;answerability `e40f68050c8e3f56c26ea20fb19772a6fe78109c76d2f5d29d98efc5426f257a`;release `6cdce303c806ff36e804f01d67e42595d6307984a83312efe211a50f4fdac256`。Release boundaries 检查所有 Docker transmitted contexts/COPY candidates 均 OK；git diff 无 whitespace 错误。
+- **文件与精确行号**: 四个 `backend/tests/goldens/versioned/*.json`;`scripts/check_release_boundaries.sh`;本条与 EV-0030~EV-0032。
+- **命令与原始结果摘要**: Python 3.12.13:专项 98 passed、全量 404 passed、compileall 通过、Ruff 通过；Node/Vitest:34 passed；Vite production build 通过；release boundaries 全部 OK；`git diff --check` 通过；raw SHA 逐一匹配。
+- **提交 SHA**: 实施提交 `88c2195`,`1e4bc79`,`8ceaff3`,`c8328b4`,`360ab8b`,`4ea1dfc`;证据提交的实时 SHA 必须按 D-0004 由 Git 查询。
+- **是否已复现**: 是；所有可在本机执行的 P0/P1 工程验证均完成。
+- **限制和不确定性**: PostgreSQL 与真实容器 runtime probe 未执行；Legal Content MVP、Controlled Pilot Ready、Formal Customer Release Ready 均缺真实律师、客户与生产证据，只能保持 `blocked_external`。
