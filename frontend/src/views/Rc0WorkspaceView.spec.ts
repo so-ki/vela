@@ -3,7 +3,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import { describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 
-import { rc0SyntheticCase, syntheticRecordGroups } from '@/demo/rc0SyntheticCase'
+import { rc0SyntheticCase } from '@/demo/rc0SyntheticCase'
 import Rc0WorkspaceView from './Rc0WorkspaceView.vue'
 
 const buildRouter = () => createRouter({
@@ -13,19 +13,23 @@ const buildRouter = () => createRouter({
 
 describe('RC0 synthetic workspace', () => {
   it('forces the four demo-only boundary fields onto every synthetic record', () => {
-    expect(rc0SyntheticCase.simulated).toBe(true)
-    expect(rc0SyntheticCase.evidence_origin).toBe('synthetic_demo')
-    expect(rc0SyntheticCase.status).toBe('demo_only')
-    expect(rc0SyntheticCase.formal_release_allowed).toBe(false)
-
-    for (const record of syntheticRecordGroups.flat()) {
-      expect(record).toMatchObject({
-        simulated: true,
-        evidence_origin: 'synthetic_demo',
-        status: 'demo_only',
-        formal_release_allowed: false,
-      })
+    const assertSyntheticObject = (value: unknown): void => {
+      if (Array.isArray(value)) {
+        value.forEach(assertSyntheticObject)
+        return
+      }
+      if (value !== null && typeof value === 'object') {
+        expect(value).toMatchObject({
+          simulated: true,
+          evidence_origin: 'synthetic_demo',
+          status: 'demo_only',
+          formal_release_allowed: false,
+        })
+        Object.values(value).forEach(assertSyntheticObject)
+      }
     }
+
+    assertSyntheticObject(rc0SyntheticCase)
   })
 
   it('renders all required navigation, boundary labels and non-happy-path states', async () => {

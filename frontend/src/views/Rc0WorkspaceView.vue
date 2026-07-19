@@ -21,6 +21,7 @@ const activeSection = computed(() => {
 })
 const activeResearchIndex = ref(0)
 const activeResearch = computed(() => matter.researchItems[activeResearchIndex.value])
+const coverageCountKeys = ['supported', 'pending', 'refused', 'unanswerable', 'uncovered', 'outOfScope', 'total', 'scopeTotal'] as const
 
 const exportSyntheticSummary = () => {
   const payload = {
@@ -111,7 +112,7 @@ const exportSyntheticSummary = () => {
         <section v-else-if="activeSection === 'coverage'" class="rc0-page" aria-labelledby="coverage-title">
           <div class="rc0-page-heading"><div><span class="rc0-kicker">DENOMINATOR PROOF</span><h2 id="coverage-title">CoverageProof</h2><p>披露分母、五类 disposition、版本、生成时间和完整 hash。</p></div><span class="rc0-version-chip">compiler {{ matter.coverage.compilerVersion }} · proof {{ matter.coverage.schemaVersion }}</span></div>
           <div class="rc0-coverage-hero"><div><span>Pack total</span><strong>{{ matter.coverage.counts.total }}</strong><small>Scope total {{ matter.coverage.counts.scopeTotal }}</small></div><div class="rc0-coverage-bar" aria-label="CoverageProof 分布"><span style="--segment:7" class="demo"></span><span style="--segment:5" class="review"></span><span style="--segment:2" class="blocked"></span><span style="--segment:3" class="unknown"></span><span style="--segment:1" class="empty"></span></div></div>
-          <div class="rc0-coverage-grid"><article v-for="(value, key) in matter.coverage.counts" :key="key"><span>{{ key }}</span><strong>{{ value }}</strong></article></div>
+          <div class="rc0-coverage-grid"><article v-for="key in coverageCountKeys" :key="key"><span>{{ key }}</span><strong>{{ matter.coverage.counts[key] }}</strong></article></div>
           <article class="rc0-panel"><dl class="rc0-definition-list"><div><dt>Denominator</dt><dd><code>{{ matter.coverage.denominatorRef }}</code></dd></div><div><dt>Denominator hash</dt><dd><code>{{ matter.coverage.denominatorHash }}</code></dd></div><div><dt>Proof hash</dt><dd><code>{{ matter.coverage.proofHash }}</code></dd></div><div><dt>生成时间</dt><dd>{{ matter.coverage.generatedAt }}</dd></div></dl></article>
         </section>
 

@@ -18,13 +18,13 @@ export const rc0SyntheticCase = demo({
   title: 'Projeto Aurora · 储能系统绿地投资协查',
   company: 'Aurora Grid Systems（虚构）',
   summary: '拟在巴西圣保罗州建设储能系统集成与测试设施。本对象只用于展示工程工作流，不代表真实客户、律师意见或生产事实。',
-  context: {
+  context: demo({
     country: '巴西 / Brazil',
     state: '圣保罗州 / São Paulo',
     industry: '新能源 · 储能系统集成',
     actionType: '绿地投资 / Greenfield',
-  },
-  versions: {
+  }),
+  versions: demo({
     pack: 'brazil_new_energy_greenfield@1.3.1',
     rules: '2.9',
     corpus: '1.13',
@@ -32,7 +32,7 @@ export const rc0SyntheticCase = demo({
     coverageProof: '0.1',
     snapshot: '1.0',
     release: '1.1',
-  },
+  }),
   currentStage: 'CoverageProof 工程重验完成；外部认证未开始',
   gate: 'blocked_external',
   contentState: 'engineering_demonstrator_rc0',
@@ -102,7 +102,7 @@ export const rc0SyntheticCase = demo({
     proofHash: 'sha256:synthetic-proof-not-evidence',
     generatedAt: '2026-07-19T09:45:00+08:00',
     compilerVersion: '0.2', schemaVersion: '0.1',
-    counts: { supported: 7, pending: 5, refused: 2, unanswerable: 3, uncovered: 1, outOfScope: 12, total: 30, scopeTotal: 18 },
+    counts: demo({ supported: 7, pending: 5, refused: 2, unanswerable: 3, uncovered: 1, outOfScope: 12, total: 30, scopeTotal: 18 }),
   }),
   deliveryStages: [
     demo({ name: 'Compiler', state: 'demo', detail: '0.2 · synthetic snapshot', hash: '5e566256…ded0b' }),
@@ -121,16 +121,3 @@ export const rc0SyntheticCase = demo({
     demo({ at: '2026-07-19 09:46 CST', actor: 'Formal Release Gate', action: '检查外部证据', version: 'release 1.1', hash: 'no release hash', change: 'blocked_external → blocked_external', result: 'blocked', reason: '真实律师、UAT、部署证据均缺失' }),
   ],
 })
-
-export const syntheticRecordGroups = [
-  rc0SyntheticCase.metrics,
-  rc0SyntheticCase.materials,
-  rc0SyntheticCase.facts,
-  rc0SyntheticCase.checklist,
-  rc0SyntheticCase.researchItems,
-  rc0SyntheticCase.researchItems.flatMap((item) => item.evidence),
-  rc0SyntheticCase.claims,
-  [rc0SyntheticCase.coverage],
-  rc0SyntheticCase.deliveryStages,
-  rc0SyntheticCase.audit,
-]
