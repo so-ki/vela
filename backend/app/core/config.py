@@ -19,6 +19,7 @@ class Settings(BaseSettings):
 
     app_name: str = "Vela 出海法务平台"
     app_env: str = "development"
+    vela_app_mode: str = "development"
     debug: bool = True
     secret_key: str = "dev-secret-key-change-in-production"
     access_token_expire_minutes: int = 480
@@ -87,6 +88,14 @@ class Settings(BaseSettings):
             raise ValueError("APP_ENV must be development, test, or production")
         return normalized
 
+    @field_validator("vela_app_mode", mode="before")
+    @classmethod
+    def normalize_vela_app_mode(cls, value: object) -> str:
+        normalized = str(value or "").strip().lower()
+        if normalized not in {"development", "competition"}:
+            raise ValueError("VELA_APP_MODE must be development or competition")
+        return normalized
+
     @property
     def cors_origin_list(self) -> list[str]:
         return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
@@ -94,6 +103,10 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
+
+    @property
+    def is_competition(self) -> bool:
+        return self.vela_app_mode == "competition"
 
     @property
     def sso_configured(self) -> bool:
@@ -122,6 +135,12 @@ def validate_runtime_configuration(settings: Settings | None = None) -> None:
     """
 
     settings = settings or get_settings()
+    if settings.is_competition:
+        parsed_database = urlsplit(settings.database_url)
+        if parsed_database.scheme.lower() != "sqlite" or Path(parsed_database.path).name != "vela_competition.db":
+            raise RuntimeError(
+                "competition mode requires the isolated vela_competition.db SQLite database"
+            )
     if not settings.is_production:
         return
 

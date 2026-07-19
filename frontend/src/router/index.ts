@@ -1,8 +1,10 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import { createRouter, createWebHistory, type RouterHistory } from 'vue-router'
+import { competitionOverviewPath, isCompetitionMode } from '@/config/appMode'
 import { useAuthStore } from '@/stores/auth'
 
-const router = createRouter({
-  history: createWebHistory(),
+export function createAppRouter(history: RouterHistory = createWebHistory()) {
+  const router = createRouter({
+  history,
   routes: [
     {
       path: '/login',
@@ -126,10 +128,22 @@ const router = createRouter({
       ],
     },
   ],
-})
+  })
 
-router.beforeEach(async (to) => {
+  router.beforeEach(async (to) => {
   const auth = useAuthStore()
+  const competitionMode = isCompetitionMode()
+
+  if (competitionMode && to.name === 'dashboard') {
+    return competitionOverviewPath()
+  }
+
+  if (
+    competitionMode
+    && !['login', 'sso-callback', 'competition-workspace'].includes(String(to.name))
+  ) {
+    return auth.isAuthenticated ? competitionOverviewPath() : { name: 'login' }
+  }
 
   if (auth.token && !auth.user) {
     try {
@@ -145,7 +159,7 @@ router.beforeEach(async (to) => {
   }
 
   if (to.meta.guest && auth.isAuthenticated && auth.user?.disclaimer_accepted) {
-    return { name: 'dashboard' }
+    return competitionMode ? competitionOverviewPath() : { name: 'dashboard' }
   }
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
@@ -173,6 +187,10 @@ router.beforeEach(async (to) => {
   }
 
   return true
-})
+  })
 
+  return router
+}
+
+const router = createAppRouter()
 export default router

@@ -376,3 +376,12 @@
 - **提交 SHA**: `b2c1be62d52bdda6b18aac31cbd548f7efaa946c`。
 - **是否已复现**: 是；CI event=`push`，run result=`completed/success`。
 - **限制和不确定性**: 容器与 PostgreSQL 证据来自 GitHub 托管 runner 的隔离生产 Compose，不代表客户生产环境。镜像值为该 run 输出的内容身份；artifact 保留期有限。没有创建正式 Release、没有合并分支、没有外部律师或客户证明。
+
+## EV-0037
+
+- **claim**: 比赛专用干净入口从精确冻结提交 `1bc2bed72871a281ce3c7548081589d5a37b2092` 建立并完成本机验收。启动仅重建 `backend/data/vela_competition.db`，只 seed `legal@demo.vela`、`biz@demo.vela` 与 Aurora 储能系统集成工厂唯一场景；正式机制数据保持固定 30 项 ResearchItem、单一环境 Claim、CoverageProof 0.2 与 `blocked_external`。Competition 模式登录和 `/` 均进入 Aurora 八页工作台，顶部不呈现旧 Dashboard、机制附录、RC0 或法源维护。普通 development 路由保持原行为。
+- **文件与精确行号**: `backend/app/core/config.py`;`backend/scripts/seed_competition_demo.py`;`backend/tests/test_competition_clean_entry.py`;`scripts/start_competition.sh`;`frontend/src/config/appMode.ts`;`frontend/src/router/index.ts`;`frontend/src/router/competitionMode.spec.ts`;`frontend/src/layouts/AppLayout.vue`;`frontend/src/views/LoginView.vue`;`frontend/src/views/CompetitionWorkspaceView.vue`。
+- **命令与原始结果摘要**: Python 3.12.13 全量 backend **415 passed**；frontend **10 files / 40 passed**；Vite production build **167 modules transformed**；release boundary、5-surface competition claim scan 与 `git diff --check` 通过。实际运行 `./scripts/start_competition.sh`，浏览器登录后 URL 为 `/competition/1/overview`，八个页面均从正式 API 返回数据，固定 30 行、Claim/ResearchItem 为 1/30、CoverageProof 0.2、delivery `blocked_external`，console warning/error 为 0；用户可见页面扫描无 `BYD/byd/Campinas/campinas/坎皮纳斯`。
+- **提交 SHA**: 本条随比赛入口提交落账；实时 SHA 必须按 D-0004 由 Git 查询。
+- **是否已复现**: 是；单元、全量、build、实际启动和浏览器 smoke 均完成。
+- **限制和不确定性**: Aurora 是虚构测试案例；本证据不构成律师认证、客户 UAT、客户生产部署或正式 Release。三个普通数据库启动前后 SHA-256 精确相同：`backend/data/vela.db=ccd59779...bc66`、`data/vela.db=9e3758e3...3b66`、`data/chroma/chroma.sqlite3=c86c2909...192b`。

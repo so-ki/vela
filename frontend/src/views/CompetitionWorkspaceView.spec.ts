@@ -36,10 +36,10 @@ beforeEach(() => {
   vi.clearAllMocks()
   api.fetchScenario.mockResolvedValue({
     id: 17,
-    project_name: '圣保罗州新能源绿地设厂比赛测试案件',
+    project_name: 'Aurora 储能系统集成工厂',
     country: 'BR',
     state: 'sao_paulo',
-    city: 'campinas',
+    city: '',
     industry: 'new_energy_manufacturing',
     action_type: 'greenfield_plant',
     scenario_scope: {
@@ -71,7 +71,7 @@ beforeEach(() => {
     id: 'fact-1',
     subject: 'project',
     attribute: 'site',
-    value: 'Campinas',
+    value: '圣保罗州，市级选址待定',
     assertion_polarity: 'affirmative',
     fact_time: '2026-07-19',
     block_id: 'upload:1',

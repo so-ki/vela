@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { fetchSsoConfig } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
+import { competitionOverviewPath, isCompetitionMode } from '@/config/appMode'
 import type { SsoConfig } from '@/types'
 
 const auth = useAuthStore()
@@ -11,6 +12,7 @@ const route = useRoute()
 const email = ref('')
 const password = ref('')
 const showDemoHint = import.meta.env.DEV
+const competitionMode = isCompetitionMode()
 const localError = ref<string | null>(null)
 const ssoConfig = ref<SsoConfig | null>(null)
 
@@ -26,7 +28,9 @@ async function handleSubmit() {
   localError.value = null
   try {
     const user = await auth.login(email.value, password.value)
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/'
+    const redirect = competitionMode
+      ? competitionOverviewPath()
+      : typeof route.query.redirect === 'string' ? route.query.redirect : '/'
     router.push(user.disclaimer_accepted ? redirect : redirect)
   } catch {
     localError.value = auth.error
@@ -46,8 +50,13 @@ function startSsoLogin() {
     <div class="auth-card">
       <div class="auth-header">
         <img src="/vela.svg" alt="Vela" class="brand-icon lg" />
-        <h1>Vela 出海法务平台</h1>
-        <p>拉美涉外投资合规协查与法律风险简报助手</p>
+        <h1>{{ competitionMode ? 'Vela 比赛主演示' : 'Vela 出海法务平台' }}</h1>
+        <template v-if="competitionMode">
+          <p>Vela 是面向中国企业法务的拉美投资前合规协查过程保证平台。</p>
+          <p class="competition-login-pack">当前完成端到端验证的首个 Capability Pack：<br /><strong>巴西 · 圣保罗州 · 新能源制造 · 绿地设厂</strong></p>
+          <p>本次演示案例：<br /><strong>Aurora 储能系统集成工厂（虚构测试案例）</strong></p>
+        </template>
+        <p v-else>拉美涉外投资合规协查与法律风险简报助手</p>
       </div>
 
       <button
@@ -84,7 +93,7 @@ function startSsoLogin() {
         </button>
       </form>
 
-      <p class="auth-footer" v-if="ssoConfig === null || ssoConfig.allow_open_registration">
+      <p class="auth-footer" v-if="!competitionMode && (ssoConfig === null || ssoConfig.allow_open_registration)">
         还没有账户？
         <RouterLink to="/register">注册账户</RouterLink>
       </p>

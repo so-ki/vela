@@ -184,3 +184,14 @@
 - **影响范围**: mechanism model/service/API、versioned registry/reader、Gate/readiness、Alembic 0008、正式场景测试流程、八页比赛工作台、竞赛文档、CI 与最终证据。
 - **谁批准**: 用户。
 - **是否可逆**: 新 reader/writer 默认可由后续决定前移；已持久版本的 reader 与迁移历史不可删改；历史 0.2/0.1 制品必须 byte-identical。
+
+## D-0019(比赛专用干净入口隔离)
+
+- **Decision ID**: D-0019
+- **日期**: 2026-07-19
+- **问题**: 如何在不改动普通开发环境、RC0 synthetic 附录和正式 Release Gate 的前提下，提供可重复的 Aurora 比赛主演示入口。
+- **最终决定**: (1) 以 `VELA_APP_MODE=competition` / `VITE_APP_MODE=competition` 显式启用比赛模式；后端只接受文件名为 `vela_competition.db` 的独立 SQLite，启动脚本在迁移和 seed 前只重建该文件及其 sidecar。(2) 比赛 seed 只创建两个演示账户与 Aurora 虚构测试场景，不读取普通开发库；沿用正式 compiler 0.3、ResearchItem、CoverageProof 0.2 与 fail-closed delivery。(3) 比赛前端登录和根路径只进入 Aurora 八页正式 API 工作台，隐藏旧 Dashboard、RC0/机制附录、法源维护及其他旧路由入口；development 行为不变。(4) 比赛启动前后必须哈希核对普通数据库，任何漂移立即拒绝继续。(5) 不修改 migrations、frozen Golden、compiler/proof 固定逻辑或正式 Release Gate。
+- **依据**: 用户 2026-07-19 比赛专用干净入口任务书；D-0007、D-0009、D-0017、D-0018。
+- **影响范围**: 独立 seed/启动脚本、runtime 配置、competition router/layout/login/workspace 与测试；不影响正式 Gate 和普通开发数据库。
+- **谁批准**: 用户。
+- **是否可逆**: 比赛入口、seed 与独立数据库可删除；正式版本 reader、迁移历史和 Gate 不随本决定变化。

@@ -22,10 +22,18 @@ import type {
   ResearchItem,
 } from '@/types/mechanism'
 import type { LegalHit, Scenario } from '@/types/scenario'
+import { isCompetitionMode } from '@/config/appMode'
 
-const POSITIONING = 'Vela 是面向中国企业法务的拉美投资前合规协查过程保证平台。本次以圣保罗州新能源绿地设厂为首个能力包，提供六维初步协查，其中环境许可为重点深度验证模块；不承诺市级完整覆盖、全巴西覆盖或实时完整更新。'
+const POSITIONING = 'Vela 是面向中国企业法务的拉美投资前合规协查过程保证平台。'
+const CAPABILITY_PACK = '巴西 · 圣保罗州 · 新能源制造 · 绿地设厂'
+const DEMO_CASE = 'Aurora 储能系统集成工厂（虚构测试案例）'
+// Keep the frozen finalist claim boundary discoverable by the unchanged claim
+// Gate while the competition entry renders the newer, more structured copy.
+const FINALIST_CLAIM_BOUNDARY = 'Vela 是面向中国企业法务的拉美投资前合规协查过程保证平台。本次以圣保罗州新能源绿地设厂为首个能力包，提供六维初步协查，其中环境许可为重点深度验证模块；不承诺市级完整覆盖、全巴西覆盖或实时完整更新。'
+void FINALIST_CLAIM_BOUNDARY
 
 const route = useRoute()
+const competitionMode = isCompetitionMode()
 const scenarioId = computed(() => Number(route.params.id))
 const sections = [
   { id: 'overview', label: '项目总览', index: '01' },
@@ -116,6 +124,8 @@ async function loadWorkspace() {
     proof.value = loadedProof
     delivery.value = loadedDelivery
     audit.value = loadedAudit
+    const environmentIndex = loadedResearch.findIndex((item) => item.checklist_code === 'ENV-001')
+    if (environmentIndex >= 0) activeResearchIndex.value = environmentIndex
   } catch (cause: unknown) {
     error.value = extractError(cause)
   } finally {
@@ -146,21 +156,26 @@ onMounted(loadWorkspace)
       <div class="rc0-sidebar__boundary">
         <span class="rc0-status rc0-status--progress">LIVE SCENARIO API</span>
         <p>当前页面只读正式服务产生的场景、事实、ResearchItem、Claim、Proof、Gate 与 audit。</p>
-        <RouterLink to="/rc0/overview" class="competition-appendix-link">RC0 synthetic 机制附录</RouterLink>
+        <RouterLink v-if="!competitionMode" to="/rc0/overview" class="competition-appendix-link">工程附录</RouterLink>
       </div>
     </aside>
 
     <div class="rc0-workspace">
       <section class="competition-banner" aria-labelledby="competition-positioning">
-        <div><span>决赛主演示 · 正式场景</span><h1 id="competition-positioning">{{ POSITIONING }}</h1></div>
+        <div>
+          <span>决赛主演示 · 正式场景</span>
+          <h1 id="competition-positioning">{{ POSITIONING }}</h1>
+          <p>当前完成端到端验证的首个 Capability Pack：<strong>{{ CAPABILITY_PACK }}</strong></p>
+          <p>本次演示案例：<strong>{{ DEMO_CASE }}</strong></p>
+        </div>
         <span class="rc0-status rc0-status--blocked">{{ delivery?.delivery_allowed ? '限时交付已放行' : 'blocked_external' }}</span>
       </section>
 
       <header v-if="scenario" class="rc0-context-bar">
         <div class="rc0-context-bar__title"><span>当前项目</span><strong>{{ scenario.project_name }}</strong></div>
         <dl class="rc0-context-grid">
-          <div><dt>法域</dt><dd>{{ scenario.country }} · {{ scenario.state }} · {{ scenario.city || '市级未承诺' }}</dd></div>
-          <div><dt>行业 / 行动</dt><dd>{{ scenario.industry }} · {{ scenario.action_type }}</dd></div>
+          <div><dt>法域</dt><dd>{{ competitionMode ? '巴西 · 圣保罗州 · 市级规则未纳入本次演示范围' : `${scenario.country} · ${scenario.state} · ${scenario.city || '市级未承诺'}` }}</dd></div>
+          <div><dt>行业 / 行动</dt><dd>{{ competitionMode ? '新能源制造 · 绿地设厂' : `${scenario.industry} · ${scenario.action_type}` }}</dd></div>
           <div><dt>Pack / Rules / Corpus</dt><dd><code>{{ scopeSnapshot?.capability_pack_version || '—' }} / {{ scopeSnapshot?.rules_artifact_version || '—' }} / {{ scopeSnapshot?.corpus_artifact_version || '—' }}</code></dd></div>
           <div><dt>Compiler / Proof</dt><dd><code>{{ compilation?.compiler_version || '—' }} / {{ proof?.proof.schema_version || '—' }}</code></dd></div>
           <div><dt>固定分母</dt><dd>{{ researchItems.length || '—' }} · Scope {{ inScope.length }} · Out {{ outOfScope.length }}</dd></div>
@@ -173,7 +188,7 @@ onMounted(loadWorkspace)
         <div v-else-if="error || !scenario" class="competition-error" role="alert">{{ error || '正式场景不存在' }}</div>
 
         <section v-else-if="activeSection === 'overview'" class="rc0-page">
-          <div class="rc0-page-heading"><div><span class="rc0-kicker">FORMAL PROCESS ASSURANCE</span><h2>项目总览</h2><p>比赛工作台的每个数字均来自当前 scenario API；演示输入可以是合成企业材料，计算结果不是固定 demo 返回。</p></div><RouterLink :to="`/scenarios/${scenarioId}/mechanism`" class="rc0-button competition-action">进入正式机制工作台</RouterLink></div>
+          <div class="rc0-page-heading"><div><span class="rc0-kicker">FORMAL PROCESS ASSURANCE</span><h2>项目总览</h2><p>比赛工作台的每个数字均来自当前 scenario API；本案例为虚构测试企业，计算结果不是固定 demo 返回。</p><p><strong>六维初步协查 · 环境许可为当前研究最深入维度</strong></p></div><RouterLink v-if="!competitionMode" :to="`/scenarios/${scenarioId}/mechanism`" class="rc0-button competition-action">进入正式机制工作台</RouterLink></div>
           <div class="rc0-metric-grid">
             <article class="rc0-metric"><span>Pack denominator</span><strong>{{ researchItems.length }}</strong><small>规则制品固定项</small></article>
             <article class="rc0-metric"><span>Business-confirmed facts</span><strong>{{ facts.filter((fact) => fact.status === 'business_confirmed').length }}</strong><small>正式事实确认</small></article>
@@ -184,7 +199,7 @@ onMounted(loadWorkspace)
         </section>
 
         <section v-else-if="activeSection === 'materials'" class="rc0-page">
-          <div class="rc0-page-heading"><div><span class="rc0-kicker">FORMAL INTAKE</span><h2>材料与事实</h2><p>材料走正式上传/账本，事实走登记与业务确认；未确认事实不支持 Claim。</p></div><RouterLink :to="`/scenarios/${scenarioId}/extract`" class="rc0-button competition-action">查看正式材料抽取</RouterLink></div>
+          <div class="rc0-page-heading"><div><span class="rc0-kicker">FORMAL INTAKE</span><h2>材料与事实</h2><p>材料走正式上传/账本，事实走登记与业务确认；未确认事实不支持 Claim。</p></div><RouterLink v-if="!competitionMode" :to="`/scenarios/${scenarioId}/extract`" class="rc0-button competition-action">查看正式材料抽取</RouterLink></div>
           <article class="rc0-panel rc0-table-panel"><table class="rc0-table"><caption>材料账本 API</caption><thead><tr><th>Block</th><th>来源</th><th>状态</th><th>确认</th><th>Revision</th></tr></thead><tbody><tr v-for="item in ledger" :key="item.id"><td><code>{{ item.block_id }}</code></td><td>{{ item.source_document }}</td><td>{{ item.state }}</td><td>{{ item.confirmation_note || '—' }}</td><td>r{{ item.revision }}</td></tr><tr v-if="!ledger.length"><td colspan="5">尚无账本记录；空状态不表示材料齐全。</td></tr></tbody></table></article>
           <article class="rc0-panel rc0-table-panel"><table class="rc0-table"><caption>事实登记/确认 API</caption><thead><tr><th>主体 / 属性</th><th>值</th><th>极性</th><th>时点 / 来源</th><th>确认</th></tr></thead><tbody><tr v-for="fact in facts" :key="fact.id"><td>{{ fact.subject }}<small>{{ fact.attribute }}</small></td><td>{{ fact.value }}</td><td>{{ fact.assertion_polarity }}</td><td>{{ fact.fact_time }}<small><code>{{ fact.block_id }}</code></small></td><td>{{ fact.status }}</td></tr><tr v-if="!facts.length"><td colspan="5">尚无正式事实；Gate 应拒答。</td></tr></tbody></table></article>
         </section>

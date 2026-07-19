@@ -2,6 +2,8 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string
+  readonly VITE_APP_MODE?: string
+  readonly VITE_COMPETITION_SCENARIO_ID?: string
 }
 
 interface ImportMeta {
