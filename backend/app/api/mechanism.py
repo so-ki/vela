@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import or_
 
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.core.roles import is_legal_role
 from app.models.mechanism import ClaimCompilation, ClaimRecord, FactRecord, ResearchItem
+from app.models.audit_log import AuditLog
 from app.models.scenario import InvestigationScenario
 from app.models.user import User
 from app.schemas.mechanism import (
@@ -23,6 +25,7 @@ from app.schemas.mechanism import (
     FactRecordResponse,
     MaterialLedgerResponse,
     MaterialLedgerUpsertRequest,
+    MechanismAuditEventResponse,
     ResearchItemDecisionRequest,
     ResearchItemResponse,
 )
@@ -123,6 +126,34 @@ def _coverage_task_response(task) -> CoverageTaskResponse:
         created_by=task.created_by,
         created_at=task.created_at,
         updated_at=task.updated_at,
+    )
+
+
+@router.get(
+    "/scenarios/{scenario_id}/mechanism/audit",
+    response_model=list[MechanismAuditEventResponse],
+)
+def get_mechanism_audit_events(
+    scenario_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    _load_scenario(db, scenario_id, current_user)
+    scenario_marker = f"scenario={scenario_id}"
+    return (
+        db.query(AuditLog)
+        .filter(
+            or_(
+                AuditLog.detail.contains(scenario_marker),
+                (
+                    (AuditLog.resource_type == "scenario")
+                    & (AuditLog.resource_id == str(scenario_id))
+                ),
+            )
+        )
+        .order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+        .limit(200)
+        .all()
     )
 
 

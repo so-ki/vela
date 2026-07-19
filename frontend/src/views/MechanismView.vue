@@ -61,6 +61,7 @@ const factForm = reactive<FactRecordCreatePayload>({
   block_id: '',
   fact_pack_version: '',
   source_document: '',
+  assertion_polarity: 'unspecified',
 })
 const factConfirmationNotes = reactive<Record<string, string>>({})
 const claimDecisionNotes = reactive<Record<string, string>>({})
@@ -103,18 +104,40 @@ const supportedClaims = computed(
 const awaitingClaims = computed(
   () => compilation.value?.claims.filter((claim) => claim.status === 'awaiting_human_confirmation') || [],
 )
+const researchItems = computed(() => compilation.value?.research_items || [])
+const inScopeResearchItems = computed(() =>
+  researchItems.value.filter((item) => item.scope_status === 'in_scope'),
+)
+const outOfScopeResearchItems = computed(() =>
+  researchItems.value.filter((item) => item.scope_status === 'out_of_scope_by_scope'),
+)
 
 const proofMatchesLatestCompilation = computed(
   () => !!proof.value && !!compilation.value && proof.value.compilation_id === compilation.value.id,
 )
 
 const mechanismGatePassed = computed(
-  () =>
-    !!proof.value &&
-    proofMatchesLatestCompilation.value &&
-    proof.value.denominator_count > 0 &&
-    proof.value.covered_count + proof.value.unanswerable_count === proof.value.denominator_count &&
-    proof.value.uncovered_count === proof.value.unanswerable_count,
+  () => {
+    if (!proof.value || !proofMatchesLatestCompilation.value) return false
+    if (proof.value.proof.schema_version === '0.2') {
+      const body = proof.value.proof
+      return (
+        body.pack_total === 30 &&
+        body.pack_total === (body.scope_total || 0) + (body.out_of_scope_by_scope_count || 0) &&
+        body.scope_total ===
+          (body.supported_count || 0) +
+            (body.not_applicable_count || 0) +
+            (body.rejected_count || 0) +
+            (body.unanswerable_count || 0) +
+            (body.uncovered_count || 0)
+      )
+    }
+    return (
+      proof.value.denominator_count > 0 &&
+      proof.value.covered_count + proof.value.unanswerable_count === proof.value.denominator_count &&
+      proof.value.uncovered_count === proof.value.unanswerable_count
+    )
+  },
 )
 
 const deliveryAllowed = computed(() => deliveryStatus.value?.delivery_allowed === true)
@@ -268,6 +291,7 @@ async function submitFact() {
     factForm.fact_time = ''
     factForm.block_id = ''
     factForm.source_document = ''
+    factForm.assertion_polarity = 'unspecified'
     notice.value = '事实已登记。只有业务登记人再次确认后，Claim Compiler 才会把它视为已确认事实。'
   } catch (cause: unknown) {
     error.value = extractError(cause, '事实登记失败')
@@ -299,11 +323,11 @@ function compilationDrafts(): ClaimDraft[] {
     const editor = draftEditors[item.code]
     if (!editor) return []
     const statement = editor.statement.trim()
-    if (!statement && !editor.factRefs.length && !editor.evidenceRefs.length) return []
+    if (!statement) return []
     return [
       {
         checklist_code: item.code,
-        statement: statement || `关于「${item.title}」的结论尚待法务形成`,
+        statement,
         fact_refs: [...editor.factRefs],
         evidence_refs: [...editor.evidenceRefs],
       },
@@ -318,7 +342,7 @@ async function compileClaims() {
   try {
     compilation.value = await compileMechanismClaims(scenarioId.value, compilationDrafts())
     proof.value = null
-    notice.value = '已按完整 checklist 分母重新编译。缺少已确认事实或 grounded 法源的条目会自动拒答。'
+    notice.value = '已按固定 30 项 Pack 分母重新编译。无真实法务草稿的项目只创建 ResearchItem，不创建占位 Claim。'
   } catch (cause: unknown) {
     error.value = extractError(cause, 'Claim 编译失败')
   } finally {
@@ -418,6 +442,10 @@ function extractError(cause: unknown, fallback: string): string {
             :to="{ name: 'delivery-assurance', params: { id: scenario.id } }"
             class="btn-primary link-btn"
           >客户交付证据台</RouterLink>
+          <RouterLink
+            :to="{ name: 'competition-workspace', params: { id: scenario.id, section: 'overview' } }"
+            class="btn-primary link-btn"
+          >比赛正式场景</RouterLink>
         </div>
       </header>
 
@@ -537,6 +565,14 @@ function extractError(cause: unknown, fallback: string): string {
             <span>来源文件（可选）</span>
             <input v-model="factForm.source_document" data-testid="fact-source" type="text" maxlength="512" placeholder="文件名或业务系统记录" />
           </label>
+          <label>
+            <span>事实极性</span>
+            <select v-model="factForm.assertion_polarity" data-testid="fact-polarity">
+              <option value="unspecified">未指定</option>
+              <option value="affirmative">肯定事实</option>
+              <option value="negative">否定事实（可供 not_applicable 审核）</option>
+            </select>
+          </label>
           <div class="wide form-action-row">
             <button class="btn-primary" data-testid="create-fact" type="submit" :disabled="!canSubmitFact || busy === 'fact-create'">
               {{ busy === 'fact-create' ? '登记中…' : '登记待确认事实' }}
@@ -587,7 +623,7 @@ function extractError(cause: unknown, fallback: string): string {
           <div>
             <h2 id="compiler-title">Claim Compiler</h2>
             <p class="muted">
-              逐项绑定已确认事实与同一清单项的 grounded 法源。未填写的清单项仍进入分母，并自动拒答。
+              逐项绑定已确认事实与同一清单项的 grounded 法源。未形成真实法务草稿的 Pack 项仍进入 30 项分母，但只生成 ResearchItem。
             </p>
           </div>
           <button
@@ -659,6 +695,30 @@ function extractError(cause: unknown, fallback: string): string {
                 </label>
               </fieldset>
             </div>
+          </article>
+        </div>
+      </section>
+
+      <section v-if="compilation" class="panel" aria-labelledby="research-denominator-title">
+        <div class="section-heading">
+          <div>
+            <h2 id="research-denominator-title">固定 Pack 分母与 ResearchItem</h2>
+            <p class="muted">Scope 和 screening 只标记状态，不会从 30 项分母删除条目。</p>
+          </div>
+          <span class="badge">Pack {{ researchItems.length }} · in-scope {{ inScopeResearchItems.length }} · out-of-scope {{ outOfScopeResearchItems.length }}</span>
+        </div>
+        <div class="fact-list">
+          <article v-for="item in researchItems" :key="item.id" class="fact-card">
+            <div class="fact-card-head">
+              <strong><code>{{ item.checklist_code }}</code> {{ item.title }}</strong>
+              <span class="state-pill" :class="item.scope_status === 'in_scope' ? 'business_confirmed' : 'submitted'">
+                {{ item.scope_status }}
+              </span>
+            </div>
+            <p class="muted">
+              {{ item.dimension }} · {{ item.screening_status }} · disposition {{ item.disposition || '—' }}
+            </p>
+            <p v-if="item.reason_codes.length" class="confirmation-note">{{ item.reason_codes.join('；') }}</p>
           </article>
         </div>
       </section>

@@ -334,3 +334,15 @@ class CoverageProofResponse(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class MechanismAuditEventResponse(BaseModel):
+    id: int
+    user_id: int
+    action: str
+    resource_type: Optional[str]
+    resource_id: Optional[str]
+    detail: Optional[str]
+    created_at: datetime
+
+    model_config = {"from_attributes": True}

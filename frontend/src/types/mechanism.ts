@@ -62,6 +62,7 @@ export interface FactRecord {
   block_id: string
   fact_pack_version: string
   source_document: string | null
+  assertion_polarity: 'affirmative' | 'negative' | 'unspecified'
   status: 'submitted' | 'business_confirmed'
   confirmation_note: string | null
   business_confirmed_by: number | null
@@ -78,6 +79,7 @@ export interface FactRecordCreatePayload {
   block_id: string
   fact_pack_version: string
   source_document?: string | null
+  assertion_polarity?: 'affirmative' | 'negative' | 'unspecified'
 }
 
 export interface ClaimDraft {
@@ -104,6 +106,38 @@ export interface ClaimRecord {
   updated_at: string
 }
 
+export type ResearchDisposition =
+  | 'supported'
+  | 'not_applicable'
+  | 'rejected'
+  | 'unanswerable'
+  | 'uncovered'
+
+export interface ResearchItem {
+  id: string
+  compilation_id: string
+  scenario_id: number
+  checklist_code: string
+  denominator_order: number
+  title: string
+  dimension: string
+  scope_status: 'in_scope' | 'out_of_scope_by_scope'
+  screening_status: 'selected_by_screening' | 'screened_out'
+  disposition: ResearchDisposition | null
+  research_status: 'out_of_scope' | 'research_open' | 'claim_pending' | 'resolved'
+  missing_facts: string[]
+  reason_codes: string[]
+  negative_fact_refs: string[]
+  linked_claim_id: string | null
+  compiler_version: string
+  item_hash: string
+  legal_confirmed_by: number | null
+  legal_confirmed_at: string | null
+  legal_confirmation_note: string | null
+  created_at: string
+  updated_at: string
+}
+
 export interface ClaimCompilation {
   id: string
   scenario_id: number
@@ -117,6 +151,7 @@ export interface ClaimCompilation {
   created_by: number
   created_at: string
   claims: ClaimRecord[]
+  research_items: ResearchItem[]
 }
 
 export interface CoverageProof {
@@ -138,10 +173,29 @@ export interface CoverageProof {
       unanswerable_reasons: string[]
     }>
     answerability_rule?: string
+    pack_total?: number
+    scope_total?: number
+    out_of_scope_by_scope_count?: number
+    supported_count?: number
+    not_applicable_count?: number
+    rejected_count?: number
+    unanswerable_count?: number
+    uncovered_count?: number
+    out_of_scope_by_scope?: string[]
     [key: string]: unknown
   }
   proof_hash: string
   created_by: number
+  created_at: string
+}
+
+export interface MechanismAuditEvent {
+  id: number
+  user_id: number
+  action: string
+  resource_type: string | null
+  resource_id: string | null
+  detail: string | null
   created_at: string
 }
 

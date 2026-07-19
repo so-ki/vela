@@ -125,6 +125,27 @@
 .rc0-demo-banner p { margin: 0; font-size: 12px; color: #624d74; }
 .rc0-demo-banner__machine { display: grid; justify-items: end; gap: 2px; font-size: 10px; }
 
+.competition-banner {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--vela-space-5);
+  min-height: 82px;
+  padding: var(--vela-space-4) var(--vela-space-6);
+  color: #ecf7fc;
+  background: linear-gradient(120deg, #0e3043, #174f68);
+  border-bottom: 1px solid #2b6c88;
+}
+.competition-banner span:first-child { color: #99cbdf; font-size: 10px; letter-spacing: .12em; text-transform: uppercase; }
+.competition-banner h1 { max-width: 980px; margin: 4px 0 0; font: 600 13px/1.55 var(--vela-font-display); }
+.competition-action { display: inline-flex; align-items: center; color: var(--vela-navy); background: #fff; text-decoration: none; }
+.competition-appendix-link { display: inline-block; margin-top: 10px; color: #b9d4e1; font-size: 11px; }
+.competition-loading, .competition-error, .competition-empty { padding: var(--vela-space-5); border: 1px solid var(--vela-border); background: var(--vela-surface); color: var(--vela-muted); }
+.competition-error { color: var(--vela-red); border-color: #e5aeb3; }
+
 .rc0-context-bar {
   position: sticky;
   top: 0;

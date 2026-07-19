@@ -8,7 +8,7 @@ const auth = useAuthStore()
 const route = useRoute()
 
 const wideLayout = computed(() =>
-  ['review', 'checklist', 'mechanism', 'delivery-assurance', 'brief', 'project-hub', 'material-review', 'legal-corpus', 'rc0-workspace'].includes(String(route.name)),
+  ['review', 'checklist', 'mechanism', 'delivery-assurance', 'brief', 'project-hub', 'material-review', 'legal-corpus', 'competition-workspace', 'rc0-workspace'].includes(String(route.name)),
 )
 </script>
 
@@ -24,7 +24,8 @@ const wideLayout = computed(() =>
       </div>
       <nav class="nav">
         <RouterLink to="/">工作台</RouterLink>
-        <RouterLink to="/rc0/overview">RC0 演示</RouterLink>
+        <RouterLink v-if="route.params.id" :to="`/competition/${route.params.id}/overview`">比赛主演示</RouterLink>
+        <RouterLink to="/rc0/overview">机制附录</RouterLink>
         <RouterLink v-if="auth.isLegal" to="/legal/corpus">法源维护</RouterLink>
       </nav>
       <div class="user-area" v-if="auth.user">
@@ -35,7 +36,7 @@ const wideLayout = computed(() =>
       </div>
     </header>
 
-    <main class="main-content" :class="{ 'main-content--wide': wideLayout, 'main-content--rc0': route.name === 'rc0-workspace' }">
+    <main class="main-content" :class="{ 'main-content--wide': wideLayout, 'main-content--rc0': route.name === 'rc0-workspace' || route.name === 'competition-workspace' }">
       <RouterView />
     </main>
 

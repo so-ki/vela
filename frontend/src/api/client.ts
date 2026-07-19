@@ -20,6 +20,8 @@ import type {
   FactRecordCreatePayload,
   MaterialLedgerEntry,
   MaterialLedgerUpsertPayload,
+  MechanismAuditEvent,
+  ResearchItem,
 } from '@/types/mechanism'
 import type {
   ArtifactManifest,
@@ -441,6 +443,27 @@ export async function fetchLatestClaimCompilation(
     if (axios.isAxiosError(error) && error.response?.status === 404) return null
     throw error
   }
+}
+
+export async function fetchLatestResearchItems(scenarioId: number): Promise<ResearchItem[]> {
+  try {
+    const { data } = await api.get<ResearchItem[]>(
+      `/scenarios/${scenarioId}/mechanism/research-items/latest`,
+    )
+    return data
+  } catch (error) {
+    if (axios.isAxiosError(error) && error.response?.status === 404) return []
+    throw error
+  }
+}
+
+export async function fetchMechanismAuditEvents(
+  scenarioId: number,
+): Promise<MechanismAuditEvent[]> {
+  const { data } = await api.get<MechanismAuditEvent[]>(
+    `/scenarios/${scenarioId}/mechanism/audit`,
+  )
+  return data
 }
 
 export async function compileMechanismClaims(

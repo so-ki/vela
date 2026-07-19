@@ -112,6 +112,12 @@ const router = createRouter({
           meta: { requiresDisclaimer: true, legalOnly: true },
         },
         {
+          path: 'competition/:id/:section?',
+          name: 'competition-workspace',
+          component: () => import('@/views/CompetitionWorkspaceView.vue'),
+          meta: { requiresDisclaimer: true, mechanismAccess: true },
+        },
+        {
           path: 'rc0/:section?',
           name: 'rc0-workspace',
           component: () => import('@/views/Rc0WorkspaceView.vue'),

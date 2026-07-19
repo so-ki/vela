@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import io
 import json
-import zipfile
 from pathlib import Path
 
 import pytest
@@ -724,9 +722,12 @@ def test_fresh_sqlite_real_mainline_generates_reviews_and_exports(demo_environme
     drafts = []
     for section in brief["sections"]:
         for item in section["items"]:
-            if item["gate_status"] != "passed":
+            grounded_citations = [
+                value for value in item["citations"] if value["grounded"]
+            ]
+            if not grounded_citations:
                 continue
-            citation = next(value for value in item["citations"] if value["grounded"])
+            citation = grounded_citations[0]
             drafts.append(
                 {
                     "checklist_code": item["code"],
@@ -735,13 +736,81 @@ def test_fresh_sqlite_real_mainline_generates_reviews_and_exports(demo_environme
                     "evidence_refs": [f"{item['code']}:{citation['id']}"],
                 }
             )
+    assert drafts, "正式检索结果应至少支持一条真实法律 Claim 草稿"
     compilation_response = client.post(
         f"/api/v1/scenarios/{scenario_id}/mechanism/claims/compile",
         headers=legal_headers,
         json={"drafts": drafts},
     )
     assert compilation_response.status_code == 201, compilation_response.text
-    compilation = compilation_response.json()
+    first_compilation = compilation_response.json()
+    assert first_compilation["compiler_version"] == "0.3"
+    assert first_compilation["denominator_count"] == 30
+    assert len(first_compilation["research_items"]) == 30
+    assert len({item["checklist_code"] for item in first_compilation["research_items"]}) == 30
+    assert all(claim["statement"].strip() for claim in first_compilation["claims"])
+
+    # A critical supplemental fact enters through the formal business API and
+    # is explicitly selected by legal in a real Claim draft.  Both compiler
+    # input and output hashes must change; the compiler is not a fixed demo
+    # response.  A third compilation restores the brief-bound legal wording
+    # for the delivery gate while retaining the supplemental fact in history.
+    supplemental_fact_response = client.post(
+        f"/api/v1/scenarios/{scenario_id}/mechanism/facts",
+        headers=business_headers,
+        json={
+            "subject": "project",
+            "attribute": "hazardous_material_inventory",
+            "value": "测试补充事实：规划阶段预计储存 18 吨危险化学品",
+            "fact_time": "2026-07-18",
+            "block_id": "submitted-material:hazardous-inventory",
+            "fact_pack_version": "facts-v0.1",
+            "source_document": "storage-project.txt",
+            "assertion_polarity": "affirmative",
+        },
+    )
+    assert supplemental_fact_response.status_code == 201, supplemental_fact_response.text
+    supplemental_fact_id = supplemental_fact_response.json()["id"]
+    supplemental_fact_confirm = client.post(
+        f"/api/v1/scenarios/{scenario_id}/mechanism/facts/{supplemental_fact_id}/confirm",
+        headers=business_headers,
+        json={"confirmation_note": "业务提交人确认该补充测试事实来自本次正式上传材料。"},
+    )
+    assert supplemental_fact_confirm.status_code == 200, supplemental_fact_confirm.text
+    drafts_with_supplemental_fact = [
+        {
+            **draft,
+            "fact_refs": (
+                [*draft["fact_refs"], supplemental_fact_id]
+                if index == 0
+                else draft["fact_refs"]
+            ),
+        }
+        for index, draft in enumerate(drafts)
+    ]
+    changed_compilation_response = client.post(
+        f"/api/v1/scenarios/{scenario_id}/mechanism/claims/compile",
+        headers=legal_headers,
+        json={"drafts": drafts_with_supplemental_fact},
+    )
+    assert changed_compilation_response.status_code == 201, changed_compilation_response.text
+    changed_compilation = changed_compilation_response.json()
+    assert changed_compilation["input_hash"] != first_compilation["input_hash"]
+    assert changed_compilation["output_hash"] != first_compilation["output_hash"]
+    assert any(
+        supplemental_fact_id in claim["fact_refs"]
+        for claim in changed_compilation["claims"]
+    )
+
+    gate_compilation_response = client.post(
+        f"/api/v1/scenarios/{scenario_id}/mechanism/claims/compile",
+        headers=legal_headers,
+        json={"drafts": drafts},
+    )
+    assert gate_compilation_response.status_code == 201, gate_compilation_response.text
+    compilation = gate_compilation_response.json()
+    assert compilation["input_hash"] != first_compilation["input_hash"]
+    assert compilation["output_hash"] == first_compilation["output_hash"]
     for claim in compilation["claims"]:
         if claim["status"] != "awaiting_human_confirmation":
             continue
@@ -763,6 +832,32 @@ def test_fresh_sqlite_real_mainline_generates_reviews_and_exports(demo_environme
         },
     )
     assert proof_response.status_code == 201, proof_response.text
+    proof_body = proof_response.json()["proof"]
+    assert proof_body["schema_version"] == "0.2"
+    assert proof_body["pack_total"] == 30
+    assert proof_body["pack_total"] == (
+        proof_body["scope_total"] + proof_body["out_of_scope_by_scope_count"]
+    )
+    assert proof_body["scope_total"] == sum(
+        proof_body[f"{disposition}_count"]
+        for disposition in (
+            "supported",
+            "not_applicable",
+            "rejected",
+            "unanswerable",
+            "uncovered",
+        )
+    )
+
+    audit_response = client.get(
+        f"/api/v1/scenarios/{scenario_id}/mechanism/audit",
+        headers=legal_headers,
+    )
+    assert audit_response.status_code == 200, audit_response.text
+    audit_actions = [event["action"] for event in audit_response.json()]
+    assert audit_actions.count("mechanism.claim_compile") == 3
+    assert "mechanism.fact_create" in audit_actions
+    assert "mechanism.fact_business_confirm" in audit_actions
 
     # Stored-proof corruption is distinguished from ordinary workflow staleness
     # and is also audit logged as a blocked 422 delivery attempt.

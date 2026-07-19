@@ -43,6 +43,7 @@ const fact: FactRecord = {
   block_id: 'site-area',
   fact_pack_version: '1.3.1',
   source_document: '项目说明.pdf',
+  assertion_polarity: 'unspecified',
   status: 'submitted',
   confirmation_note: null,
   business_confirmed_by: null,
@@ -128,6 +129,7 @@ function compilationWith(status: 'awaiting_human_confirmation' | 'supported'): C
     input_snapshot: {},
     created_by: 2,
     created_at: '2026-07-18T00:00:00Z',
+    research_items: [],
     claims: [
       {
         id: 'claim-1',
