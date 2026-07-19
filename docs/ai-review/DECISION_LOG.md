@@ -151,3 +151,25 @@
 - **依据**: 用户批示;generation_guard 现行实现。
 - **谁批准**: 用户。
 - **是否可逆**: v1 算法不可变;未来算法以 v2 追加。
+
+## D-0016(C3-B/C4/C5 实施口径)
+
+- **Decision ID**: D-0016
+- **日期**: 2026-07-19
+- **问题**: C3-B 的持久化版本身份、迁移编号、Gate/Snapshot 边界，以及 C4/C5 的就绪与历史重验口径。
+- **最终决定**: (1) `ScenarioDeliveryRelease` 增加显式 `schema_version`;Alembic `0007` 仅负责该字段，现存行回填 `1.1`，迁移完成后为 `NOT NULL` 且不保留 server default，writer 必须显式写入所选 reader 的 `version`;D-0009 的 ResearchItem 顺延为后续迁移，不与本批混合。(2) Answerability Gate 1.0 不建立独立持久化 registry 单元；其冻结字典属于 delivery snapshot 1.0 reader 边界并随 snapshot 散列。(3) delivery release 1.1 通过持久化 `schema_version` 精确分发；未知版本稳定返回 `delivery_release_schema_unsupported`，不得回退 current/latest。(4) API 的状态响应 envelope 版本与 release reader 版本解耦，新增普通字符串字段披露 release schema，避免未来 reader 导致响应校验 500。(5) C4 production readiness 对数据库中未知持久化版本 fail-closed；空库通过；development 明确 warning；C5 重验只使用存储版本 reader，不自动改写历史数据。
+- **依据**: D-0008、D-0013、D-0014、EV-0026；用户 2026-07-19 RC0 冲刺明确授权。
+- **影响范围**: versioned registry、delivery snapshot/release 服务、模型与 Alembic 0007、API schema、readiness、容器 allowlist、专项/迁移/全量测试。
+- **谁批准**: 用户。
+- **是否可逆**: reader 与迁移历史只增不减；writer 默认与 readiness 呈现可由后续决定调整。
+
+## D-0017(RC0 拟制演示隔离与声明边界)
+
+- **Decision ID**: D-0017
+- **日期**: 2026-07-19
+- **问题**: 在没有真实律师、客户 UAT 和生产部署证据时，如何完成可演示 RC0 而不削弱正式 Release Gate。
+- **最终决定**: 允许创建独立的 synthetic demo preview 对象与 UI；所有对象必须同时携带 `simulated=true`、`evidence_origin=synthetic_demo`、`status=demo_only`、`formal_release_allowed=false`，并在界面/导出持续显示“拟制演示 / SYNTHETIC DEMO”、非真实证据及不得用于正式法律或客户发布的警示。拟制对象不得写入或被正式 delivery evidence、attestation、UAT、deployment、release evaluator 接受；正式 Release Gate 继续 `blocked_external`。RC0 仅可声明 Engineering Demonstrator RC0，不得声明 Legal Content MVP、Controlled Pilot Ready 或 Formal Customer Release Ready。
+- **依据**: TARGET_PRODUCT_STATE 第 4/6 节、REQUIREMENTS_TRACEABILITY 发布声明规则；用户 2026-07-19 RC0 冲刺明确授权。
+- **影响范围**: RC0 前端预览数据、状态标签、演示导出、测试与最终声明。
+- **谁批准**: 用户。
+- **是否可逆**: 演示适配器可删除；正式证据隔离与声明边界不可弱化。

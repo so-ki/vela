@@ -6,6 +6,7 @@
 - Checkpoint branch: claude/gracious-brahmagupta-bbg2dw(仅承载交接文件提交)
 - Claude handoff source: `origin/claude/vela-ws-1c-c3a-versioned-readers` = `00b47bc89f11aa5a8eaaf38dae18565e8fd07274`(Codex 接管时已 fetch 核验)
 - Codex integration branch: `codex/vela-mvp-integration`(从上述精确交接点创建;不得自动合并或推送 Draft 分支)
+- RC0 sprint branch: `codex/vela-rc0-sprint-20260719`(从可信 C3-A.2 交接提交 `33d8fe1cfdfebb2bdd4066f7aa4b49658d6ce16e` 创建并已推送；不得触碰占用旧 integration 分支的 worktree)
 - Last verified product-code SHA: `a6d985402ebe606cc423c9c3d2c270e00229979c`(C3-A.2;基于 C3-A/C3-A.1 交接点)
 - Allowed commits: 5 个交接文件 + 经批准的 WS-1C 产品提交(C1/C1.1/C2/C2.1/C3-A/C3-A.1/C3-A.2)
 - Resume 时必须执行的 Git 核验命令:
@@ -20,14 +21,14 @@
 - 注意:Git 的实时 HEAD 只能在恢复时通过 `git rev-parse HEAD` 获取;本文件不记录、也不得用文件记录替代 Git 实时查询(D-0004)。
 
 ## Current Phase
-- Phase: WS-1C/C3-A + C3-A.1 + C3-A.2(嵌套持久化 JSON 引用结构验证)——已实施并全量验证,等待独立复核
-- Workstream: WS-1C(C1、C1.1、C2、C2.1、C3-A/C3-A.1/C3-A.2 完成;C3-B/C4/C5 未开始)
-- Status: complete_pending_review
-- 分支说明: Codex 从 Claude 精确 HEAD `00b47bc` 建立 `codex/vela-mvp-integration`;C3-A.2 产品提交 `a6d9854`
+- Phase: Vela Engineering Demonstrator RC0 七小时冲刺——C3-B/C4/C5 与原创 RC0 UI 实施中
+- Workstream: WS-1C(C1、C1.1、C2、C2.1、C3-A/C3-A.1/C3-A.2 已独立复核批准；C3-B/C4/C5 已获本轮明确实施授权)
+- Status: implementation_in_progress
+- 分支说明: `codex/vela-rc0-sprint-20260719` 从已复核交接提交 `33d8fe1` 建立；旧 `codex/vela-mvp-integration` 与其占用 worktree 保留为历史恢复点且禁止操作
 - 外部状态: 法律认证、真实客户 UAT、客户生产部署证据继续为 `blocked_external`,工程测试不得升级这些状态
 - 分支说明: C2 在独立分支 `claude/vela-ws-1c-c2-real-archive`(基于 C1.1 提交 730b9fd);checkpoint 分支 `claude/gracious-brahmagupta-bbg2dw` 停在 C1.1
-- Allowed file scope(C3-A.2): `answerability_gate_service.py`、`test_versioned_payload_validation.py` 与交接文件;已严格遵守
-- Prohibited actions: 未获明确批准前开始 C3-B 迁移/Release reader、ResearchItem、C4/C5;创建 PR;合并;推送 Draft 分支
+- Allowed file scope(RC0): C3-B/C4/C5 所需 versioned reader、服务、模型、Alembic 0007、schema/API、容器 allowlist、测试与文档；完整原创 RC0 UI、研究账本及严格隔离的 synthetic demo preview。
+- Prohibited actions: ResearchItem/后续迁移；伪造律师、客户或生产证据；让 synthetic 对象进入正式 Release Gate；创建 PR；合并；推送 Draft 分支；修改/删除旧 integration 分支或占用它的 worktree。
 
 ## Frozen Product Definition
 - 见 `AGENTS.md` 第 2–4 节与 D-0006;产品语义新增冻结决定:**D-0007(分母 A+ 方案)、D-0008(多版本不可变共存)、D-0009(ResearchItem 与 ClaimRecord 分离)、D-0010(外证矩阵采用状态修正)**——以 DECISION_LOG 原文为准,不得再列为 unresolved。
@@ -39,6 +40,7 @@
 - Phase 0 / 0.5:见前轮(EV-0001~EV-0017)。
 - Phase 0.6:(1) D-0007~D-0010 落账;(2) **基线动态验证首次通过**(EV-0018):靶向 35 passed、全量后端 295 passed、compileall、前端 29 passed + 构建、发布边界、git diff --check,全部绿,Python 3.12.3(未用系统 3.11);(3) WS-1C 设计前提事实采集(EV-0019);(4) WS-1C 实施方案冻结(见下节)。
 - C3-A.2(EV-0029):draft 引用、ClaimRecord 三个 JSON 字段及 CoverageProof 0.1 嵌套元素全部在 frozen reader 前按 `list[str]`/对象结构校验;非法形状即 422,新增 13 个对抗测试;全量后端 **393 passed**;四个 golden raw SHA 不变。
+- RC0 接管(2026-07-19):用户确认 C3-A.2 已独立复核批准；独立分支从 `33d8fe1` 创建并推送；Draft 仍为 `65f0b398`;Python 3.12 指定基线 73 passed、前端组件 29 passed。
 
 ## WS-1C Frozen Plan(v1,待批准;完整版见本轮会话报告)
 - **核心结论**:采用**文件系统不可变归档 + 代码级 reader 版本注册表,零 Alembic 迁移**。不建 DB 版本表(与现行"文件系统为 Pack 事实源"一致,并把 Alembic 0007 让给 WS-1A 的 ResearchItem,避免迁移冲突)。
@@ -70,8 +72,7 @@
 - experiment_required 消项:基线动态验证已完成(EV-0018);仍留:PostgreSQL 并发/事务、Alembic 往返(一次性库)、四合成案例动态回归、全角色浏览器 E2E、priming 定量。
 
 ## Unresolved Questions(真正需要用户决定)
-1. C3-B 的迁移与 release reader 实施批准:是否按冻结设计为 `ScenarioDeliveryRelease` 增加显式 schema identity,以及 Alembic 0007/后续 ResearchItem 0008 的线性编号。
-2. ResearchItem 模型命名偏好:`ResearchItem` vs `ClaimCompilationItem`(D-0009 两候选,WS-1A 冻结方案时定,可由实施者建议)。
+1. ResearchItem 模型命名偏好:`ResearchItem` vs `ClaimCompilationItem`(D-0009 两候选；不属于本轮 C3-B/C4/C5/RC0 UI 范围)。
 
 ## C3 Frozen Plan(v1,待批准;完整版见本轮会话报告,证据 EV-0026)
 - **四个版本单元**(reader 只增不减,显式静态 mapping,无动态 import):`versioned/claim_compiler/v0_2`(七个 builder 函数+FactRecord 查询序+全部 hash 承载字符串)、`versioned/coverage_proof/v0_1`(纯函数,零依赖)、`versioned/delivery_snapshot/v1_0`(build_delivery_snapshot+_current_mechanism_snapshot+gate 字典 1.0 形状——gate 无独立持久化身份,其字典被嵌入 snapshot 散列,故随 snapshot 冻结)、`versioned/delivery_release/v1_1`(_release_body+六个 evidence helper+私有 _iso/_as_utc)。
