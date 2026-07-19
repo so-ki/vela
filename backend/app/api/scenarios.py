@@ -15,6 +15,7 @@ from sqlalchemy.orm.exc import StaleDataError
 from starlette.concurrency import run_in_threadpool
 
 from app.core.database import get_db
+from app.core.config import get_settings
 from app.core.deps import get_current_legal_user, get_current_user
 from app.core.roles import ROLE_BUSINESS, ROLE_LEGAL, ROLE_ADMIN, is_legal_role, require_role
 from app.models.scenario import InvestigationScenario
@@ -640,6 +641,11 @@ def get_scenario(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if get_settings().vela_app_mode == "competition" and not is_legal_role(current_user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="比赛业务账号请使用业务材料与补件中心",
+        )
     scenario = _load_accessible_scenario(db, scenario_id, current_user)
     return scenario_to_response(scenario)
 

@@ -9,6 +9,7 @@ from sqlalchemy.orm.exc import StaleDataError
 
 from app.api import (
     auth,
+    competition,
     delivery_assurance,
     legal,
     legal_source_versions,
@@ -141,6 +142,7 @@ def create_app() -> FastAPI:
         app.add_middleware(RateLimitMiddleware)
 
     app.include_router(auth.router, prefix="/api/v1")
+    app.include_router(competition.router, prefix="/api/v1")
     app.include_router(delivery_assurance.router, prefix="/api/v1")
     app.include_router(onboarding.router, prefix="/api/v1")
     app.include_router(projects.router, prefix="/api/v1")

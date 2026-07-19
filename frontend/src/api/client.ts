@@ -35,6 +35,7 @@ import type {
   LegalCredential,
   UATAcceptance,
 } from '@/types/delivery'
+import type { CompetitionBusinessCenter } from '@/types/competition'
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
@@ -100,6 +101,52 @@ export async function acceptDisclaimer(): Promise<User> {
 
 export async function fetchSystemStatus(): Promise<SystemStatus> {
   const { data } = await api.get<SystemStatus>('/status')
+  return data
+}
+
+export async function fetchCompetitionBusinessCenter(
+  scenarioId: number,
+): Promise<CompetitionBusinessCenter> {
+  const { data } = await api.get<CompetitionBusinessCenter>(
+    `/competition/scenarios/${scenarioId}/business-center`,
+  )
+  return data
+}
+
+export async function uploadCompetitionBusinessMaterial(
+  scenarioId: number,
+  purpose: 'project' | 'supplement',
+  file: File,
+): Promise<CompetitionBusinessCenter> {
+  const formData = new FormData()
+  formData.append('purpose', purpose)
+  formData.append('file', file)
+  const { data } = await api.post<CompetitionBusinessCenter>(
+    `/competition/scenarios/${scenarioId}/business-center/materials`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  )
+  return data
+}
+
+export async function confirmCompetitionBusinessFact(
+  scenarioId: number,
+  factId: string,
+  value: string,
+): Promise<CompetitionBusinessCenter> {
+  const { data } = await api.post<CompetitionBusinessCenter>(
+    `/competition/scenarios/${scenarioId}/business-center/facts/${factId}/confirm`,
+    { value },
+  )
+  return data
+}
+
+export async function submitCompetitionBusinessSupplement(
+  scenarioId: number,
+): Promise<CompetitionBusinessCenter> {
+  const { data } = await api.post<CompetitionBusinessCenter>(
+    `/competition/scenarios/${scenarioId}/business-center/submit`,
+  )
   return data
 }
 

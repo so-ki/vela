@@ -3,7 +3,7 @@ import { onMounted, ref } from 'vue'
 import { useRoute, useRouter, RouterLink } from 'vue-router'
 import { fetchSsoConfig } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
-import { competitionOverviewPath, isCompetitionMode } from '@/config/appMode'
+import { competitionEntryPath, isCompetitionMode } from '@/config/appMode'
 import type { SsoConfig } from '@/types'
 
 const auth = useAuthStore()
@@ -29,7 +29,7 @@ async function handleSubmit() {
   try {
     const user = await auth.login(email.value, password.value)
     const redirect = competitionMode
-      ? competitionOverviewPath()
+      ? competitionEntryPath(user.role)
       : typeof route.query.redirect === 'string' ? route.query.redirect : '/'
     router.push(user.disclaimer_accepted ? redirect : redirect)
   } catch {

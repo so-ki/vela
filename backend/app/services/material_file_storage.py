@@ -9,7 +9,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-UPLOAD_ROOT = Path(__file__).resolve().parents[2] / "data" / "scenario_materials"
+DEFAULT_UPLOAD_ROOT = Path(__file__).resolve().parents[2] / "data" / "scenario_materials"
+# Compatibility hook retained for existing deployments and tests that bind a
+# process-local material directory. Competition mode can override it by env.
+UPLOAD_ROOT = DEFAULT_UPLOAD_ROOT
 MAX_SCENARIO_ARCHIVED_FILES = 30
 MAX_SCENARIO_ARCHIVED_BYTES = 250 * 1024 * 1024
 MAX_INSTANCE_ARCHIVED_BYTES = 5 * 1024 * 1024 * 1024
@@ -30,7 +33,12 @@ def _safe_filename(name: str) -> str:
 
 
 def scenario_material_dir(scenario_id: int) -> Path:
-    return UPLOAD_ROOT / str(scenario_id)
+    return material_upload_root() / str(scenario_id)
+
+
+def material_upload_root() -> Path:
+    configured = os.environ.get("VELA_SCENARIO_MATERIALS_DIR", "").strip()
+    return Path(configured).expanduser().resolve() if configured else UPLOAD_ROOT
 
 
 def _regular_file_usage(root: Path) -> tuple[int, int]:
@@ -61,7 +69,7 @@ def save_scenario_material_files(
     with _STORAGE_LOCK:
         target_dir = scenario_material_dir(scenario_id)
         scenario_count, scenario_bytes = _regular_file_usage(target_dir)
-        _, instance_bytes = _regular_file_usage(UPLOAD_ROOT)
+        _, instance_bytes = _regular_file_usage(material_upload_root())
         incoming_bytes = sum(len(content) for _, content, _ in uploads)
         if scenario_count + len(uploads) > MAX_SCENARIO_ARCHIVED_FILES:
             raise ValueError(f"单个项目最多归档 {MAX_SCENARIO_ARCHIVED_FILES} 个原始文件")

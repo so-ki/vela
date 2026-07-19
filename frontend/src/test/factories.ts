@@ -230,3 +230,17 @@ export function makeBusinessUser(): User {
     created_at: '2026-07-14T00:00:00Z',
   }
 }
+
+export function makeLegalUser(): User {
+  return {
+    id: 2,
+    email: 'legal@demo.vela',
+    full_name: '演示法务',
+    organization: 'Demo Corp · 法务部',
+    role: 'legal',
+    is_active: true,
+    disclaimer_accepted: true,
+    disclaimer_accepted_at: '2026-07-14T00:00:00Z',
+    created_at: '2026-07-14T00:00:00Z',
+  }
+}

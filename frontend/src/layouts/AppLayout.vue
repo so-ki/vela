@@ -3,15 +3,17 @@ import { computed } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import DisclaimerModal from '@/components/DisclaimerModal.vue'
-import { competitionOverviewPath, isCompetitionMode } from '@/config/appMode'
+import { competitionEntryPath, isCompetitionMode } from '@/config/appMode'
 
 const auth = useAuthStore()
 const route = useRoute()
 const competitionMode = isCompetitionMode()
-const competitionHome = competitionMode ? competitionOverviewPath() : '/'
+const competitionHome = computed(() =>
+  competitionMode ? competitionEntryPath(auth.user?.role) : '/',
+)
 
 const wideLayout = computed(() =>
-  ['review', 'checklist', 'mechanism', 'delivery-assurance', 'brief', 'project-hub', 'material-review', 'legal-corpus', 'competition-workspace', 'rc0-workspace'].includes(String(route.name)),
+  ['review', 'checklist', 'mechanism', 'delivery-assurance', 'brief', 'project-hub', 'material-review', 'legal-corpus', 'competition-workspace', 'competition-business', 'rc0-workspace'].includes(String(route.name)),
 )
 </script>
 
@@ -35,7 +37,7 @@ const wideLayout = computed(() =>
         <RouterLink v-if="auth.isLegal" to="/legal/corpus">法源维护</RouterLink>
       </nav>
       <div class="user-area" v-if="auth.user">
-        <span v-if="!competitionMode" class="role-badge">{{ auth.roleLabel }}</span>
+        <span class="role-badge">{{ auth.roleLabel }}</span>
         <span>{{ auth.user.full_name }}</span>
         <span class="org" v-if="!competitionMode && auth.user.organization">{{ auth.user.organization }}</span>
         <button class="btn-text" @click="auth.logout(); $router.push('/login')">退出</button>

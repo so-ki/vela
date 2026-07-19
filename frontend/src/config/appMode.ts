@@ -18,3 +18,15 @@ export function competitionOverviewPath(): string {
   }
   return `/competition/${scenarioId}/overview`
 }
+
+export function competitionBusinessPath(): string {
+  const scenarioId = competitionScenarioId()
+  if (scenarioId === null) {
+    throw new Error('competition mode requires VITE_COMPETITION_SCENARIO_ID')
+  }
+  return `/competition/${scenarioId}/business`
+}
+
+export function competitionEntryPath(role?: string): string {
+  return role === 'business' ? competitionBusinessPath() : competitionOverviewPath()
+}

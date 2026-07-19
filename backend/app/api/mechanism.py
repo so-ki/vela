@@ -138,6 +138,7 @@ def get_mechanism_audit_events(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _require_legal(current_user)
     _load_scenario(db, scenario_id, current_user)
     scenario_marker = f"scenario={scenario_id}"
     return (
@@ -217,6 +218,7 @@ def get_coverage_tasks(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _require_legal(current_user)
     _load_scenario(db, scenario_id, current_user)
     return [_coverage_task_response(task) for task in list_coverage_tasks(db, scenario_id)]
 
@@ -393,6 +395,7 @@ def get_latest_claims(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _require_legal(current_user)
     _load_scenario(db, scenario_id, current_user)
     result = latest_compilation(db, scenario_id)
     if result is None:
@@ -414,6 +417,7 @@ def get_latest_research_items(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _require_legal(current_user)
     _load_scenario(db, scenario_id, current_user)
     result = latest_compilation(db, scenario_id)
     if result is None:
@@ -568,6 +572,7 @@ def get_latest_coverage_proof(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    _require_legal(current_user)
     _load_scenario(db, scenario_id, current_user)
     proof = latest_coverage_proof(db, scenario_id)
     if proof is None:

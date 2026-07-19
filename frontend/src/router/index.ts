@@ -1,5 +1,10 @@
 import { createRouter, createWebHistory, type RouterHistory } from 'vue-router'
-import { competitionOverviewPath, isCompetitionMode } from '@/config/appMode'
+import {
+  competitionBusinessPath,
+  competitionEntryPath,
+  competitionOverviewPath,
+  isCompetitionMode,
+} from '@/config/appMode'
 import { useAuthStore } from '@/stores/auth'
 
 export function createAppRouter(history: RouterHistory = createWebHistory()) {
@@ -114,10 +119,16 @@ export function createAppRouter(history: RouterHistory = createWebHistory()) {
           meta: { requiresDisclaimer: true, legalOnly: true },
         },
         {
+          path: 'competition/:id/business',
+          name: 'competition-business',
+          component: () => import('@/views/CompetitionBusinessView.vue'),
+          meta: { requiresDisclaimer: true, businessOnly: true },
+        },
+        {
           path: 'competition/:id/:section?',
           name: 'competition-workspace',
           component: () => import('@/views/CompetitionWorkspaceView.vue'),
-          meta: { requiresDisclaimer: true, mechanismAccess: true },
+          meta: { requiresDisclaimer: true, mechanismAccess: true, legalOnly: true },
         },
         {
           path: 'rc0/:section?',
@@ -134,17 +145,6 @@ export function createAppRouter(history: RouterHistory = createWebHistory()) {
   const auth = useAuthStore()
   const competitionMode = isCompetitionMode()
 
-  if (competitionMode && to.name === 'dashboard') {
-    return competitionOverviewPath()
-  }
-
-  if (
-    competitionMode
-    && !['login', 'sso-callback', 'competition-workspace'].includes(String(to.name))
-  ) {
-    return auth.isAuthenticated ? competitionOverviewPath() : { name: 'login' }
-  }
-
   if (auth.token && !auth.user) {
     try {
       await Promise.race([
@@ -158,8 +158,34 @@ export function createAppRouter(history: RouterHistory = createWebHistory()) {
     }
   }
 
+  if (competitionMode) {
+    const routeName = String(to.name)
+    const guestRouteAllowed = ['login', 'sso-callback'].includes(routeName)
+
+    if (!auth.isAuthenticated) {
+      return guestRouteAllowed
+        ? true
+        : { name: 'login', query: { redirect: to.fullPath } }
+    }
+
+    if (to.meta.guest) {
+      return competitionEntryPath(auth.user?.role)
+    }
+
+    if (auth.isBusiness) {
+      return routeName === 'competition-business' ? true : competitionBusinessPath()
+    }
+
+    if (auth.isLegal) {
+      return routeName === 'competition-workspace' ? true : competitionOverviewPath()
+    }
+
+    auth.logout()
+    return { name: 'login' }
+  }
+
   if (to.meta.guest && auth.isAuthenticated && auth.user?.disclaimer_accepted) {
-    return competitionMode ? competitionOverviewPath() : { name: 'dashboard' }
+    return { name: 'dashboard' }
   }
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {

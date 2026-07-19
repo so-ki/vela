@@ -1113,6 +1113,8 @@ def get_delivery_assurance_status(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if not is_legal_role(current_user):
+        raise HTTPException(status_code=403, detail="交付状态仅供法务查看")
     scenario = _load_scenario(db, scenario_id, current_user)
     return evaluate_delivery_release(
         db,
