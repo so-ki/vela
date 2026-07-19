@@ -188,7 +188,7 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
     }
     monkeypatch.setattr(
         "app.services.delivery_assurance_service.build_delivery_snapshot",
-        lambda db, *, scenario, generation_config: fixed_snapshot,
+        lambda db, *, scenario, generation_config, reader=None: fixed_snapshot,
     )
 
     with delivery_db() as db:
@@ -859,6 +859,41 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
         assert report["release_schema_version"] == "1.1"
         validated_report = DeliveryGateStatusResponse.model_validate(report)
         assert validated_report.schema_version == "1.1"
+
+        from dataclasses import replace
+
+        from app.services.versioned.registry import (
+            get_delivery_release_reader,
+            get_delivery_snapshot_reader,
+        )
+
+        future_snapshot_writer = replace(
+            get_delivery_snapshot_reader("1.0"),
+            version="2.0",
+            gate_version="2.0",
+            build_snapshot_payload=lambda **_: {"future": "must-not-run"},
+        )
+        future_release_writer = replace(
+            get_delivery_release_reader("1.1"),
+            version="2.0",
+            build_release_body=lambda **_: {"future": "must-not-run"},
+        )
+        with monkeypatch.context() as future_defaults:
+            future_defaults.setattr(
+                delivery_service,
+                "current_delivery_snapshot_writer",
+                lambda: future_snapshot_writer,
+            )
+            future_defaults.setattr(
+                delivery_service,
+                "current_delivery_release_writer",
+                lambda: future_release_writer,
+            )
+            historical_report = evaluate_delivery_release(
+                db, scenario=scenario, generation_config=_config()
+            )
+        assert historical_report["delivery_allowed"] is True
+        assert historical_report["release_schema_version"] == "1.1"
 
         db.execute(
             update(ScenarioDeliveryRelease)

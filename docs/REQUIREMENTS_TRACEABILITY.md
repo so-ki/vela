@@ -36,6 +36,7 @@
 | B-06 | 审计日志 | `accepted`（应用层） | 关键写操作与复核同事务记录 | 审计原子性与 audit bundle 测试 |
 | B-07 | 抗特权管理员篡改 | `blocked_external` | 客户 WORM/对象锁或签名哈希链部署并演练恢复 | 当前仅应用审计与导出 SHA-256 |
 | B-08 | “删除巴西”平台边界 | `accepted`（工程） | 移除正式巴西包后，非真实 fixture 仍能完成生成/拒答测试；核心不得含巴西默认回退 | `test_country_independent_fixture_flow.py` 阻止读取正式 Brazil manifest/rules/corpus |
+| B-09 | 历史对象多版本读取与就绪门 | `accepted`（工程） | compiler/proof/snapshot/release 按存储版本精确读取；reader 只增不减；未知版本在使用时及 production readiness fail-closed；空库可启动；不得自动改写历史对象 | versioned registry、`/api/v1/readiness`、Alembic `0007`、`test_version_readiness.py`、`test_delivery_release_schema_migration.py` |
 
 ## E. 真实客户交付保证
 

@@ -124,6 +124,23 @@ def test_current_write_version_not_used_for_reader_selection(monkeypatch) -> Non
         get_compiler_reader("0.3")
 
 
+def test_future_delivery_write_defaults_do_not_replace_historical_readers(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        versioned_registry, "CURRENT_DELIVERY_SNAPSHOT_WRITE_VERSION", "2.0"
+    )
+    monkeypatch.setattr(
+        versioned_registry, "CURRENT_DELIVERY_RELEASE_WRITE_VERSION", "2.0"
+    )
+    assert versioned_registry.get_delivery_snapshot_reader("1.0").version == "1.0"
+    assert versioned_registry.get_delivery_release_reader("1.1").version == "1.1"
+    with pytest.raises(UnsupportedVersionError):
+        versioned_registry.get_delivery_snapshot_reader("2.0")
+    with pytest.raises(UnsupportedVersionError):
+        versioned_registry.get_delivery_release_reader("2.0")
+
+
 # --- gate dispatch (uses the golden fixture state) ---------------------------
 
 
