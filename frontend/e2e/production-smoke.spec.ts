@@ -70,7 +70,7 @@ test('admin authenticates and reaches independent release controls', async ({ pa
 
   await login(page, 'admin@demo.vela')
   await expect(page.getByRole('heading', { name: '欢迎，Finalist Admin' })).toBeVisible()
-  await expect(page.getByText('系统管理员')).toBeVisible()
+  await expect(page.getByRole('banner').getByText('系统管理员')).toBeVisible()
   await page.goto(`/scenarios/${scenarioId}/delivery-assurance`)
   await expect(page.getByRole('heading', { name: '客户交付证据台' })).toBeVisible()
   await expect(page.getByRole('heading', { name: '创建限时客户交付 release' })).toBeVisible()
