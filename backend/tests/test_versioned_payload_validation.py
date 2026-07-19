@@ -6,6 +6,10 @@ recompute the matching hashes. Structural validation at the gate boundary must
 still fail closed with 422 + stable reason codes — never an uncaught 500.
 """
 
+# Pytest intentionally injects the imported shared fixture through same-name
+# test parameters; Ruff otherwise reports those parameters as F811 shadows.
+# ruff: noqa: F811
+
 from __future__ import annotations
 
 import json
@@ -14,7 +18,7 @@ from dataclasses import replace
 import pytest
 from sqlalchemy import update
 
-from app.models.mechanism import ClaimCompilation, CoverageProof
+from app.models.mechanism import ClaimCompilation, ClaimRecord, CoverageProof
 from app.models.scenario import ComplianceChecklist
 from app.schemas.mechanism import ClaimCompileRequest
 from app.services import mechanism_service
@@ -29,7 +33,7 @@ from app.services.versioned.registry import (
     validate_registry_configuration,
 )
 
-from test_versioned_goldens import golden_state  # noqa: F401, F811  (shared fixture)
+from test_versioned_goldens import golden_state  # noqa: F401
 from test_versioned_registry import _prepare_gate_state  # noqa: F401
 
 
@@ -59,6 +63,12 @@ def _set_proof(db, scenario_id: int, **values) -> None:
     db.expire_all()
 
 
+def _set_claim(db, claim_id: str, **values) -> None:
+    db.execute(update(ClaimRecord).where(ClaimRecord.id == claim_id).values(**values))
+    db.flush()
+    db.expire_all()
+
+
 # --- compiler snapshot structure --------------------------------------------
 
 
@@ -84,6 +94,20 @@ def test_input_snapshot_as_list_with_matching_hash_is_422(golden_state) -> None:
         [{"checklist_code": "ENV-001"}],
         [{"checklist_code": 7, "statement": "x"}],
         [{"checklist_code": "ENV-001", "statement": "x", "fact_refs": "not-a-list"}],
+        [
+            {
+                "checklist_code": "ENV-001",
+                "statement": "x",
+                "fact_refs": [{"bad": "ref"}],
+            }
+        ],
+        [
+            {
+                "checklist_code": "ENV-001",
+                "statement": "x",
+                "evidence_refs": [["bad"]],
+            }
+        ],
     ],
 )
 def test_malformed_drafts_with_recomputed_hash_are_422(golden_state, bad_drafts) -> None:
@@ -116,6 +140,42 @@ def test_corrupt_current_checklist_payload_is_422(golden_state) -> None:
     error = _gate_error(db, golden_state["scenario"])
     assert error.http_status == 422
     assert error.reason_codes == ("compiler_current_payload_invalid",)
+
+
+# --- claim record JSON structure --------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("field", "bad_value"),
+    [
+        ("fact_refs", 7),
+        ("evidence_refs", "not-a-list"),
+        ("reason_codes", {"bad": "shape"}),
+        ("reason_codes", None),
+        ("fact_refs", [{"bad": "ref"}]),
+        ("evidence_refs", [7]),
+        ("reason_codes", [{"bad": "reason"}]),
+    ],
+)
+def test_malformed_claim_json_is_422(golden_state, field, bad_value) -> None:
+    _prepare_gate_state(golden_state)
+    db = golden_state["db"]
+    claim = next(c for c in golden_state["claims"] if c.checklist_code == "TAX-001")
+    _set_claim(db, claim.id, **{field: bad_value})
+    error = _gate_error(db, golden_state["scenario"])
+    assert error.http_status == 422
+    assert error.reason_codes == ("claim_record_json_invalid:TAX-001",)
+
+
+def test_supported_claim_invalid_evidence_refs_fails_before_disclosure(golden_state) -> None:
+    _prepare_gate_state(golden_state)
+    db = golden_state["db"]
+    claim = next(c for c in golden_state["claims"] if c.checklist_code == "ENV-001")
+    assert db.get(ClaimRecord, claim.id).status == "supported"
+    _set_claim(db, claim.id, evidence_refs=7)
+    error = _gate_error(db, golden_state["scenario"])
+    assert error.http_status == 422
+    assert error.reason_codes == ("claim_record_json_invalid:ENV-001",)
 
 
 # --- coverage proof structure ------------------------------------------------
@@ -153,6 +213,11 @@ def test_numeric_proof_schema_version_is_422(golden_state) -> None:
         lambda body: body.__setitem__("covered_checklist_codes", "ENV-001"),
         lambda body: body.__setitem__(
             "uncovered", [{"checklist_code": "X", "status": 5, "unanswerable_reasons": []}]
+        ),
+        lambda body: body["denominator"][0].pop("statement"),
+        lambda body: body.__setitem__("covered_checklist_codes", [{"bad": "code"}]),
+        lambda body: body["uncovered"][0].__setitem__(
+            "unanswerable_reasons", [{"bad": "reason"}]
         ),
     ],
 )

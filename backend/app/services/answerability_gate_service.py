@@ -95,9 +95,29 @@ def _drafts_structure_ok(drafts: list[Any]) -> bool:
         for key in ("fact_refs", "evidence_refs"):
             value = draft.get(key)
             # Historical semantics treat a missing/None value as empty.
-            if value is not None and not isinstance(value, list):
+            if value is not None and (
+                not isinstance(value, list)
+                or any(not isinstance(ref, str) for ref in value)
+            ):
                 return False
     return True
+
+
+def _string_list(value: Any) -> bool:
+    return isinstance(value, list) and all(isinstance(item, str) for item in value)
+
+
+def _claim_record_json_error(claim: ClaimRecord) -> str | None:
+    """Return a stable reason when persisted Claim JSON is not list[str]."""
+
+    if all(
+        _string_list(value)
+        for value in (claim.fact_refs, claim.evidence_refs, claim.reason_codes)
+    ):
+        return None
+    code = claim.checklist_code
+    safe_code = code if isinstance(code, str) and code.strip() else "unknown"
+    return f"claim_record_json_invalid:{safe_code}"
 
 
 def _items_structure_ok(items: Any) -> bool:
@@ -158,7 +178,14 @@ def _coverage_proof_body_structure_ok(body: dict[str, Any]) -> bool:
         return False
     if not isinstance(uncovered, list):
         return False
-    if any(not isinstance(entry, dict) for entry in denominator):
+    for entry in denominator:
+        if not isinstance(entry, dict):
+            return False
+        if not isinstance(entry.get("checklist_code"), str):
+            return False
+        if not isinstance(entry.get("statement"), str):
+            return False
+    if any(not isinstance(code, str) for code in covered):
         return False
     for item in uncovered:
         if not isinstance(item, dict):
@@ -167,7 +194,7 @@ def _coverage_proof_body_structure_ok(body: dict[str, Any]) -> bool:
             return False
         if not isinstance(item.get("status"), str):
             return False
-        if not isinstance(item.get("unanswerable_reasons"), list):
+        if not _string_list(item.get("unanswerable_reasons")):
             return False
     return True
 
@@ -266,6 +293,17 @@ def _assert_compiler_integrity(
         facts=current_snapshot["facts"],
         evidence=current_snapshot["evidence"],
     )
+    invalid_claim_json = [
+        reason
+        for claim in claims
+        if (reason := _claim_record_json_error(claim)) is not None
+    ]
+    if invalid_claim_json:
+        raise _integrity_error(
+            "Claim 记录的引用或原因字段结构非法，禁止交付。",
+            invalid_claim_json,
+            compilation=compilation,
+        )
     if reader.hash_payload(expected_values) != compilation.output_hash:
         reasons.append("compiler_output_hash_invalid")
     if compilation.denominator_count != len(expected_values) or len(claims) != len(expected_values):
