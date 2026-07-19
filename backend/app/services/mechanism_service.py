@@ -651,16 +651,26 @@ def build_coverage_proof_body(
     scenario_id: int,
     compilation: ClaimCompilation,
     claims: list[ClaimRecord],
+    research_items: list[ResearchItem] | None,
     denominator_ref: str,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Build the CoverageProof body (current write version)."""
 
-    return versioned_registry.current_coverage_proof_writer().build_proof_body(
-        scenario_id=scenario_id,
-        compilation=compilation,
-        claims=claims,
-        denominator_ref=denominator_ref,
-    )
+    try:
+        writer = versioned_registry.coverage_proof_writer_for_compiler(
+            compilation.compiler_version
+        )
+    except versioned_registry.UnsupportedCombinationError as exc:
+        raise MechanismValidationError(str(exc)) from exc
+    kwargs = {
+        "scenario_id": scenario_id,
+        "compilation": compilation,
+        "claims": claims,
+        "denominator_ref": denominator_ref,
+    }
+    if writer.requires_research_items:
+        kwargs["research_items"] = list(research_items or [])
+    return writer.build_proof_body(**kwargs)
 
 
 def create_coverage_proof(
@@ -674,26 +684,48 @@ def create_coverage_proof(
 ) -> CoverageProof:
     if compilation.scenario_id != scenario.id:
         raise MechanismValidationError("Claim compilation 与场景不匹配")
+    try:
+        writer = versioned_registry.coverage_proof_writer_for_compiler(
+            compilation.compiler_version
+        )
+    except versioned_registry.UnsupportedCombinationError as exc:
+        raise MechanismValidationError(str(exc)) from exc
+    research_items = (
+        compilation_research_items(db, compilation.id)
+        if writer.requires_research_items
+        else []
+    )
     denominator, proof_body = build_coverage_proof_body(
         scenario_id=scenario.id,
         compilation=compilation,
         claims=claims,
+        research_items=research_items,
         denominator_ref=denominator_ref,
     )
     covered = list(proof_body["covered_checklist_codes"])
     uncovered = list(proof_body["uncovered"])
+    counts = (
+        writer.stored_counts(proof_body)
+        if writer.stored_counts is not None
+        else (
+            len(denominator),
+            len(covered),
+            len(uncovered),
+            sum(1 for item in uncovered if item.get("status") == "refused"),
+        )
+    )
     proof = CoverageProof(
         id=str(uuid4()),
         scenario_id=scenario.id,
         compilation_id=compilation.id,
         denominator_ref=denominator_ref.strip(),
-        denominator_hash=versioned_registry.current_coverage_proof_writer().hash_payload(denominator),
-        denominator_count=len(denominator),
-        covered_count=len(covered),
-        uncovered_count=len(uncovered),
-        unanswerable_count=sum(1 for claim in claims if claim.status == "refused"),
+        denominator_hash=writer.hash_payload(denominator),
+        denominator_count=counts[0],
+        covered_count=counts[1],
+        uncovered_count=counts[2],
+        unanswerable_count=counts[3],
         proof=proof_body,
-        proof_hash=versioned_registry.current_coverage_proof_writer().hash_payload(proof_body),
+        proof_hash=writer.hash_payload(proof_body),
         created_by=user.id,
     )
     db.add(proof)

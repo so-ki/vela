@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from app.services.versioned.claim_compiler import v0_2 as claim_compiler_v0_2
 from app.services.versioned.claim_compiler import v0_3 as claim_compiler_v0_3
 from app.services.versioned.coverage_proof import v0_1 as coverage_proof_v0_1
+from app.services.versioned.coverage_proof import v0_2 as coverage_proof_v0_2
 from app.services.versioned.delivery_release import v1_1 as delivery_release_v1_1
 from app.services.versioned.delivery_snapshot import v1_0 as delivery_snapshot_v1_0
 
@@ -54,8 +55,8 @@ class VersionedRegistryConfigurationError(VersionedRegistryError):
     """The registry itself is misconfigured; refuse to operate, never repair."""
 
 
-CURRENT_COMPILER_WRITE_VERSION = "0.2"
-CURRENT_COVERAGE_PROOF_WRITE_VERSION = "0.1"
+CURRENT_COMPILER_WRITE_VERSION = "0.3"
+CURRENT_COVERAGE_PROOF_WRITE_VERSION = "0.2"
 CURRENT_DELIVERY_SNAPSHOT_WRITE_VERSION = "1.0"
 CURRENT_DELIVERY_RELEASE_WRITE_VERSION = "1.1"
 
@@ -137,6 +138,9 @@ class CoverageProofReader:
     version: str
     build_proof_body: Callable[..., tuple[list[dict[str, Any]], dict[str, Any]]]
     hash_payload: Callable[[Any], str]
+    requires_research_items: bool = False
+    validate_body_structure: Callable[[dict[str, Any]], bool] | None = None
+    stored_counts: Callable[[dict[str, Any]], tuple[int, int, int, int]] | None = None
 
 
 _COVERAGE_PROOF_V0_1 = CoverageProofReader(
@@ -145,11 +149,21 @@ _COVERAGE_PROOF_V0_1 = CoverageProofReader(
     hash_payload=coverage_proof_v0_1.hash_payload,
 )
 
+_COVERAGE_PROOF_V0_2 = CoverageProofReader(
+    version=coverage_proof_v0_2.VERSION,
+    build_proof_body=coverage_proof_v0_2.build_proof_body,
+    hash_payload=coverage_proof_v0_2.hash_payload,
+    requires_research_items=True,
+    validate_body_structure=coverage_proof_v0_2.validate_body_structure,
+    stored_counts=coverage_proof_v0_2.stored_counts,
+)
+
 
 SUPPORTED_COVERAGE_PROOF_READERS: Mapping[str, CoverageProofReader] = build_unique_version_map(
     "coverage_proof",
     (
         ("0.1", _COVERAGE_PROOF_V0_1),
+        ("0.2", _COVERAGE_PROOF_V0_2),
     ),
 )
 
@@ -173,6 +187,7 @@ SUPPORTED_COMPILER_PROOF_COMBINATIONS: frozenset[tuple[str, str]] = (
     build_unique_combination_set(
         (
             ("0.2", "0.1"),
+            ("0.3", "0.2"),
         )
     )
 )
@@ -201,6 +216,26 @@ def require_supported_combination(
 
 def current_coverage_proof_writer() -> CoverageProofReader:
     return get_coverage_reader(CURRENT_COVERAGE_PROOF_WRITE_VERSION)
+
+
+def coverage_proof_writer_for_compiler(compiler_version: str) -> CoverageProofReader:
+    """Choose the unique explicitly compatible writer for a compilation.
+
+    This is write routing only. Persisted proofs are always read by their own
+    schema identity and never use this helper.
+    """
+
+    current = current_coverage_proof_writer()
+    if (compiler_version, current.version) in SUPPORTED_COMPILER_PROOF_COMBINATIONS:
+        return current
+    compatible = sorted(
+        proof
+        for compiler, proof in SUPPORTED_COMPILER_PROOF_COMBINATIONS
+        if compiler == compiler_version
+    )
+    if len(compatible) != 1:
+        raise UnsupportedCombinationError(compiler_version, current.version)
+    return get_coverage_reader(compatible[0])
 
 
 @dataclass(frozen=True)
@@ -278,7 +313,10 @@ def current_delivery_release_writer() -> DeliveryReleaseReader:
 
 
 SUPPORTED_DELIVERY_COMBINATIONS: frozenset[tuple[str, str, str, str]] = frozenset(
-    {("0.2", "0.1", "1.0", "1.1")}
+    {
+        ("0.2", "0.1", "1.0", "1.1"),
+        ("0.3", "0.2", "1.0", "1.1"),
+    }
 )
 
 

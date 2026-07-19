@@ -333,11 +333,12 @@ def test_production_registry_configuration_is_self_consistent() -> None:
 def test_compile_claims_persists_writer_version_not_module_constant(
     golden_state, monkeypatch
 ) -> None:
-    """The persisted identity must come from writer.version — never from a
-    copied constant. The synthetic 0.3 writer reuses the frozen 0.2 behavior
-    and is NOT added to the production registry."""
+    """The persisted identity must come from writer.version -- never from a
+    copied constant. The synthetic 0.4 writer reuses frozen 0.2 behavior."""
 
-    synthetic_writer = replace(versioned_registry.current_compiler_writer(), version="0.3")
+    synthetic_writer = replace(
+        versioned_registry.get_compiler_reader("0.2"), version="0.4"
+    )
     monkeypatch.setattr(
         versioned_registry, "current_compiler_writer", lambda: synthetic_writer
     )
@@ -346,7 +347,7 @@ def test_compile_claims_persists_writer_version_not_module_constant(
     compilation, _claims = mechanism_service.compile_claims(
         db, scenario=golden_state["scenario"], request=request, user=golden_state["legal"]
     )
-    assert compilation.compiler_version == "0.3"
+    assert compilation.compiler_version == "0.4"
     assert compilation.compiler_version != mechanism_service.COMPILER_VERSION
     assert compilation.input_hash == synthetic_writer.hash_payload(compilation.input_snapshot)
     expected_values = synthetic_writer.build_claim_values(

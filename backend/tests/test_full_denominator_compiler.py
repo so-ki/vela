@@ -16,8 +16,11 @@ from app.services.generation_guard import stable_hash
 from app.services.mechanism_service import (
     MechanismValidationError,
     compilation_research_items,
+    confirm_claim,
     compile_claims,
+    create_coverage_proof,
 )
+from app.services.answerability_gate_service import require_delivery_answerability
 from app.services.versioned import registry as versioned_registry
 
 
@@ -272,3 +275,118 @@ def test_compiler_03_input_hash_changes_when_formal_fact_changes(compiler_db) ->
     )
     assert first.input_hash != second.input_hash
     assert first.output_hash == second.output_hash
+
+
+def test_coverage_proof_02_counts_all_dispositions_and_keeps_pack_total_30(
+    compiler_db,
+) -> None:
+    db, scenario, business, legal = compiler_db
+    supporting_fact = FactRecord(
+        id="fact-site-supported",
+        scenario_id=scenario.id,
+        subject="project",
+        attribute="site",
+        value="Campinas",
+        assertion_polarity="affirmative",
+        fact_time="2026-07-19",
+        block_id="upload:4",
+        fact_pack_version="facts-v1",
+        status="business_confirmed",
+        confirmation_note="confirmed by business",
+        business_confirmed_by=business.id,
+        created_by=business.id,
+    )
+    negative_fact = FactRecord(
+        id="fact-no-suppression-system",
+        scenario_id=scenario.id,
+        subject="project",
+        attribute="special_suppression_system",
+        value="No special suppression system is planned",
+        assertion_polarity="negative",
+        fact_time="2026-07-19",
+        block_id="upload:5",
+        fact_pack_version="facts-v1",
+        status="business_confirmed",
+        confirmation_note="negative fact confirmed by business",
+        business_confirmed_by=business.id,
+        created_by=business.id,
+    )
+    db.add_all([supporting_fact, negative_fact])
+    db.flush()
+    compilation, claims = compile_claims(
+        db,
+        scenario=scenario,
+        request=ClaimCompileRequest(
+            drafts=[
+                {
+                    "checklist_code": "ENV-001",
+                    "statement": "The project requires the scoped environmental licensing review.",
+                    "fact_refs": [supporting_fact.id],
+                    "evidence_refs": ["ENV-001:law-1"],
+                }
+            ],
+            research_decisions=[
+                {
+                    "checklist_code": "ENV-002",
+                    "disposition": "not_applicable",
+                    "negative_fact_refs": [negative_fact.id],
+                    "confirmation_note": "Legal confirmed non-applicability from the negative fact.",
+                },
+                {
+                    "checklist_code": "ENV-003",
+                    "disposition": "rejected",
+                    "reason_codes": ["legal_scope_rejected"],
+                    "confirmation_note": "Legal rejected this proposed conclusion.",
+                },
+                {
+                    "checklist_code": "ENV-004",
+                    "disposition": "unanswerable",
+                    "reason_codes": ["official_source_missing"],
+                    "confirmation_note": "Legal recorded the current evidence gap.",
+                },
+            ],
+        ),
+        user=legal,
+    )
+    confirm_claim(
+        db,
+        claim=claims[0],
+        decision="confirmed",
+        confirmation_note="Legal confirmed the bounded claim.",
+        user=legal,
+    )
+    proof = create_coverage_proof(
+        db,
+        scenario=scenario,
+        compilation=compilation,
+        claims=claims,
+        denominator_ref="capability-pack:fixed-30",
+        user=legal,
+    )
+    body = proof.proof
+    assert body["schema_version"] == "0.2"
+    assert body["pack_total"] == proof.denominator_count == 30
+    assert body["scope_total"] == 4
+    assert body["out_of_scope_by_scope_count"] == 26
+    assert body["supported_count"] == proof.covered_count == 1
+    assert body["not_applicable_count"] == 1
+    assert body["rejected_count"] == 1
+    assert body["unanswerable_count"] == proof.unanswerable_count == 1
+    assert body["uncovered_count"] == 0
+    assert proof.uncovered_count == 3
+    assert body["pack_total"] == (
+        body["scope_total"] + body["out_of_scope_by_scope_count"]
+    )
+    assert body["scope_total"] == sum(
+        body[key]
+        for key in (
+            "supported_count",
+            "not_applicable_count",
+            "rejected_count",
+            "unanswerable_count",
+            "uncovered_count",
+        )
+    )
+    gate = require_delivery_answerability(db, scenario=scenario)
+    assert gate["decision"] == "passed"
+    assert gate["compiler_version"] == "0.3"

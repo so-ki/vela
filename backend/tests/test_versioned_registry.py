@@ -73,7 +73,7 @@ def test_canonical_hash_v1_reproduces_all_golden_hashes() -> None:
 def test_registry_contains_required_historical_entries() -> None:
     assert "0.2" in versioned_registry.SUPPORTED_COMPILER_READERS
     assert "0.3" in versioned_registry.SUPPORTED_COMPILER_READERS
-    assert versioned_registry.CURRENT_COMPILER_WRITE_VERSION == "0.2"
+    assert versioned_registry.CURRENT_COMPILER_WRITE_VERSION == "0.3"
     reader = get_compiler_reader("0.2")
     assert reader.version == "0.2"
 
@@ -86,6 +86,9 @@ def test_delivery_registry_contains_frozen_snapshot_and_release_readers() -> Non
     assert snapshot_reader.version == snapshot_reader.gate_version == "1.0"
     assert release_reader.version == "1.1"
     assert ("0.2", "0.1", "1.0", "1.1") in (
+        versioned_registry.SUPPORTED_DELIVERY_COMBINATIONS
+    )
+    assert ("0.3", "0.2", "1.0", "1.1") in (
         versioned_registry.SUPPORTED_DELIVERY_COMBINATIONS
     )
     versioned_registry.validate_delivery_registry_configuration()
@@ -218,8 +221,10 @@ def test_existing_stale_and_tamper_codes_unchanged(_golden_state_fixture) -> Non
 
 def test_proof_registry_and_combination_matrix_minimum_entries() -> None:
     assert "0.1" in versioned_registry.SUPPORTED_COVERAGE_PROOF_READERS
-    assert versioned_registry.CURRENT_COVERAGE_PROOF_WRITE_VERSION == "0.1"
+    assert "0.2" in versioned_registry.SUPPORTED_COVERAGE_PROOF_READERS
+    assert versioned_registry.CURRENT_COVERAGE_PROOF_WRITE_VERSION == "0.2"
     assert ("0.2", "0.1") in versioned_registry.SUPPORTED_COMPILER_PROOF_COMBINATIONS
+    assert ("0.3", "0.2") in versioned_registry.SUPPORTED_COMPILER_PROOF_COMBINATIONS
     reader = versioned_registry.get_coverage_reader("0.1")
     assert reader.version == "0.1"
 

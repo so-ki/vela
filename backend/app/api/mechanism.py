@@ -499,14 +499,18 @@ def post_coverage_proof(
         if result is None:
             raise HTTPException(status_code=409, detail="请先编译 Claim")
         compilation, claims = result
-    proof = create_coverage_proof(
-        db,
-        scenario=scenario,
-        compilation=compilation,
-        claims=claims,
-        denominator_ref=body.denominator_ref,
-        user=current_user,
-    )
+    try:
+        proof = create_coverage_proof(
+            db,
+            scenario=scenario,
+            compilation=compilation,
+            claims=claims,
+            denominator_ref=body.denominator_ref,
+            user=current_user,
+        )
+    except MechanismValidationError as exc:
+        db.rollback()
+        _raise_service_error(exc)
     write_audit_log(
         db,
         user=current_user,

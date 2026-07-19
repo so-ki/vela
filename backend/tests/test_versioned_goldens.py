@@ -70,6 +70,16 @@ def golden_state(tmp_path: Path, monkeypatch):
 
     compiler_golden = _load("compiler_v0_2.json")
     inputs = compiler_golden["inputs"]
+    monkeypatch.setattr(
+        mechanism_service.versioned_registry,
+        "CURRENT_COMPILER_WRITE_VERSION",
+        "0.2",
+    )
+    monkeypatch.setattr(
+        mechanism_service.versioned_registry,
+        "CURRENT_COVERAGE_PROOF_WRITE_VERSION",
+        "0.1",
+    )
     monkeypatch.setattr(mechanism_service, "uuid4", _UuidSeq())
 
     engine = create_engine(

@@ -23,7 +23,13 @@ from app.services.generation_guard import stable_hash
 
 
 @pytest.fixture()
-def db_factory(tmp_path: Path):
+def db_factory(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from app.services.versioned import registry as versioned_registry
+
+    monkeypatch.setattr(versioned_registry, "CURRENT_COMPILER_WRITE_VERSION", "0.2")
+    monkeypatch.setattr(
+        versioned_registry, "CURRENT_COVERAGE_PROOF_WRITE_VERSION", "0.1"
+    )
     engine = create_engine(
         f"sqlite:///{tmp_path / 'mechanism.db'}",
         connect_args={"check_same_thread": False},

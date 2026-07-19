@@ -12,9 +12,10 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models.mechanism import ClaimCompilation, ClaimRecord, CoverageProof
+from app.models.mechanism import ClaimCompilation, ClaimRecord, CoverageProof, ResearchItem
 from app.models.scenario import InvestigationScenario
 from app.services.mechanism_service import (
+    compilation_research_items,
     latest_compilation,
     latest_coverage_proof,
 )
@@ -104,6 +105,28 @@ def _drafts_structure_ok(drafts: list[Any]) -> bool:
     return True
 
 
+def _research_decisions_structure_ok(decisions: list[Any]) -> bool:
+    for decision in decisions:
+        if not isinstance(decision, dict):
+            return False
+        if not isinstance(decision.get("checklist_code"), str):
+            return False
+        if decision.get("disposition") not in {
+            "not_applicable",
+            "rejected",
+            "unanswerable",
+            "uncovered",
+        }:
+            return False
+        if not isinstance(decision.get("confirmation_note"), str):
+            return False
+        if not _string_list(decision.get("negative_fact_refs")):
+            return False
+        if not _string_list(decision.get("reason_codes")):
+            return False
+    return True
+
+
 def _string_list(value: Any) -> bool:
     return isinstance(value, list) and all(isinstance(item, str) for item in value)
 
@@ -119,6 +142,108 @@ def _claim_record_json_error(claim: ClaimRecord) -> str | None:
     code = claim.checklist_code
     safe_code = code if isinstance(code, str) and code.strip() else "unknown"
     return f"claim_record_json_invalid:{safe_code}"
+
+
+def _research_record_json_error(item: ResearchItem) -> str | None:
+    if all(
+        _string_list(value)
+        for value in (item.missing_facts, item.reason_codes, item.negative_fact_refs)
+    ):
+        return None
+    code = item.checklist_code if isinstance(item.checklist_code, str) else "unknown"
+    return f"research_item_json_invalid:{code}"
+
+
+def _research_integrity_reasons(
+    *,
+    compilation: ClaimCompilation,
+    claims: list[ClaimRecord],
+    research_items: list[ResearchItem],
+    expected_values: list[dict[str, Any]],
+) -> list[str]:
+    reasons: list[str] = []
+    invalid_json = [
+        reason
+        for item in research_items
+        if (reason := _research_record_json_error(item)) is not None
+    ]
+    reasons.extend(invalid_json)
+    by_code = {item.checklist_code: item for item in research_items}
+    if len(by_code) != len(research_items):
+        reasons.append("duplicate_research_item_code")
+    claim_by_code = {claim.checklist_code: claim for claim in claims}
+    expected_by_code = {value["checklist_code"]: value for value in expected_values}
+    if len(research_items) != len(expected_values):
+        reasons.append("research_denominator_mismatch")
+    facts = compilation.input_snapshot.get("facts") or {}
+    for code, expected in expected_by_code.items():
+        item = by_code.get(code)
+        if item is None:
+            reasons.append(f"research_item_missing:{code}")
+            continue
+        for field in (
+            "denominator_order",
+            "title",
+            "dimension",
+            "scope_status",
+            "screening_status",
+            "compiler_version",
+            "item_hash",
+        ):
+            if getattr(item, field) != expected[field]:
+                reasons.append(f"research_item_{field}_tampered:{code}")
+        claim = claim_by_code.get(code)
+        expected_claim_id = claim.id if claim is not None else None
+        if item.linked_claim_id != expected_claim_id:
+            reasons.append(f"research_item_claim_binding_invalid:{code}")
+        if item.scope_status == "out_of_scope_by_scope":
+            if item.disposition is not None or item.research_status != "out_of_scope":
+                reasons.append(f"out_of_scope_disposition_invalid:{code}")
+            continue
+        if item.disposition not in {
+            "supported",
+            "not_applicable",
+            "rejected",
+            "unanswerable",
+            "uncovered",
+        }:
+            reasons.append(f"research_disposition_invalid:{code}")
+            continue
+        if claim is None and item.disposition == "supported":
+            reasons.append(f"supported_research_claim_missing:{code}")
+        if claim is not None:
+            if claim.status == "supported" and item.disposition != "supported":
+                reasons.append(f"supported_claim_research_mismatch:{code}")
+            elif claim.status == "awaiting_human_confirmation" and (
+                item.disposition != "uncovered" or item.research_status != "claim_pending"
+            ):
+                reasons.append(f"pending_claim_research_mismatch:{code}")
+            elif claim.status == "refused":
+                expected_disposition = (
+                    "rejected"
+                    if list(claim.reason_codes or []) == ["human_rejected"]
+                    else "unanswerable"
+                )
+                if item.disposition != expected_disposition:
+                    reasons.append(f"refused_claim_research_mismatch:{code}")
+        if item.disposition in {"supported", "not_applicable", "rejected"} and (
+            not item.legal_confirmed_by
+            or not item.legal_confirmed_at
+            or not (item.legal_confirmation_note or "").strip()
+        ):
+            reasons.append(f"research_legal_confirmation_missing:{code}")
+        if item.disposition == "not_applicable":
+            if not item.negative_fact_refs:
+                reasons.append(f"not_applicable_negative_fact_missing:{code}")
+            for ref in item.negative_fact_refs:
+                fact = facts.get(ref) if isinstance(facts, dict) else None
+                if (
+                    not isinstance(fact, dict)
+                    or not fact.get("verified")
+                    or fact.get("assertion_polarity") != "negative"
+                ):
+                    reasons.append(f"not_applicable_negative_fact_invalid:{code}:{ref}")
+    return reasons
 
 
 def _items_structure_ok(items: Any) -> bool:
@@ -259,6 +384,15 @@ def _assert_compiler_integrity(
     elif not _drafts_structure_ok(drafts):
         reasons.append("compiler_input_snapshot_invalid")
         drafts = []
+    research_decisions = stored_snapshot.get("research_decisions", [])
+    if reader.build_research_values is not None:
+        if not isinstance(research_decisions, list) or not _research_decisions_structure_ok(
+            research_decisions
+        ):
+            reasons.append("compiler_input_snapshot_invalid")
+            research_decisions = []
+    elif research_decisions not in (None, []):
+        reasons.append("compiler_input_snapshot_invalid")
     if reasons:
         raise _integrity_error(
             "Claim compilation 输入快照完整性校验失败，禁止交付。",
@@ -272,11 +406,17 @@ def _assert_compiler_integrity(
             ["compiler_current_payload_invalid"],
             compilation=compilation,
         )
-    current_snapshot = reader.build_input_snapshot(
-        db,
-        scenario=scenario,
-        drafts=drafts,
-    )
+    snapshot_kwargs = {"scenario": scenario, "drafts": drafts}
+    if reader.build_research_values is not None:
+        snapshot_kwargs["research_decisions"] = research_decisions
+    try:
+        current_snapshot = reader.build_input_snapshot(db, **snapshot_kwargs)
+    except ValueError as exc:
+        raise _integrity_error(
+            f"当前冻结 Pack 分母无法由持久版本重建：{exc}",
+            ["compiler_current_denominator_invalid"],
+            compilation=compilation,
+        ) from exc
     if reader.hash_payload(current_snapshot) != compilation.input_hash:
         raise _conflict_error(
             (
@@ -287,7 +427,13 @@ def _assert_compiler_integrity(
             compilation=compilation,
         )
 
-    items = reader.checklist_items(scenario.checklist.payload if scenario.checklist else {})
+    items = (
+        reader.build_denominator(scenario=scenario)
+        if reader.build_denominator is not None
+        else reader.checklist_items(
+            scenario.checklist.payload if scenario.checklist else {}
+        )
+    )
     expected_values = reader.build_claim_values(
         items,
         drafts=drafts,
@@ -305,10 +451,38 @@ def _assert_compiler_integrity(
             invalid_claim_json,
             compilation=compilation,
         )
-    if reader.hash_payload(expected_values) != compilation.output_hash:
+    if reader.build_research_values is not None:
+        expected_research_values = reader.build_research_values(
+            items,
+            claim_values=expected_values,
+            research_decisions=research_decisions,
+        )
+        expected_output = reader.build_output_payload(
+            claim_values=expected_values,
+            research_values=expected_research_values,
+        )
+        research_items = compilation_research_items(db, compilation.id)
+        reasons.extend(
+            _research_integrity_reasons(
+                compilation=compilation,
+                claims=claims,
+                research_items=research_items,
+                expected_values=expected_research_values,
+            )
+        )
+        if compilation.denominator_count != len(expected_research_values):
+            reasons.append("research_denominator_mismatch")
+        if len(claims) != len(expected_values):
+            reasons.append("claim_count_mismatch")
+    else:
+        expected_output = expected_values
+        if (
+            compilation.denominator_count != len(expected_values)
+            or len(claims) != len(expected_values)
+        ):
+            reasons.append("claim_denominator_mismatch")
+    if reader.hash_payload(expected_output) != compilation.output_hash:
         reasons.append("compiler_output_hash_invalid")
-    if compilation.denominator_count != len(expected_values) or len(claims) != len(expected_values):
-        reasons.append("claim_denominator_mismatch")
 
     claims_by_code = {claim.checklist_code: claim for claim in claims}
     if len(claims_by_code) != len(claims):
@@ -347,6 +521,7 @@ def _assert_compiler_integrity(
 
 
 def _assert_coverage_integrity(
+    db: Session,
     *,
     scenario: InvestigationScenario,
     compilation: ClaimCompilation,
@@ -399,7 +574,10 @@ def _assert_coverage_integrity(
             proof=proof,
         ) from None
 
-    if not _coverage_proof_body_structure_ok(stored_body):
+    if not _coverage_proof_body_structure_ok(stored_body) or (
+        proof_reader.validate_body_structure is not None
+        and not proof_reader.validate_body_structure(stored_body)
+    ):
         raise _integrity_error(
             "CoverageProof 存储体结构非法，禁止交付。",
             ["coverage_proof_body_invalid"],
@@ -415,10 +593,14 @@ def _assert_coverage_integrity(
     if proof.denominator_hash != proof_reader.hash_payload(stored_denominator):
         integrity_reasons.append("coverage_denominator_hash_invalid")
     stored_counts = (
-        len(stored_denominator),
-        len(stored_body.get("covered_checklist_codes") or []),
-        len(stored_uncovered),
-        sum(1 for item in stored_uncovered if item.get("status") == "refused"),
+        proof_reader.stored_counts(stored_body)
+        if proof_reader.stored_counts is not None
+        else (
+            len(stored_denominator),
+            len(stored_body.get("covered_checklist_codes") or []),
+            len(stored_uncovered),
+            sum(1 for item in stored_uncovered if item.get("status") == "refused"),
+        )
     )
     actual_counts = (
         proof.denominator_count,
@@ -444,12 +626,17 @@ def _assert_coverage_integrity(
             proof=proof,
         )
 
-    denominator, expected_body = proof_reader.build_proof_body(
-        scenario_id=scenario.id,
-        compilation=compilation,
-        claims=claims,
-        denominator_ref=proof.denominator_ref,
-    )
+    proof_kwargs = {
+        "scenario_id": scenario.id,
+        "compilation": compilation,
+        "claims": claims,
+        "denominator_ref": proof.denominator_ref,
+    }
+    if proof_reader.requires_research_items:
+        proof_kwargs["research_items"] = compilation_research_items(
+            db, compilation.id
+        )
+    denominator, expected_body = proof_reader.build_proof_body(**proof_kwargs)
     expected_hash = proof_reader.hash_payload(expected_body)
     if (
         proof.proof != expected_body
@@ -497,6 +684,7 @@ def require_delivery_answerability(
             compilation=compilation,
         )
     _assert_coverage_integrity(
+        db,
         scenario=scenario,
         compilation=compilation,
         claims=claims,
