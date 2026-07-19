@@ -162,6 +162,8 @@ def test_backend_image_allowlists_include_versioned_readers() -> None:
         "!app/services/versioned/canonical_hash/*.py",
         "!app/services/versioned/claim_compiler/*.py",
         "!app/services/versioned/coverage_proof/*.py",
+        "!app/services/versioned/delivery_snapshot/*.py",
+        "!app/services/versioned/delivery_release/*.py",
     ):
         assert needed in dockerignore
     for name in ("docker/Dockerfile.backend", "docker/Dockerfile.backend.prod"):
@@ -173,5 +175,7 @@ def test_backend_image_allowlists_include_versioned_readers() -> None:
         "backend/app/services/versioned/registry.py",
         "backend/app/services/versioned/canonical_hash/v1.py",
         "backend/app/services/versioned/claim_compiler/v0_2.py",
+        "backend/app/services/versioned/delivery_snapshot/v1_0.py",
+        "backend/app/services/versioned/delivery_release/v1_1.py",
     ):
         assert expected in files

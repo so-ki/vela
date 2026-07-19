@@ -36,6 +36,10 @@ app/services/**
 !app/services/versioned/claim_compiler/*.py
 !app/services/versioned/coverage_proof/
 !app/services/versioned/coverage_proof/*.py
+!app/services/versioned/delivery_snapshot/
+!app/services/versioned/delivery_snapshot/*.py
+!app/services/versioned/delivery_release/
+!app/services/versioned/delivery_release/*.py
 !app/rules/
 app/rules/**
 !app/rules/brazil_new_energy.json

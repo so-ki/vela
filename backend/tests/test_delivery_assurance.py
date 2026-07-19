@@ -855,8 +855,65 @@ def test_real_delivery_chain_is_separated_hash_bound_and_fail_closed(
         )
         assert report["delivery_allowed"] is True
         assert report["release_hash"] == release.release_hash
+        assert release.schema_version == "1.1"
+        assert report["release_schema_version"] == "1.1"
         validated_report = DeliveryGateStatusResponse.model_validate(report)
         assert validated_report.schema_version == "1.1"
+
+        db.execute(
+            update(ScenarioDeliveryRelease)
+            .where(ScenarioDeliveryRelease.id == release.id)
+            .values(schema_version="9.9")
+        )
+        db.commit()
+        unknown_release_report = evaluate_delivery_release(
+            db, scenario=scenario, generation_config=_config()
+        )
+        assert unknown_release_report["delivery_allowed"] is False
+        assert "delivery_release_schema_unsupported" in (
+            unknown_release_report["blocking_reasons"]
+        )
+        assert DeliveryGateStatusResponse.model_validate(
+            unknown_release_report
+        ).release_schema_version == "9.9"
+        with pytest.raises(DeliveryGateBlocked) as unsupported_release:
+            require_released_delivery_artifact(
+                db,
+                scenario=scenario,
+                generation_config=_config(),
+                artifact_type="docx",
+            )
+        assert "delivery_release_schema_unsupported" in (
+            unsupported_release.value.report["blocking_reasons"]
+        )
+        db.execute(
+            update(ScenarioDeliveryRelease)
+            .where(ScenarioDeliveryRelease.id == release.id)
+            .values(schema_version="1.1")
+        )
+        db.commit()
+
+        original_attestation_snapshot = attestation.snapshot
+        unsupported_snapshot = json.loads(json.dumps(original_attestation_snapshot))
+        unsupported_snapshot["schema_version"] = "9.9"
+        db.execute(
+            update(ScenarioExpertAttestation)
+            .where(ScenarioExpertAttestation.id == attestation.id)
+            .values(snapshot=unsupported_snapshot)
+        )
+        db.commit()
+        unknown_snapshot_report = evaluate_delivery_release(
+            db, scenario=scenario, generation_config=_config()
+        )
+        assert "delivery_snapshot_schema_unsupported" in (
+            unknown_snapshot_report["blocking_reasons"]
+        )
+        db.execute(
+            update(ScenarioExpertAttestation)
+            .where(ScenarioExpertAttestation.id == attestation.id)
+            .values(snapshot=original_attestation_snapshot)
+        )
+        db.commit()
 
         original_runtime_probe = runtime_probe.content
         db.execute(

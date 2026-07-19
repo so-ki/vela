@@ -14,14 +14,15 @@ from sqlalchemy.orm import Session
 
 from app.models.mechanism import ClaimCompilation, ClaimRecord, CoverageProof
 from app.models.scenario import InvestigationScenario
-from app.services.generation_guard import stable_hash
 from app.services.mechanism_service import (
     latest_compilation,
     latest_coverage_proof,
 )
 from app.services.versioned.registry import (
+    DeliverySnapshotReader,
     UnsupportedCombinationError,
     UnsupportedVersionError,
+    current_delivery_snapshot_writer,
     get_compiler_reader,
     get_coverage_reader,
     require_supported_combination,
@@ -467,6 +468,7 @@ def require_delivery_answerability(
     db: Session,
     *,
     scenario: InvestigationScenario,
+    snapshot_reader: DeliverySnapshotReader | None = None,
 ) -> dict[str, Any]:
     """Validate and return the proof record attached to delivery audit output."""
 
@@ -548,24 +550,18 @@ def require_delivery_answerability(
             != "expert_verified"
         }
     )
-    return {
-        "gate_version": "1.0",
-        "decision": "passed",
-        "compiler_version": compilation.compiler_version,
-        "compilation_id": compilation.id,
-        "compiler_input_hash": compilation.input_hash,
-        "compiler_output_hash": compilation.output_hash,
-        "coverage_proof_id": proof.id,
-        "coverage_proof_hash": proof.proof_hash,
-        "denominator_hash": proof.denominator_hash,
-        "included_conclusion_codes": included_codes,
-        "included_conclusions_hash": stable_hash(
-            [included[code] for code in included_codes]
-        ),
-        "supported_included_count": len(included_codes),
-        "explicitly_unanswerable_count": proof.unanswerable_count,
-        # This is disclosure, never a promotion: only the recorded legal human
-        # decision changes a Claim to supported; corpus status remains intact.
-        "provisional_evidence_refs": provisional_refs,
-        "provisional_evidence_promoted": False,
-    }
+    reader = snapshot_reader or current_delivery_snapshot_writer()
+    return reader.build_gate_payload(
+        compiler_version=compilation.compiler_version,
+        compilation_id=compilation.id,
+        compiler_input_hash=compilation.input_hash,
+        compiler_output_hash=compilation.output_hash,
+        coverage_proof_id=proof.id,
+        coverage_proof_hash=proof.proof_hash,
+        denominator_hash=proof.denominator_hash,
+        included_conclusion_codes=included_codes,
+        included_conclusions=[included[code] for code in included_codes],
+        explicitly_unanswerable_count=proof.unanswerable_count,
+        # Disclosure only; this never promotes evidence or a Claim.
+        provisional_evidence_refs=provisional_refs,
+    )

@@ -1,5 +1,8 @@
 """WS-1C/C3-A: versioned reader registry, canonical hash v1 and gate dispatch."""
 
+# ruff: noqa: F811 -- imported pytest fixture names are intentionally requested
+# again as test parameters in this module.
+
 from __future__ import annotations
 
 import json
@@ -25,7 +28,7 @@ from app.services.versioned.registry import (
     get_compiler_reader,
 )
 
-from test_versioned_goldens import golden_state  # noqa: F401, F811  (shared fixture)
+from test_versioned_goldens import golden_state as _golden_state_fixture  # noqa: F401
 
 GOLDEN_DIR = Path(__file__).parent / "goldens" / "versioned"
 
@@ -74,6 +77,27 @@ def test_registry_contains_required_historical_entries() -> None:
     assert reader.version == "0.2"
 
 
+def test_delivery_registry_contains_frozen_snapshot_and_release_readers() -> None:
+    assert versioned_registry.CURRENT_DELIVERY_SNAPSHOT_WRITE_VERSION == "1.0"
+    assert versioned_registry.CURRENT_DELIVERY_RELEASE_WRITE_VERSION == "1.1"
+    snapshot_reader = versioned_registry.get_delivery_snapshot_reader("1.0")
+    release_reader = versioned_registry.get_delivery_release_reader("1.1")
+    assert snapshot_reader.version == snapshot_reader.gate_version == "1.0"
+    assert release_reader.version == "1.1"
+    assert ("0.2", "0.1", "1.0", "1.1") in (
+        versioned_registry.SUPPORTED_DELIVERY_COMBINATIONS
+    )
+    versioned_registry.validate_delivery_registry_configuration()
+
+
+@pytest.mark.parametrize("bad", ["", "latest", "9.9", None])
+def test_unknown_delivery_versions_never_fall_back(bad) -> None:
+    with pytest.raises(UnsupportedVersionError):
+        versioned_registry.get_delivery_snapshot_reader(bad)
+    with pytest.raises(UnsupportedVersionError):
+        versioned_registry.get_delivery_release_reader(bad)
+
+
 def test_duplicate_version_registration_fails() -> None:
     with pytest.raises(DuplicateVersionError):
         build_unique_version_map("unit", (("0.2", object()), ("0.2", object())))
@@ -103,26 +127,27 @@ def test_current_write_version_not_used_for_reader_selection(monkeypatch) -> Non
 # --- gate dispatch (uses the golden fixture state) ---------------------------
 
 
-def _prepare_gate_state(golden_state) -> None:
-    db = golden_state["db"]
-    env_claim = next(c for c in golden_state["claims"] if c.checklist_code == "ENV-001")
+def _prepare_gate_state(state) -> None:
+    db = state["db"]
+    env_claim = next(c for c in state["claims"] if c.checklist_code == "ENV-001")
     mechanism_service.confirm_claim(
         db, claim=env_claim, decision="confirmed",
-        confirmation_note="confirmed by golden counsel", user=golden_state["legal"],
+        confirmation_note="confirmed by golden counsel", user=state["legal"],
     )
     mechanism_service.create_coverage_proof(
         db,
-        scenario=golden_state["scenario"],
-        compilation=golden_state["compilation"],
-        claims=mechanism_service.compilation_claims(db, golden_state["compilation"].id),
+        scenario=state["scenario"],
+        compilation=state["compilation"],
+        claims=mechanism_service.compilation_claims(db, state["compilation"].id),
         denominator_ref="manual:golden-denominator",
-        user=golden_state["legal"],
+        user=state["legal"],
     )
 
 
 def test_gate_passes_current_versions_and_ignores_future_write_default(
-    golden_state, monkeypatch
+    _golden_state_fixture, monkeypatch
 ) -> None:
+    golden_state = _golden_state_fixture
     _prepare_gate_state(golden_state)
     db = golden_state["db"]
     gate = require_delivery_answerability(db, scenario=golden_state["scenario"])
@@ -135,7 +160,10 @@ def test_gate_passes_current_versions_and_ignores_future_write_default(
     assert gate_again["compiler_version"] == "0.2"
 
 
-def test_unknown_stored_compiler_version_fails_closed_422(golden_state) -> None:
+def test_unknown_stored_compiler_version_fails_closed_422(
+    _golden_state_fixture,
+) -> None:
+    golden_state = _golden_state_fixture
     _prepare_gate_state(golden_state)
     db = golden_state["db"]
     db.execute(
@@ -151,7 +179,8 @@ def test_unknown_stored_compiler_version_fails_closed_422(golden_state) -> None:
     assert exc.value.reason_codes == ("compiler_version_unsupported",)
 
 
-def test_existing_stale_and_tamper_codes_unchanged(golden_state) -> None:
+def test_existing_stale_and_tamper_codes_unchanged(_golden_state_fixture) -> None:
+    golden_state = _golden_state_fixture
     _prepare_gate_state(golden_state)
     db = golden_state["db"]
     scenario = golden_state["scenario"]
@@ -214,7 +243,8 @@ def _tamper_proof_body(db, scenario_id: int, mutate) -> None:
     db.expire_all()
 
 
-def test_missing_proof_schema_version_fails_closed_422(golden_state) -> None:
+def test_missing_proof_schema_version_fails_closed_422(_golden_state_fixture) -> None:
+    golden_state = _golden_state_fixture
     _prepare_gate_state(golden_state)
     db = golden_state["db"]
     _tamper_proof_body(db, 1, lambda body: body.pop("schema_version"))
@@ -224,7 +254,8 @@ def test_missing_proof_schema_version_fails_closed_422(golden_state) -> None:
     assert exc.value.reason_codes == ("coverage_proof_schema_unsupported",)
 
 
-def test_unknown_proof_schema_version_fails_closed_422(golden_state) -> None:
+def test_unknown_proof_schema_version_fails_closed_422(_golden_state_fixture) -> None:
+    golden_state = _golden_state_fixture
     _prepare_gate_state(golden_state)
     db = golden_state["db"]
     _tamper_proof_body(db, 1, lambda body: body.__setitem__("schema_version", "0.9"))
@@ -234,7 +265,8 @@ def test_unknown_proof_schema_version_fails_closed_422(golden_state) -> None:
     assert exc.value.reason_codes == ("coverage_proof_schema_unsupported",)
 
 
-def test_proof_writer_still_writes_0_1(golden_state) -> None:
+def test_proof_writer_still_writes_0_1(_golden_state_fixture) -> None:
+    golden_state = _golden_state_fixture
     _prepare_gate_state(golden_state)
     db = golden_state["db"]
     from app.models.mechanism import CoverageProof

@@ -515,6 +515,7 @@ class DeliveryReleaseResponse(BaseModel):
     expert_attestation_id: str
     uat_acceptance_id: str
     deployment_evidence_id: str
+    schema_version: str
     snapshot_hash: str
     release_hash: str
     release_note: str
@@ -545,6 +546,7 @@ class DeliveryGateStatusResponse(BaseModel):
     snapshot_hash: Optional[str]
     release_id: Optional[str]
     release_hash: Optional[str]
+    release_schema_version: Optional[str]
     expert_attestation_id: Optional[str]
     uat_acceptance_id: Optional[str]
     deployment_evidence_id: Optional[str]

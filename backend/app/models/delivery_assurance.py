@@ -427,6 +427,7 @@ class ScenarioDeliveryRelease(Base):
     deployment_evidence_id: Mapped[str] = mapped_column(
         ForeignKey("deployment_evidence.id"), index=True, nullable=False
     )
+    schema_version: Mapped[str] = mapped_column(String(16), nullable=False)
     snapshot_hash: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
     release_hash: Mapped[str] = mapped_column(String(64), index=True, nullable=False)
     release_note: Mapped[str] = mapped_column(Text, nullable=False)

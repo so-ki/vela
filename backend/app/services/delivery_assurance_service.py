@@ -41,6 +41,15 @@ from app.services.answerability_gate_service import (
     AnswerabilityGateError,
     require_delivery_answerability,
 )
+from app.services.versioned.registry import (
+    DeliveryReleaseReader,
+    DeliverySnapshotReader,
+    UnsupportedVersionError,
+    current_delivery_release_writer,
+    current_delivery_snapshot_writer,
+    get_delivery_release_reader,
+    get_delivery_snapshot_reader,
+)
 from app.services.audit_bundle_service import build_audit_bundle
 from app.services.export_service import build_sample_docx, build_sample_pdf
 
@@ -799,42 +808,22 @@ def _release_body(
     released_at: datetime,
     expires_at: datetime,
 ) -> dict[str, Any]:
-    return {
-        "schema_version": "1.1",
-        "scenario_id": scenario_id,
-        "snapshot_hash": snapshot_hash,
-        "expert_attestation_id": attestation.id,
-        "expert_attestation_evidence_hash": stable_hash(
-            _attestation_evidence(attestation)
-        ),
-        "artifact_manifest_hash": attestation.artifact_manifest_hash,
-        "uat_acceptance_id": acceptance.id,
-        "uat_evidence_hash": stable_hash(_uat_evidence(acceptance)),
-        "deployment_evidence_id": deployment.id,
-        "deployment_evidence_hash": stable_hash(
-            _deployment_evidence_manifest(deployment)
-        ),
-        "legal_content_certification_id": content_certification.id,
-        "legal_content_certification_evidence_hash": stable_hash(
-            _content_certification_evidence(content_certification)
-        ),
-        "scenario_credential_evidence_hash": stable_hash(
-            _credential_evidence(scenario_credential)
-        ),
-        "primary_content_credential_evidence_hash": stable_hash(
-            _credential_evidence(primary_credential)
-        ),
-        "secondary_content_credential_evidence_hash": stable_hash(
-            _credential_evidence(secondary_credential)
-        ),
-        "delivery_evidence_manifest_hash": stable_hash(
-            _delivery_evidence_manifest(evidence_objects)
-        ),
-        "release_note_hash": stable_hash({"release_note": release_note.strip()}),
-        "released_by": released_by,
-        "released_at": _as_utc(released_at).isoformat(),
-        "expires_at": _as_utc(expires_at).isoformat(),
-    }
+    return current_delivery_release_writer().build_release_body(
+        scenario_id=scenario_id,
+        snapshot_hash=snapshot_hash,
+        attestation=attestation,
+        acceptance=acceptance,
+        deployment=deployment,
+        content_certification=content_certification,
+        scenario_credential=scenario_credential,
+        primary_credential=primary_credential,
+        secondary_credential=secondary_credential,
+        evidence_objects=evidence_objects,
+        release_note=release_note,
+        released_by=released_by,
+        released_at=released_at,
+        expires_at=expires_at,
+    )
 
 
 def build_legal_content_manifest(
@@ -894,9 +883,13 @@ def _active_legal_changes_after(
 def _current_mechanism_snapshot(
     db: Session,
     scenario: InvestigationScenario,
+    *,
+    reader: DeliverySnapshotReader,
 ) -> tuple[dict[str, Any], Any, list[ClaimRecord], CoverageProof]:
     try:
-        gate = require_delivery_answerability(db, scenario=scenario)
+        gate = require_delivery_answerability(
+            db, scenario=scenario, snapshot_reader=reader
+        )
     except AnswerabilityGateError as exc:
         raise DeliveryAssuranceError(
             f"Answerability Gate 未通过：{exc.message} ({', '.join(exc.reason_codes)})"
@@ -936,18 +929,12 @@ def _current_mechanism_snapshot(
             "Answerability Gate 与 CoverageProof 读取结果不一致"
         )
 
-    mechanism = {
-        "compilation_id": compilation.id,
-        "compiler_version": compilation.compiler_version,
-        "compiler_input_hash": compilation.input_hash,
-        "compiler_output_hash": compilation.output_hash,
-        "confirmed_claims_hash": stable_hash(claims_snapshot),
-        "claim_count": len(claims),
-        "coverage_proof_id": proof.id,
-        "coverage_proof_hash": proof.proof_hash,
-        "coverage_denominator_hash": proof.denominator_hash,
-        "answerability_gate": gate,
-    }
+    mechanism = reader.build_mechanism_payload(
+        compilation=compilation,
+        claims_snapshot=claims_snapshot,
+        proof=proof,
+        gate=gate,
+    )
     return mechanism, compilation, claims, proof
 
 
@@ -956,7 +943,9 @@ def build_delivery_snapshot(
     *,
     scenario: InvestigationScenario,
     generation_config: GenerationConfig,
+    reader: DeliverySnapshotReader | None = None,
 ) -> dict[str, Any]:
+    selected_reader = reader or current_delivery_snapshot_writer()
     if scenario.is_demo or scenario.checklist is None:
         raise DeliveryAssuranceError("演示场景或无清单场景不得进入客户交付")
     review = (scenario.checklist.payload or {}).get("review") or {}
@@ -976,41 +965,41 @@ def build_delivery_snapshot(
     if generation_config.scenario_id != scenario.id:
         raise DeliveryAssuranceError("冻结生成配置与场景错绑")
 
-    mechanism, _compilation, _claims, _proof = _current_mechanism_snapshot(db, scenario)
+    mechanism, _compilation, _claims, _proof = _current_mechanism_snapshot(
+        db, scenario, reader=selected_reader
+    )
     payload = scenario.checklist.payload or {}
-    snapshot = {
-        "schema_version": "1.0",
-        "scenario_id": scenario.id,
-        "scope_snapshot_hash": scenario.scope_snapshot_hash,
-        "checklist_id": scenario.checklist.id,
-        "checklist_revision": scenario.checklist.revision,
-        "checklist_payload_hash": stable_hash(payload),
-        "review": {
-            "status": review.get("status"),
-            "revision": review.get("revision"),
-            "finalized_at": review.get("finalized_at"),
-            "finalized_by_id": review.get("finalized_by_id"),
-        },
-        "generation": {
-            "attempt_id": generation_config.attempt_id,
-            "snapshot_hash": generation_config.snapshot_hash,
-            "config_hash": generation_config.config_hash,
-            "generation_input_hash": generation_config.generation_input_hash,
-            "capability_pack_id": generation_config.capability_pack_id,
-            "capability_pack_version": generation_config.capability_pack_version,
-            "capability_pack_hash": generation_config.capability_pack_hash,
-            "rules_artifact_id": generation_config.rules_artifact_id,
-            "rules_artifact_version": generation_config.rules_artifact_version,
-            "rules_artifact_hash": generation_config.rules_artifact_hash,
-            "corpus_artifact_id": generation_config.corpus_artifact_id,
-            "corpus_artifact_version": generation_config.corpus_artifact_version,
-            "corpus_artifact_hash": generation_config.corpus_artifact_hash,
-        },
-        "mechanism": mechanism,
-    }
+    snapshot = selected_reader.build_snapshot_payload(
+        scenario=scenario,
+        payload=payload,
+        review=review,
+        generation_config=generation_config,
+        mechanism=mechanism,
+    )
     if not snapshot["scope_snapshot_hash"]:
         raise DeliveryAssuranceError("缺少冻结 scope_snapshot_hash")
     return snapshot
+
+
+def _build_delivery_snapshot_for_reader(
+    db: Session,
+    *,
+    scenario: InvestigationScenario,
+    generation_config: GenerationConfig,
+    reader: DeliverySnapshotReader,
+) -> dict[str, Any]:
+    # Preserve the established current-writer call boundary (including test
+    # and integration adapters); only historical readers require injection.
+    if reader is current_delivery_snapshot_writer():
+        return build_delivery_snapshot(
+            db, scenario=scenario, generation_config=generation_config
+        )
+    return build_delivery_snapshot(
+        db,
+        scenario=scenario,
+        generation_config=generation_config,
+        reader=reader,
+    )
 
 
 def submit_credential(
@@ -1161,10 +1150,11 @@ def create_delivery_artifacts(
     """Freeze exact bytes. The endpoint returns metadata only until a release is active."""
 
     _require_scenario_counsel(scenario, user)
+    snapshot_writer = current_delivery_snapshot_writer()
     snapshot = build_delivery_snapshot(
         db, scenario=scenario, generation_config=generation_config
     )
-    snapshot_hash = stable_hash(snapshot)
+    snapshot_hash = snapshot_writer.hash_payload(snapshot)
     answerability = snapshot["mechanism"]["answerability_gate"]
     bundle = build_audit_bundle(scenario, generation_config=generation_config)
     bundle["bundle_version"] = "1.4"
@@ -1416,10 +1406,11 @@ def create_expert_attestation(
     _require_expiry_covered_by_evidence(
         expires_at, [signature_evidence, validation_evidence]
     )
+    snapshot_writer = current_delivery_snapshot_writer()
     snapshot = build_delivery_snapshot(
         db, scenario=scenario, generation_config=generation_config
     )
-    snapshot_hash = stable_hash(snapshot)
+    snapshot_hash = snapshot_writer.hash_payload(snapshot)
     manifest = _artifact_manifest(
         db,
         scenario_id=scenario.id,
@@ -2304,10 +2295,11 @@ def create_delivery_release(
         secondary_credential=secondary_credential,
         now=now,
     )
+    snapshot_writer = current_delivery_snapshot_writer()
     snapshot = build_delivery_snapshot(
         db, scenario=scenario, generation_config=generation_config
     )
-    snapshot_hash = stable_hash(snapshot)
+    snapshot_hash = snapshot_writer.hash_payload(snapshot)
     if (
         attestation.snapshot_hash != snapshot_hash
         or acceptance.snapshot_hash != snapshot_hash
@@ -2329,7 +2321,8 @@ def create_delivery_release(
         )
     _require_expiry_covered_by_evidence(expires_at, release_evidence_objects)
     normalized_release_note = release_note.strip()
-    release_body = _release_body(
+    release_writer = current_delivery_release_writer()
+    release_body = release_writer.build_release_body(
         scenario_id=scenario.id,
         snapshot_hash=snapshot_hash,
         attestation=attestation,
@@ -2359,8 +2352,9 @@ def create_delivery_release(
         expert_attestation_id=attestation.id,
         uat_acceptance_id=acceptance.id,
         deployment_evidence_id=deployment.id,
+        schema_version=release_writer.version,
         snapshot_hash=snapshot_hash,
-        release_hash=stable_hash(release_body),
+        release_hash=release_writer.hash_payload(release_body),
         release_note=normalized_release_note,
         status="active",
         released_by=user.id,
@@ -2423,16 +2417,6 @@ def evaluate_delivery_release(
     generation_config: GenerationConfig,
 ) -> dict[str, Any]:
     reasons: list[str] = []
-    try:
-        snapshot = build_delivery_snapshot(
-            db, scenario=scenario, generation_config=generation_config
-        )
-        snapshot_hash = stable_hash(snapshot)
-    except DeliveryAssuranceError as exc:
-        snapshot = None
-        snapshot_hash = None
-        reasons.append(f"answerability_snapshot_invalid:{exc}")
-
     release = (
         db.query(ScenarioDeliveryRelease)
         .filter(
@@ -2443,7 +2427,49 @@ def evaluate_delivery_release(
         .first()
     )
     now = _now()
-    attestation = acceptance = deployment = content_certification = None
+    release_reader: DeliveryReleaseReader | None = None
+    snapshot_reader: DeliverySnapshotReader | None = None
+    attestation = (
+        db.get(ScenarioExpertAttestation, release.expert_attestation_id)
+        if release is not None
+        else None
+    )
+    if release is None:
+        snapshot_reader = current_delivery_snapshot_writer()
+    else:
+        try:
+            release_reader = get_delivery_release_reader(release.schema_version)
+        except UnsupportedVersionError:
+            reasons.append("delivery_release_schema_unsupported")
+        stored_snapshot = attestation.snapshot if attestation is not None else None
+        stored_snapshot_version = (
+            stored_snapshot.get("schema_version")
+            if isinstance(stored_snapshot, dict)
+            else None
+        )
+        try:
+            snapshot_reader = get_delivery_snapshot_reader(stored_snapshot_version)
+        except UnsupportedVersionError:
+            reasons.append("delivery_snapshot_schema_unsupported")
+
+    if snapshot_reader is None:
+        snapshot = None
+        snapshot_hash = None
+    else:
+        try:
+            snapshot = _build_delivery_snapshot_for_reader(
+                db,
+                scenario=scenario,
+                generation_config=generation_config,
+                reader=snapshot_reader,
+            )
+            snapshot_hash = snapshot_reader.hash_payload(snapshot)
+        except DeliveryAssuranceError as exc:
+            snapshot = None
+            snapshot_hash = None
+            reasons.append(f"answerability_snapshot_invalid:{exc}")
+
+    acceptance = deployment = content_certification = None
     credential = primary_credential = secondary_credential = None
     if release is None:
         reasons.append("active_delivery_release_missing")
@@ -2452,7 +2478,6 @@ def evaluate_delivery_release(
             reasons.append("delivery_release_expired")
         if snapshot_hash is None or release.snapshot_hash != snapshot_hash:
             reasons.append("delivery_release_snapshot_stale")
-        attestation = db.get(ScenarioExpertAttestation, release.expert_attestation_id)
         acceptance = db.get(ScenarioUATAcceptance, release.uat_acceptance_id)
         deployment = db.get(DeploymentEvidence, release.deployment_evidence_id)
         if deployment is not None:
@@ -2478,7 +2503,9 @@ def evaluate_delivery_release(
             or not attestation.signature_verified_by
             or not attestation.signature_verified_at
             or _as_utc(attestation.certificate_valid_until) <= now
-            or stable_hash(attestation.snapshot or {}) != attestation.snapshot_hash
+            or snapshot_reader is None
+            or snapshot_reader.hash_payload(attestation.snapshot or {})
+            != attestation.snapshot_hash
             or stable_hash(attestation.artifact_manifest or {})
             != attestation.artifact_manifest_hash
             or attestation.scenario_id != scenario.id
@@ -2657,7 +2684,9 @@ def evaluate_delivery_release(
             primary_credential,
             secondary_credential,
         )
-        if all(item is not None for item in evidence_records):
+        if release_reader is not None and all(
+            item is not None for item in evidence_records
+        ):
             try:
                 release_evidence_objects = _require_release_evidence_objects(
                     db,
@@ -2674,7 +2703,7 @@ def evaluate_delivery_release(
             except DeliveryAssuranceError:
                 release_evidence_objects = []
                 reasons.append("delivery_evidence_objects_invalid")
-            release_body = _release_body(
+            release_body = release_reader.build_release_body(
                 scenario_id=release.scenario_id,
                 snapshot_hash=release.snapshot_hash,
                 attestation=attestation,
@@ -2690,7 +2719,7 @@ def evaluate_delivery_release(
                 released_at=release.released_at,
                 expires_at=release.expires_at,
             )
-            if stable_hash(release_body) != release.release_hash:
+            if release_reader.hash_payload(release_body) != release.release_hash:
                 reasons.append("delivery_release_hash_invalid")
             evidence_expiries = (
                 attestation.expires_at,
@@ -2718,6 +2747,7 @@ def evaluate_delivery_release(
         "snapshot_hash": snapshot_hash,
         "release_id": release.id if release else None,
         "release_hash": release.release_hash if release else None,
+        "release_schema_version": release.schema_version if release else None,
         "expert_attestation_id": attestation.id if attestation else None,
         "uat_acceptance_id": acceptance.id if acceptance else None,
         "deployment_evidence_id": deployment.id if deployment else None,

@@ -21,6 +21,8 @@ from sqlalchemy.orm import Session
 
 from app.services.versioned.claim_compiler import v0_2 as claim_compiler_v0_2
 from app.services.versioned.coverage_proof import v0_1 as coverage_proof_v0_1
+from app.services.versioned.delivery_release import v1_1 as delivery_release_v1_1
+from app.services.versioned.delivery_snapshot import v1_0 as delivery_snapshot_v1_0
 
 
 class VersionedRegistryError(ValueError):
@@ -53,6 +55,8 @@ class VersionedRegistryConfigurationError(VersionedRegistryError):
 
 CURRENT_COMPILER_WRITE_VERSION = "0.2"
 CURRENT_COVERAGE_PROOF_WRITE_VERSION = "0.1"
+CURRENT_DELIVERY_SNAPSHOT_WRITE_VERSION = "1.0"
+CURRENT_DELIVERY_RELEASE_WRITE_VERSION = "1.1"
 
 
 @dataclass(frozen=True)
@@ -183,6 +187,117 @@ def current_coverage_proof_writer() -> CoverageProofReader:
     return get_coverage_reader(CURRENT_COVERAGE_PROOF_WRITE_VERSION)
 
 
+@dataclass(frozen=True)
+class DeliverySnapshotReader:
+    version: str
+    gate_version: str
+    build_gate_payload: Callable[..., dict[str, Any]]
+    build_mechanism_payload: Callable[..., dict[str, Any]]
+    build_snapshot_payload: Callable[..., dict[str, Any]]
+    hash_payload: Callable[[Any], str]
+
+
+_DELIVERY_SNAPSHOT_V1_0 = DeliverySnapshotReader(
+    version=delivery_snapshot_v1_0.VERSION,
+    gate_version=delivery_snapshot_v1_0.GATE_VERSION,
+    build_gate_payload=delivery_snapshot_v1_0.build_gate_payload,
+    build_mechanism_payload=delivery_snapshot_v1_0.build_mechanism_payload,
+    build_snapshot_payload=delivery_snapshot_v1_0.build_snapshot_payload,
+    hash_payload=delivery_snapshot_v1_0.hash_payload,
+)
+
+SUPPORTED_DELIVERY_SNAPSHOT_READERS: Mapping[str, DeliverySnapshotReader] = (
+    build_unique_version_map("delivery_snapshot", (("1.0", _DELIVERY_SNAPSHOT_V1_0),))
+)
+
+
+def get_delivery_snapshot_reader(version: object) -> DeliverySnapshotReader:
+    if not isinstance(version, str) or version not in SUPPORTED_DELIVERY_SNAPSHOT_READERS:
+        raise UnsupportedVersionError("delivery_snapshot", version)
+    return SUPPORTED_DELIVERY_SNAPSHOT_READERS[version]
+
+
+def current_delivery_snapshot_writer() -> DeliverySnapshotReader:
+    return get_delivery_snapshot_reader(CURRENT_DELIVERY_SNAPSHOT_WRITE_VERSION)
+
+
+@dataclass(frozen=True)
+class DeliveryReleaseReader:
+    version: str
+    build_release_body: Callable[..., dict[str, Any]]
+    credential_evidence: Callable[[Any], dict[str, Any]]
+    attestation_evidence: Callable[[Any], dict[str, Any]]
+    uat_evidence: Callable[[Any], dict[str, Any]]
+    content_certification_evidence: Callable[[Any], dict[str, Any]]
+    deployment_evidence_manifest: Callable[[Any], dict[str, Any]]
+    delivery_evidence_manifest: Callable[[list[Any]], list[dict[str, Any]]]
+    hash_payload: Callable[[Any], str]
+
+
+_DELIVERY_RELEASE_V1_1 = DeliveryReleaseReader(
+    version=delivery_release_v1_1.VERSION,
+    build_release_body=delivery_release_v1_1.build_release_body,
+    credential_evidence=delivery_release_v1_1.credential_evidence,
+    attestation_evidence=delivery_release_v1_1.attestation_evidence,
+    uat_evidence=delivery_release_v1_1.uat_evidence,
+    content_certification_evidence=delivery_release_v1_1.content_certification_evidence,
+    deployment_evidence_manifest=delivery_release_v1_1.deployment_evidence_manifest,
+    delivery_evidence_manifest=delivery_release_v1_1.delivery_evidence_manifest,
+    hash_payload=delivery_release_v1_1.hash_payload,
+)
+
+SUPPORTED_DELIVERY_RELEASE_READERS: Mapping[str, DeliveryReleaseReader] = (
+    build_unique_version_map("delivery_release", (("1.1", _DELIVERY_RELEASE_V1_1),))
+)
+
+
+def get_delivery_release_reader(version: object) -> DeliveryReleaseReader:
+    if not isinstance(version, str) or version not in SUPPORTED_DELIVERY_RELEASE_READERS:
+        raise UnsupportedVersionError("delivery_release", version)
+    return SUPPORTED_DELIVERY_RELEASE_READERS[version]
+
+
+def current_delivery_release_writer() -> DeliveryReleaseReader:
+    return get_delivery_release_reader(CURRENT_DELIVERY_RELEASE_WRITE_VERSION)
+
+
+SUPPORTED_DELIVERY_COMBINATIONS: frozenset[tuple[str, str, str, str]] = frozenset(
+    {("0.2", "0.1", "1.0", "1.1")}
+)
+
+
+def require_supported_delivery_combination(
+    compiler_version: str,
+    proof_version: str,
+    snapshot_version: str,
+    release_version: str,
+) -> None:
+    combination = (compiler_version, proof_version, snapshot_version, release_version)
+    if combination not in SUPPORTED_DELIVERY_COMBINATIONS:
+        raise VersionedRegistryConfigurationError(
+            "不受支持的 delivery 版本组合：" + "+".join(combination)
+        )
+
+
+def validate_delivery_registry_configuration() -> None:
+    for unit, readers, current in (
+        ("delivery_snapshot", SUPPORTED_DELIVERY_SNAPSHOT_READERS, CURRENT_DELIVERY_SNAPSHOT_WRITE_VERSION),
+        ("delivery_release", SUPPORTED_DELIVERY_RELEASE_READERS, CURRENT_DELIVERY_RELEASE_WRITE_VERSION),
+    ):
+        if current not in readers:
+            raise VersionedRegistryConfigurationError(f"CURRENT {unit} writer {current!r} 未注册")
+        for key, reader in readers.items():
+            if reader.version != key:
+                raise VersionedRegistryConfigurationError(
+                    f"{unit} registry key {key!r} 与 reader.version {reader.version!r} 不一致"
+                )
+    for compiler, proof, snapshot, release in SUPPORTED_DELIVERY_COMBINATIONS:
+        if compiler not in SUPPORTED_COMPILER_READERS or proof not in SUPPORTED_COVERAGE_PROOF_READERS:
+            raise VersionedRegistryConfigurationError("delivery 兼容矩阵引用未注册机制 reader")
+        if snapshot not in SUPPORTED_DELIVERY_SNAPSHOT_READERS or release not in SUPPORTED_DELIVERY_RELEASE_READERS:
+            raise VersionedRegistryConfigurationError("delivery 兼容矩阵引用未注册 delivery reader")
+
+
 def validate_registry_configuration(
     *,
     compiler_readers: Mapping[str, Any],
@@ -241,6 +356,7 @@ validate_registry_configuration(
     current_compiler_write_version=CURRENT_COMPILER_WRITE_VERSION,
     current_proof_write_version=CURRENT_COVERAGE_PROOF_WRITE_VERSION,
 )
+validate_delivery_registry_configuration()
 
 
 def current_compiler_writer() -> CompilerReader:
