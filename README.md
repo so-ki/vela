@@ -1,336 +1,52 @@
 # Vela 合规协查过程保证平台
 
-Vela 是面向中国企业法务的拉美投资前合规协查过程保证平台。本次以圣保罗州新能源绿地设厂为首个能力包，提供六维初步协查，其中环境许可为重点深度验证模块；不承诺市级完整覆盖、全巴西覆盖或实时完整更新。
+Vela 是面向中国企业法务的拉美投资前合规协查过程保证平台。
 
-**唯一正式主流程：** 业务上传项目材料并确认知情 → 后端提出 Capability Pack → 法务确认场景与维度并冻结快照 → 系统生成清单、RAG 与双语简报 → 法务复核 → Word/PDF 导出
+## 当前验证范围
 
-**演示场景：** BYD 坎皮纳斯类新能源制造绿地设厂（巴西 · 圣保罗州）
+- 首个完成端到端验证的 Capability Pack：**巴西 · 圣保罗州 · 新能源制造 · 绿地设厂**
+- 当前演示案例：**Aurora 储能系统集成工厂（虚构测试案例）**
+- 当前只完成上述首个 Pack 的端到端验证，覆盖范围不扩展至整个拉丁美洲、巴西全国或市级规则。
+- 法律内容状态为 `provisional`，仍须由律师复核与确认。
+- 律师认证、客户 UAT、生产部署和正式 Release 均为 `blocked_external`。
+- Vela 用于保障合规协查过程，不替代律师，也不构成正式法律意见。
 
-**能力边界：** 当前 Registry 只有一个正式包 `brazil_new_energy_greenfield`（巴西 · 新能源制造 · 绿地设厂）。`test_fixture_pack` 仅用于自动化测试，不是真实国家、行业或法律能力，也不会进入生产 Registry 或发布制品。
-
-**法律责任边界：** AI 输出仅是可溯源的协查底稿，必须经过法务逐条复核和定稿，不构成正式法律意见。
-
-**发布状态：** 当前仅为单客户、私网受控试点 RC；冻结证据、启用清单和不可越过的限制见 [`docs/RELEASE_CANDIDATE.md`](docs/RELEASE_CANDIDATE.md)。
-
-**复赛演示：** 只走 [`docs/DEMO_GOLDEN_PATH.md`](docs/DEMO_GOLDEN_PATH.md) 一条线；门控说明见 [`docs/match_tier_and_gate.md`](docs/match_tier_and_gate.md)。
-
-### P1 LLM + Harness（复赛）
-
-| 能力 | 说明 |
-|------|------|
-| **Gate A 缺口优先** | 协查缺口摘要、材料 House Rules、法条默认折叠 |
-| **B1 议题识别** | LLM 建议核查项 + grounding 护栏，法务勾选后并入清单 |
-| **B2 材料 Playbook** | `material_house_rules.json` 纯规则预检 |
-| **B3/B4** | 缺口说明 / S2 Red Team（不改 tier） |
-| **AI 设置栏** | 工作台 → **AI 设置**：Provider、Base URL、Model、API Key、测试连接 |
-| **Golden Path** | 无 LLM Key 时规则回退，冻结 E2E `17/17` |
-
-详见 [`docs/P1_LLM_HARNESS.md`](docs/P1_LLM_HARNESS.md)。
-
----
-
-## 技术栈
-
-| 层级 | 技术 |
-|------|------|
-| 后端 | Python 3.12 · FastAPI · SQLAlchemy · JWT |
-| 前端 | Vue 3 · Vite · Pinia · Vue Router |
-| 数据库 | SQLite（开发）/ PostgreSQL（生产） |
-| 检索 | 确定性关键词检索（Chroma 因上游安全公告暂不随生产版发布） |
-| LLM | 本地开发可选受控调用；生产受控试点默认且强制不外发 |
-
----
-
-## 快速启动
+## 启动比赛环境
 
 ```bash
-chmod +x scripts/start.sh
-./scripts/start.sh
+git switch codex/vela-final-handoff-20260720
+./scripts/start_competition.sh
 ```
 
-或分别启动：
+启动后访问：
 
-```bash
-# 后端
-cd backend
-python3.12 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.lock
-# .env 可选；发布包不包含任何 .env*。如需 LLM，请通过本地环境变量安全注入。
-python scripts/seed_demo_user.py
-uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+- 前端：<http://127.0.0.1:5180>
+- 后端：<http://127.0.0.1:8010>
 
-# 前端（新终端）
-cd frontend
-npm ci
-npm run dev -- --host 127.0.0.1 --port 5173
-```
+## 演示账号与路径
 
-- 前端：http://127.0.0.1:5173
-- 后端 API：http://127.0.0.1:8000
-- 本地开发演示账户：`legal@demo.vela` / `biz@demo.vela`（密码均为 `Demo1234!`，仅由 `scripts/start.sh` 或手工 seed 创建；生产默认不创建）
-- 演示 business 可直接进入业务工作台，不填写 Legal Playbook；演示 legal 已预置 `demo-legal-playbook-v1.0.0`。真实 business 同样不做 Legal onboarding，真实新 legal 用户仍须完成 onboarding。
+### 业务角色
 
-### LLM 润色（仅本地开发实验，可选）
+- 账号：`biz@demo.vela`
+- 密码：`Demo1234!`
+- 路径：<http://127.0.0.1:5180/competition/1/business>
+- 职责：材料、事实确认、补件和提交法务。
 
-在 `backend/.env` 中配置任选其一：
+### 法务角色
 
-```env
-# 通义千问（推荐）
-QWEN_API_KEY=sk-...
-QWEN_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
-QWEN_MODEL=qwen-plus
+- 账号：`legal@demo.vela`
+- 密码：`Demo1234!`
+- 路径：<http://127.0.0.1:5180/competition/1/overview>
+- 职责：项目总览、材料与事实、固定 30 项、法律研究、Claim 与缺口、CoverageProof、交付中心和审计记录。
 
-# 或 DeepSeek
-# DEEPSEEK_API_KEY=sk-...
-# DEEPSEEK_BASE_URL=https://api.deepseek.com
-# DEEPSEEK_MODEL=deepseek-chat
+## 最终文档
 
-LLM_POLISH_ENABLED=true
-```
+- [用户手册](docs/submission/USER_MANUAL.pdf)
+- [演示案例](docs/submission/DEMO_CASE.pdf)
+- [评审指南](docs/submission/EVALUATOR_GUIDE.pdf)
 
-重启开发后端后，访问 `GET /api/v1/llm/status` 或简报页查看是否启用。未配置 Key 时自动回退为规则模板模式。生产受控试点会拒绝第三方 LLM 外发；不得把此开发配置复制到 `.env.prod`。
+GitHub 文档用于项目交接。实际比赛上传文件是单独整理的三份 PDF 和一份 MP4；MP4 不存放在 GitHub 仓库中。
 
----
+## 交接说明
 
-## 演示路径
-
-### Scope Confirmation Golden Path（推荐）
-
-| 步骤 | 页面 | 说明 |
-|------|------|------|
-| 1 | 业务上传材料 | 明确展示「巴西 · 新能源制造 · 绿地设厂」，业务勾选知情后提交，进入 `pending_scope` |
-| 2 | 法务范围确认 | 查看 Capability Pack、材料缺口和适配结论，选择维度后点击 **确认范围并生成** |
-| 3 | 原子生成 | 冻结 Capability Pack、规则、语料和检索配置快照，再生成清单、法源绑定和双语简报 |
-| 4 | 法务复核 | 70 分门控；逐条确认 / 驳回 / 批注并定稿 |
-| 5 | 导出 | Word/PDF 协查底稿 |
-
-旧的 `/scenarios` 直接生成、`generate-and-submit` 和 `demo/sample` 一键绕过接口均已关闭并返回 `410 Gone`。`POST /retrieve` 与 `POST /brief` 仅是读取历史结果的兼容别名，不会启动生成。
-
----
-
-## Docker
-
-```bash
-docker compose up --build
-# 仅本地开发需要演示账号时显式执行
-docker compose exec backend python scripts/seed_demo_user.py
-```
-
-生产启动路径不支持创建固定口令演示账号，见 [`DEPLOYMENT.md`](DEPLOYMENT.md)。构建前可运行 `./scripts/check_release_boundaries.sh` 检查 Docker COPY 候选；提交包使用 `./scripts/build_submission_package.sh /tmp/vela-capability-pack-mvp.zip`，禁止直接压缩工作区。
-
----
-
-## 目录结构
-
-```
-vela-platform/
-├── backend/
-│   ├── app/
-│   │   ├── api/          # REST 路由
-│   │   ├── core/         # 配置、数据库、认证、检索后端边界
-│   │   ├── data/         # 巴西法源语料 brazil_legal_corpus.json
-│   │   ├── models/       # SQLAlchemy 模型
-│   │   ├── rules/        # 场景规则库 brazil_new_energy.json
-│   │   ├── schemas/      # Pydantic 模式
-│   │   └── services/     # 业务逻辑（RAG、简报、复核、导出、LLM）
-│   └── scripts/          # 种子数据等
-├── frontend/
-│   └── src/
-│       ├── api/          # API 客户端
-│       ├── components/   # 通用组件
-│       ├── layouts/      # 页面布局
-│       ├── stores/       # Pinia 状态
-│       └── views/        # 页面视图
-├── docker/               # Dockerfile
-└── scripts/              # 启动脚本
-```
-
----
-
-## 交付清单（Step 1–8）
-
-### Step 1 — 项目骨架与认证
-
-- [x] FastAPI 后端骨架与健康检查
-- [x] 用户注册 / 登录（JWT）
-- [x] 免责声明强制确认（注册勾选 + 弹窗复核）
-- [x] SQLite 用户表 + 审计日志表
-- [x] 确定性关键词检索（Chroma 接入保留但未随生产版安装）
-- [x] Vue 3 前端：登录、注册、工作台、路线图
-- [x] 本地一键启动脚本 + Docker Compose
-
-### Step 2 — Capability Pack 与范围确认
-
-- [x] 唯一正式 Capability Pack `brazil_new_energy_greenfield`，绑定巴西新能源规则制品 **v2.9** 与正式语料制品
-- [x] 业务上传材料并确认知情，只创建 `pending_scope` 与后端 `proposed` scope
-- [x] 法务确认适配、维度和议题后原子冻结 snapshot，再启动唯一 generation attempt
-- [x] BYD 坎皮纳斯演示场景模板
-- [x] 无有效 snapshot 时，清单、RAG、简报和复核初始化全部 fail closed
-
-### Step 3 — 法源 RAG（增强）
-
-- [x] 法源审计库 **82 条记录**；运行时默认拒绝，仅 **11 条**具备官方定位、时点、范围与哈希的 provisional 条目可检索，其余 71 条 pending/quarantined 不作为法律依据（扩库走人工审核队列）
-- [x] 法务确认后，同一 generation attempt 为清单条目检索冻结 Top-K 法条片段 + LexML 溯源链接
-- [x] 匹配度评分，低于 70 分标记「需法务复核」
-- [x] 中英葡关键词联合打分（跨语种检索增强）
-- [x] 法规动态监测 MVP（手动扫描 + 提醒列表）
-
-### Step 4 — 清单生成（规则 + 核查项定位）
-
-- [x] 只从冻结 snapshot 与绑定规则制品构造 ScenarioInput 并生成清单
-- [x] 可选 LLM 核查项定位不得扩展 snapshot 之外的维度或议题
-
-### Step 5 — 双语法律风险简报
-
-- [x] 条目级 70 分门控
-- [x] 中葡双语执行摘要 + 分维度风险说明
-- [x] 法条引用与溯源链接
-
-### Step 6 — 法务复核工作台
-
-- [x] 逐条确认 / 驳回 / 批注
-- [x] 全部确认、提交复核定稿
-- [x] 状态流转与审计日志
-
-### Step 7 — Word / PDF 导出
-
-- [x] 导出协查底稿 Word（.docx）
-- [x] 导出协查底稿 PDF（.pdf）
-
-### Step 8 — LLM 增强
-
-- [x] 通义千问 / DeepSeek 双语简报润色
-- [x] LLM 中文场景核查项定位（清单条目触发辅助）
-
----
-
-## API 端点
-
-### 系统与认证
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/v1/health` | 健康检查（无需登录） |
-| GET | `/api/v1/status` | 系统状态（数据库、检索后端） |
-| GET | `/api/v1/llm/status` | LLM 润色服务状态 |
-| GET | `/api/v1/auth/disclaimer` | 获取免责声明 |
-| POST | `/api/v1/auth/register` | 注册 |
-| POST | `/api/v1/auth/login` | 登录 |
-| GET | `/api/v1/auth/me` | 当前用户 |
-| POST | `/api/v1/auth/accept-disclaimer` | 确认免责条款 |
-
-### 规则与场景
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/v1/capability-packs` | 当前正式启用的 Capability Pack |
-| GET | `/api/v1/capability-packs/catalog` | 当前正式包的规则与维度元数据 |
-| GET | `/api/v1/rules/demo-template` | BYD 演示模板 |
-| POST | `/api/v1/scenarios/submit-materials` | 业务提交材料与知情确认，创建 `pending_scope` 记录；不生成 |
-| POST | `/api/v1/scenarios/{id}/confirm-scope` | 法务原子确认范围、冻结快照并启动唯一生成任务 |
-| POST | `/api/v1/scenarios/{id}/retry-generation` | 失败后沿用原快照创建新 attempt |
-| GET | `/api/v1/scenarios` | 场景列表 |
-| GET | `/api/v1/scenarios/{id}` | 场景详情 + 清单 |
-
-### 法源检索
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/v1/legal/status` | 法源索引状态 |
-| POST | `/api/v1/legal/index` | 构建法源索引 |
-| POST | `/api/v1/scenarios/{id}/retrieve` | **废弃的只读兼容别名**：返回确认阶段已生成的法源结果，不启动 RAG |
-
-### 简报
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/v1/scenarios/{id}/brief` | 获取已生成简报 |
-| POST | `/api/v1/scenarios/{id}/brief` | **废弃的只读兼容别名**：忽略 `polish`，不生成或润色 |
-
-### 已关闭的绕过入口
-
-以下接口仅返回 `410 Gone`：`POST /api/v1/scenarios`、`POST /api/v1/scenarios/generate-and-submit`、`POST /api/v1/scenarios/demo/generate-and-submit`、`POST /api/v1/scenarios/demo/sample`。
-
-### 法务复核
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/v1/scenarios/{id}/review` | 获取复核状态 |
-| POST | `/api/v1/scenarios/{id}/review/init` | 仅基于已生成结果初始化复核；不得隐式生成 |
-| PATCH | `/api/v1/scenarios/{id}/review/items/{code}` | 按 `expected_revision` 条件更新单条复核 |
-| POST | `/api/v1/scenarios/{id}/review/approve-all` | 按 `expected_revision` 条件批量确认低风险项 |
-| POST | `/api/v1/scenarios/{id}/review/finalize` | 按 `expected_revision` 条件提交复核定稿 |
-
-### 导出
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/v1/scenarios/{id}/export/docx` | 导出 Word 协查底稿（历史法学院模板标签，需复核定稿，不代表法律意见） |
-| GET | `/api/v1/scenarios/{id}/export/pdf` | 导出 PDF 协查底稿（legacy 格式，需复核定稿） |
-
-### 法源监测
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/v1/legal/monitor` | 法规动态监测状态与提醒 |
-| POST | `/api/v1/legal/monitor/scan` | 手动扫描/刷新监测（可选 force_reindex） |
-
-### 演示模板
-
-| 方法 | 路径 | 说明 |
-|------|------|------|
-| GET | `/api/v1/rules/demo-template` | BYD 坎皮纳斯投资协查演示 |
-| GET | `/api/v1/rules/demo-template/mining` | ~~矿产模板~~ **501 未上线**（先深耕巴西投资协查） |
-
----
-
-## 开放法源
-
-| 法源 | 网址 |
-|------|------|
-| LexML Brasil | https://www.lexml.gov.br/ |
-| STF | https://portal.stf.jus.br/jurisprudencia/ |
-| STJ | https://scon.stj.jus.br/SCON/ |
-
----
-
-## 合规设计要点
-
-- 匹配度 **低于 70 分** 或 **未命中法条** → 强制标注「需法务复核」，不自动定稿
-- LLM **仅润色措辞**，不新增法律结论、法条名称或溯源链接
-- 免责声明贯穿注册、简报与 Word 导出
-- 每条风险说明附 **LexML / STF / STJ** 可点击溯源
-
----
-
-## 样本文件
-
-发布 ZIP 不携带预生成静态 Word 样本，避免把历史输出误当成当前运行结果。演示时应完成法务复核定稿后从系统实时导出；服务不可用时只展示流程与已冻结证据，不用历史文档冒充本次生成。
-
----
-
-## 已知限制与后续规划
-
-**产品策略：** 当前仅对 `brazil_new_energy_greenfield` 开放受控试点工程范围，即 **巴西 · 圣保罗州 · 新能源制造 · 绿地设厂**。工程链路已经过本地验收，但法律内容仍为 provisional，须巴西法务逐项复核；并购、研发机构、既有工厂扩建、矿产、跨境电商及其他国家/行业均不属于当前受控试点能力。
-
-| 项 | 现状 | 规划 |
-|----|------|------|
-| 正式 Capability Pack | **`brazil_new_energy_greenfield`**：巴西 · 新能源制造 · 绿地设厂；规则制品 v2.9 | 经法律内容审核后再增加独立能力包 |
-| 法域与动作 | 巴西单国 · 绿地设厂 | 其他国家、并购或扩建尚未上线 |
-| 法源库 | `brazil_legal_corpus` **v1.13**：82 条审计记录中仅 11 条 provisional 可检索，71 条 pending/quarantined 默认拒绝；确定性关键词检索 | `backend/scripts/propose_corpus_entry.py` + `data/corpus_pending_review.json` 人工审核 |
-| 核查项定位 | 冻结 snapshot + 规则触发 + 可选受限 LLM（不得扩展维度或议题） | 随后续独立 Capability Pack 验证扩展 |
-| 法规监测 | 手动扫描 + 提醒列表 | 自动爬虫 + 订阅推送 |
-| 导出 | Word 法学院意见书 + PDF legacy 底稿 | 律所 `.docx` 样张加载、PDF 与 Word 统一 |
-| 角色 | 业务提交 / 法务复核分权 | ✅ 已实现 |
-
----
-
-## 使用授权边界
-
-仓库当前未附带开源许可证，因此不默示授予复制、分发或对外商用权利。内部演示可按项目所有者授权进行；任何真实客户试点必须先由权利人与客户签署明确的试点使用、保密、数据处理和退出安排。法条原文版权归相应官方机构所有；平台输出不构成正式法律意见。
-
----
-
-## 上传 GitHub / 邀请测试者
-
-见 **[DEPLOYMENT.md](./DEPLOYMENT.md)**（生产 Docker / 受控试点边界 / 账户与导出配置）、**[Python 运行依赖安全基线](./docs/dependency_security.md)**、**[客户操作手册.md](./客户操作手册.md)**（面向法务/业务用户）、**[操作手册.md](./操作手册.md)**（含部署与演示脚本）、**[GITHUB_SETUP.md](./GITHUB_SETUP.md)**、**[TESTING.md](./TESTING.md)** 与 **[API.md](./API.md)**（REST 集成说明）。
+仓库中可能保留早期研发阶段的历史脚本或文档；它们不属于当前比赛入口、当前演示案例或运行基准。对外交接只以本 README、`start_competition.sh` 和 Aurora 比赛环境为准。本轮仅纠正首页说明，不删除历史文件。
