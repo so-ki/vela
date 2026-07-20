@@ -1,6 +1,6 @@
 # Vela 合规协查过程保证平台
 
-Vela 是面向中国企业法务的拉美投资前合规协查过程保证平台。
+Vela 是面向中国企业法务的拉美投资前合规协查过程保证平台。本次以圣保罗州新能源绿地设厂为首个能力包，提供六维初步协查，其中环境许可为重点深度验证模块；不承诺市级完整覆盖、全巴西覆盖或实时完整更新。
 
 ## 当前验证范围
 
@@ -41,9 +41,9 @@ git switch codex/vela-final-handoff-20260720
 
 ## 最终文档
 
-- [用户手册](docs/submission/USER_MANUAL.pdf)
-- [演示案例](docs/submission/DEMO_CASE.pdf)
-- [评审指南](docs/submission/EVALUATOR_GUIDE.pdf)
+- [用户手册](docs/submission/USER_MANUAL.md)
+- [演示案例](docs/submission/DEMO_CASE.md)
+- [评审指南](docs/submission/EVALUATOR_GUIDE.md)
 
 GitHub 文档用于项目交接。实际比赛上传文件是单独整理的三份 PDF 和一份 MP4；MP4 不存放在 GitHub 仓库中。
 
